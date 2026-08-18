@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ants-incremental</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Ant Colony</h1>
+  <div class="readouts">
+    <div class="readout" id="readoutReserves"><b data-value>0</b><i>reserves</i></div>
+    <div class="readout"><b id="valFood">0</b><i>food</i></div>
+    <div class="readout"><b id="valRate">0/s</b><i>food per second</i></div>
+    <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
+    <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="queenPanel">
+    <h2>The queen</h2>
+    <p id="queenText"></p>
+    <button id="btnShed">Shed her wings</button>
+  </section>
+
+  <section class="panel" id="broodPanel" hidden>
+    <h2>Brood</h2>
+    <p id="eggCost"></p>
+    <button id="btnLay">Lay an egg</button>
+    <div id="casteChoice"></div>
+    <ul id="eggList"></ul>
+  </section>
+
+  <section class="panel" id="colonyPanel" hidden>
+    <h2>Colony</h2>
+    <ul id="casteList"></ul>
+  </section>
+</main>
+
+<script type="module" src="js/ui.js"></script>
+</body>
+</html>

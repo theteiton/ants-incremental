@@ -1,0 +1,167 @@
+:root {
+  --bg: #14110e;
+  --panel: #201b16;
+  --line: #38302a;
+  --text: #efe6da;
+  --dim: #a3907b;
+  --accent: #d99b4a;
+  --good: #8fbf5f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+header {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 20px;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 10px;
+  letter-spacing: 0.5px;
+}
+
+.readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.readout b { font-size: 18px; }
+
+.readout i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+
+.panel p {
+  margin: 0 0 12px;
+  color: var(--dim);
+}
+
+button {
+  font: inherit;
+  color: #23180d;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#casteChoice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.caste-choice {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.caste-choice.selected {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+#eggList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--dim);
+  padding: 3px 0;
+}
+
+.bar {
+  flex: 1;
+  height: 4px;
+  background: #100d0b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+
+#casteList li {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+#casteList li:first-child { border-top: none; }
+
+.caste-name { font-weight: 600; }
+
+.caste-role {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.caste-count {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+[hidden] { display: none !important; }
