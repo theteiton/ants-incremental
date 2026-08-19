@@ -59,7 +59,7 @@ Keep to this layout. If a file grows past roughly 400 lines, tell me and suggest
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v3`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v4`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
@@ -78,6 +78,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 **Castes differ in kind, not degree.** Never make a caste a strictly-better version of another one.
 
 - Foragers — produce Food, the main currency
+- Big Foragers — a rare oversized forager variant, never laid on purpose
 - Nurses — increase the egg-to-worker conversion rate
 - Excavators — increase the colony population cap
 - Soldiers — reduce losses from raid events
@@ -100,6 +101,10 @@ Last updated 19 August 2026. Published and playable at the Pages URL below.
 
 **Nanitics die of old age at two hours.** Their base output is 0.9 against a forager's 1.0, which is high for ants described as feeble; it buys the fast opening. They stay capped at 5 and never scale with forager upgrades.
 
+**Brood slots.** Only a few eggs develop at once; the rest queue. Base is 3 slots, each nurse adds 0.25 and the nurse upgrades raise that. Incubation is 24s per egg. This exists because hatching speed was never the bottleneck — food was — so nurses were dead weight. Measured: a run that never buys nurses reaches 1,000 ants in 160 minutes with the brood saturated 99% of the time; buying them when the brood backs up reaches it in 108. Do not raise the base slot count much; every point of it makes nurses matter less, and at base 5 with 15s incubation they were worth 3 minutes across a whole run.
+
+**Big Foragers.** A rare variant that hatches from ordinary forager eggs and cannot be laid deliberately. The k-th is guaranteed by the 3.5^k-th forager since the last one, with a chance that rises toward that threshold, so in practice the roll fires well before the guarantee — about ten appear over 750 forager hatches. Each produces 5x a forager's base and grows +5% per minute alive to a cap of 3x, so she starts strong and ages into something stronger. They are not exilable and stay hidden in the roster until the first one appears.
+
 **Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. Theme is red. Each caste and the queen have a pixel sprite drawn in JS onto a canvas.
 
 **Upgrades.** 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and a toggle hides them. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
@@ -110,11 +115,13 @@ Last updated 19 August 2026. Published and playable at the Pages URL below.
 
 **Background tabs are credited.** `requestAnimationFrame` does not fire in a hidden tab, so the frame loop feeds the whole elapsed gap through `tick()` in chunks, clamped to the same eight hour cap as offline progress. Capping a frame at one second instead threw away 99.8% of a ten minute absence.
 
-**Pacing.** Incubation is 10s. Milestones under strong simulated play, so a human runs slower:
+**Pacing.** Milestones under strong simulated play, so a human runs slower:
 
 | ants | 20 | 50 | 100 | 250 | 500 | 1000 |
 |---|---|---|---|---|---|---|
-| time | 1.6m | 5.5m | 11.7m | 33m | 64m | 101m |
+| time | 2.9m | 6.9m | 13.7m | 29m | 52m | 84m |
+
+The opening is slower than it was (20 ants in 2.9m against 1.6m) because brood slots cap early throughput. That is the price of nurses mattering — the two trade directly against each other.
 
 Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
 
@@ -122,37 +129,22 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 **Soldiers are inert.** They gate at 400 and have an achievement, but with no raids they produce nothing. Their row in the Ants tab says so rather than letting anyone buy them blind.
 
-**Nurses have diminishing returns by construction.** Hatch *rate* is linear in nurse count, so hatch *time* is hyperbolic: the first nurse cuts 2.0s, the tenth 0.22s, the twentieth 0.07s. Not a bug, but it reads as broken. Making nurses raise brood capacity instead of speed is the open idea.
-
 **Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
 
 ---
 
 ## Playtest feedback — 19 August 2026
 
-Raised in Discord by Feliza, Gyroth and amsel. Nothing here is implemented yet. Grouped by kind, not priority.
+Raised in Discord by Feliza, Gyroth and amsel. Most is now done; what remains is listed at the end.
 
-**Bugs and wrong-looking things.**
+**Done.** Number precision (1862 reads as 1.86K), the founding phase naming Nanitic instead of Forager, affordable costs in green and owned not in red, a hide-owned toggle with both toggles living only on the Upgrades tab, dots on the Upgrades and Achievements tabs, wide-screen layout, light and soil themes, a nameable queen, per-egg brood bars, the nurse rework, and Big Foragers.
 
-- `fmt()` loses too much precision. 1862 displays as `1.9K`; it reads as an error rather than rounding.
-- The brood says it will lay a Forager, then five Nanitics emerge. The founding phase needs to say so on the button and in the text — Feliza hit this and could not work out what happened.
-- Costs are drawn in red whether or not you can afford them, and the word "owned" is red too. Red should mean unaffordable; affordable should read as affordable.
-- The nurse sprite's egg looks like a white shield, or an eye. Art is being redrawn by hand later, so leave it alone for now.
+**Still open.**
 
-**Interface requests.**
-
-- Hide *owned* upgrades, not just locked ones. Both Gyroth and Feliza asked; Feliza wants the toggles in one place only — on the Upgrades tab, not duplicated in Settings.
-- A marker on the Upgrades and Achievements tabs when something new is available, so the tabs do not need checking constantly. A small dot or star, explicitly not a spammy notification.
-- Use the horizontal space on desktop. The layout is mobile-friendly and leaves a PC screen mostly empty. Feliza is asking for media queries.
-- Light and dark themes, and possibly others.
-- The incubation bar shows the whole batch, and players expect it to track a single egg. Feliza read it as one egg and was confused. Per-egg or per-batch bars, without filling the screen with them.
-- Let the queen be named. "Queen Amelia" instead of "The Queen". The colony still only ever has one queen.
-
-**Open design questions.**
-
-- **Nurses feel useless.** amsel: hatching faster does not matter when you are waiting minutes on food anyway. Gyroth: they would matter if incubation took longer, or if eggs hatched one at a time instead of all at once. Both routes slow the pace, which is the tension.
-- **A new ant type.** amsel proposed one with compounding food gain and a growth time that rises, or a pheromone ant that boosts other castes. Gyroth read it as a variant that could hatch out of an ordinary forager egg. Working name: Big Forager.
-- Nanitic lifespan: Gyroth suggested one hour, current value is two.
+- The nurse sprite's egg reads as a white shield. Art is being redrawn by hand, so leave it.
+- Soldiers still do nothing; raids remain unbuilt.
+- Two tabs open at once still clobber each other's saves.
+- amsel also floated a pheromone ant that boosts other castes. Not designed.
 
 ---
 

@@ -1,6 +1,7 @@
 const PALETTES = {
   nanitic: { d: "#7d5f55", h: "#8d6d62", t: "#7d5f55", b: "#6d5149", a: "#5d443d" },
   forager: { d: "#8e2f26", h: "#b8453a", t: "#a03a30", b: "#8e2f26", a: "#6d221b" },
+  bigforager: { d: "#a3332a", h: "#d1503f", t: "#bb4335", b: "#a3332a", a: "#7d251d" },
   excavator: { d: "#7a3b2a", h: "#964a34", t: "#85402e", b: "#6d3425", a: "#552718" },
   nurse: { d: "#a85449", h: "#c2645a", t: "#b25a4f", b: "#a04c42", a: "#7d3a32" },
   soldier: { d: "#6b241c", h: "#8a2f24", t: "#772a20", b: "#63211a", a: "#4a1710" },
@@ -39,6 +40,19 @@ const BODIES = {
     "....bbbbbbb....",
     "...bbbbbbbbb...",
     "....bbbbbbb...."
+  ],
+  bigforager: [
+    "...ggggggggg...",
+    "..a.ggggggg.a..",
+    "..ahhhhhhhhha..",
+    "..hhhhhhhhhhh..",
+    "...hhhhhhhhh...",
+    ".l...ttttt...l.",
+    "lll..ttttt..lll",
+    ".l...ttttt...l.",
+    "...bbbbbbbbb...",
+    "..bbbbbbbbbbb..",
+    "...bbbbbbbbb..."
   ],
   excavator: [
     "..a.........a..",

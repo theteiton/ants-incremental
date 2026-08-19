@@ -5,6 +5,8 @@ import {
   emergingCaste,
   EXCAVATOR_OVERFLOW,
   BASE_POPULATION_CAP,
+  bigForagerThreshold,
+  broodCapacity,
   CASTE_COSTS,
   casteStock,
   NANITIC_LIFESPAN,
@@ -66,7 +68,9 @@ function blankGame() {
     reserves: 0,
     food: 0,
     eggs: [],
-    ants: { nanitic: 0, forager: 0, excavator: 0, nurse: 0, soldier: 0 },
+    ants: { nanitic: 0, forager: 0, bigforager: 0, excavator: 0, nurse: 0, soldier: 0 },
+    bigForagers: [],
+    foragersSinceBig: 0,
     emerged: 0,
     nextCaste: "forager",
     upgrades: [],
@@ -267,6 +271,12 @@ function recountAchievements() {
   game.achievementLevel = Math.floor(points / POINTS_PER_LEVEL);
 }
 
+function rollBigForager() {
+  const threshold = bigForagerThreshold(game);
+  if (game.foragersSinceBig + 1 >= threshold) return true;
+  return Math.random() < (game.foragersSinceBig + 1) / threshold;
+}
+
 export function tick(dt) {
   if (!isFinite(dt) || dt <= 0) return;
   const earned = foodPerSecond(game) * dt;
@@ -275,11 +285,21 @@ export function tick(dt) {
   game.stats.playtime += dt;
 
   const rate = hatchRate(game);
+  const tended = broodCapacity(game);
   for (let i = game.eggs.length - 1; i >= 0; i--) {
     const egg = game.eggs[i];
+    if (i >= tended) continue;
     egg.progress += rate * dt;
     if (egg.progress >= EGG_TIME) {
-      game.ants[emergingCaste(game, egg)]++;
+      const caste = emergingCaste(game, egg);
+      if (caste === "forager" && rollBigForager()) {
+        game.ants.bigforager++;
+        game.bigForagers.push(game.stats.playtime);
+        game.foragersSinceBig = 0;
+      } else {
+        game.ants[caste]++;
+        if (caste === "forager") game.foragersSinceBig++;
+      }
       game.emerged++;
       game.stats.eggsHatched++;
       game.eggs.splice(i, 1);
@@ -333,6 +353,9 @@ function migrate(data) {
       theme: "dark"
     });
     data.seen = { upgrades: 0, achievements: 0 };
+    data.bigForagers = [];
+    data.foragersSinceBig = 0;
+    if (data.ants) data.ants.bigforager = 0;
     data.version = 4;
   }
   return data;
@@ -367,6 +390,8 @@ export function load() {
   game.stats = Object.assign(fresh.stats, data.stats);
   game.settings = Object.assign(fresh.settings, data.settings);
   game.seen = Object.assign(fresh.seen, data.seen);
+  game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
+  game.foragersSinceBig = data.foragersSinceBig || 0;
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];

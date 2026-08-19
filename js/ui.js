@@ -1,10 +1,12 @@
 import {
+  broodCapacity,
   CASTES,
   EGG_TIME,
+  emergingCaste,
+  incubationTime,
   NANITIC_GENERATION,
   eggCost,
   foodPerSecond,
-  hatchRate,
   isUnlocked,
   layableCastes,
   population,
@@ -153,17 +155,50 @@ function renderBrood() {
   });
 
   const eggs = game.eggs;
+  const slots = broodCapacity(game);
+  const tended = Math.min(eggs.length, slots);
+  const waiting = Math.max(0, eggs.length - slots);
+  const period = incubationTime(game);
+
   if (eggs.length === 0) {
-    el("eggSummary").textContent = "No eggs in the brood chamber.";
-    el("eggBar").style.width = "0%";
-    return;
+    el("eggSummary").textContent =
+      "No eggs in the brood chamber. " + slots + " can be tended at once.";
+  } else {
+    let soonest = 0;
+    for (let i = 0; i < tended; i++) soonest = Math.max(soonest, eggs[i].progress);
+    el("eggSummary").textContent =
+      tended + " of " + slots + " brood slots working — next hatches in " +
+      Math.max(0, (EGG_TIME - soonest) / (EGG_TIME / period)).toFixed(1) + "s" +
+      (waiting > 0 ? ", " + fmt(waiting) + " waiting for a slot" : "");
   }
-  let best = 0;
-  for (const egg of eggs) best = Math.max(best, egg.progress);
-  el("eggSummary").textContent =
-    fmt(eggs.length) + " eggs incubating — next hatches in " +
-    Math.max(0, (EGG_TIME - best) / hatchRate(game)).toFixed(1) + "s";
-  el("eggBar").style.width = Math.min(100, (best / EGG_TIME) * 100).toFixed(1) + "%";
+  renderSlots(eggs, slots, tended);
+}
+
+const SLOT_LIMIT = 12;
+function renderSlots(eggs, slots, tended) {
+  const box = el("eggSlots");
+  const shown = Math.min(slots, SLOT_LIMIT);
+  while (box.children.length < shown) {
+    const row = document.createElement("div");
+    row.className = "slot";
+    row.innerHTML = '<span class="slot-caste"></span><span class="bar"><i></i></span>';
+    box.appendChild(row);
+  }
+  while (box.children.length > shown) box.removeChild(box.lastChild);
+
+  for (let i = 0; i < shown; i++) {
+    const row = box.children[i];
+    const egg = i < tended ? eggs[i] : null;
+    row.classList.toggle("empty", !egg);
+    row.querySelector(".slot-caste").textContent = egg
+      ? CASTES[emergingCaste(game, egg)].name
+      : "empty";
+    row.querySelector(".bar i").style.width =
+      egg ? Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1) + "%" : "0%";
+  }
+  el("slotOverflow").hidden = slots <= SLOT_LIMIT;
+  el("slotOverflow").textContent = slots > SLOT_LIMIT
+    ? "and " + (slots - SLOT_LIMIT) + " more slots working" : "";
 }
 
 function render() {

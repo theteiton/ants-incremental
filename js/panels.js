@@ -1,13 +1,16 @@
 import {
   ACHIEVEMENT_FOOD_PER_LEVEL,
   ACHIEVEMENT_HATCH_PER_LEVEL,
+  BASE_BROOD_SLOTS,
+  bigForagerOutput,
+  broodCapacity,
   CASTES,
   casteCount,
   casteFoodPerSecond,
   EGG_TIME,
   eggCost,
   foodPerSecond,
-  hatchRate,
+  incubationTime,
   isUnlocked,
   population,
   populationCap,
@@ -112,10 +115,18 @@ function casteEffectText(id) {
     return held > 0 ? "+" + fmt(per * held) + " cap (" + fmt(per) + " each)" : "";
   }
   if (id === "nurse") {
-    return held > 0 ? "hatching in " + (EGG_TIME / hatchRate(game)).toFixed(1) + "s" : "";
+    return held > 0
+      ? "+" + fmt(broodCapacity(game) - BASE_BROOD_SLOTS) + " brood slots (" +
+        broodCapacity(game) + " tended at once)"
+      : "";
   }
   if (id === "soldier") {
     return held > 0 ? "no effect until raids exist" : "";
+  }
+  if (id === "bigforager") {
+    return held > 0
+      ? fmt(bigForagerOutput(game)) + "/s total (" + fmt(bigForagerOutput(game) / held) + " each, rising with age)"
+      : "";
   }
   const each = casteFoodPerSecond(game, id);
   return held > 0 ? fmt(each * held) + "/s total (" + fmt(each) + " each)" : "";
@@ -125,7 +136,7 @@ export function renderAnts() {
   Object.keys(CASTES).forEach(id => {
     const ui = casteRows[id];
     const held = game.ants[id];
-    ui.row.hidden = held === 0 && !isUnlocked(game, id);
+    ui.row.hidden = held === 0 && (!CASTES[id].layable || !isUnlocked(game, id));
     ui.name.textContent = CASTES[id].name;
     ui.role.textContent = CASTES[id].role;
     ui.effect.textContent = casteEffectText(id);
@@ -218,10 +229,9 @@ function previewUpgrade(upgrade) {
   if (type === "excavatorCap") {
     return "Cap " + fmt(populationCap(game)) + " to " + fmt(populationCap(probe));
   }
-  if (type === "nurseHatch") {
+  if (type === "nurseSlots") {
     if (game.ants.nurse === 0) return "Needs nurses to matter";
-    return "Hatching " + (EGG_TIME / hatchRate(game)).toFixed(1) + "s to " +
-      (EGG_TIME / hatchRate(probe)).toFixed(1) + "s";
+    return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
   }
   const before = foodPerSecond(game);
   const after = foodPerSecond(probe);
