@@ -20,6 +20,7 @@ import {
   importSave,
   layEggs,
   load,
+  OFFLINE_CAP,
   QUEEN_RESERVES,
   save,
   setNextCaste,
@@ -204,8 +205,12 @@ selectTab("ants");
 let lastFrame = Date.now();
 function frame() {
   const now = Date.now();
-  tick(Math.min((now - lastFrame) / 1000, 1));
+  const elapsed = Math.min(Math.max(0, (now - lastFrame) / 1000), OFFLINE_CAP);
   lastFrame = now;
+  const step = Math.max(0.25, elapsed / 600);
+  for (let done = 0; done < elapsed; done += step) {
+    tick(Math.min(step, elapsed - done));
+  }
   render();
   requestAnimationFrame(frame);
 }
