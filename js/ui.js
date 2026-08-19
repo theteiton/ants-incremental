@@ -1,6 +1,7 @@
 import {
   CASTES,
   EGG_TIME,
+  NANITIC_GENERATION,
   eggCost,
   foodPerSecond,
   hatchRate,
@@ -20,7 +21,9 @@ import {
   importSave,
   layEggs,
   load,
+  markSeen,
   OFFLINE_CAP,
+  queenTitle,
   QUEEN_RESERVES,
   save,
   setNextCaste,
@@ -28,6 +31,8 @@ import {
   tick
 } from "./game.js";
 import {
+  achievementBadge,
+  affordableUpgrades,
   buildAchievements,
   buildAnts,
   buildExileDialog,
@@ -38,7 +43,8 @@ import {
   renderAchievements,
   renderAnts,
   renderSettings,
-  renderUpgrades
+  renderUpgrades,
+  upgradeBadge
 } from "./panels.js";
 import { drawSprite } from "./sprites.js";
 
@@ -76,8 +82,24 @@ function buildCasteChoice() {
   });
 }
 
+function pendingCaste() {
+  return game.emerged < NANITIC_GENERATION ? "nanitic" : game.nextCaste;
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", game.settings.theme || "dark");
+}
+
+function renderBadges() {
+  const upgrades = upgradeBadge();
+  const achievements = achievementBadge();
+  el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
+  el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
+}
+
 function renderQueen() {
   if (!game.wingsShed) {
+    el("queenTitle").textContent = queenTitle();
     el("queenText").textContent =
       "She has landed and will never fly again. Shedding her wings frees " +
       QUEEN_RESERVES + " units of body reserves — all she will ever have.";
@@ -85,9 +107,11 @@ function renderQueen() {
     return;
   }
   el("btnShed").hidden = true;
+  el("queenTitle").textContent = queenTitle();
   if (game.emerged === 0) {
     el("queenText").textContent =
-      "Her wing muscles are being metabolised into eggs. Nothing else will feed this brood.";
+      "Her wing muscles are being metabolised into eggs. The first " + NANITIC_GENERATION +
+      " workers will emerge as undersized nanitics whatever caste is chosen — nothing else will feed this brood.";
   } else if (game.naniticsDied) {
     el("queenText").textContent =
       "The founding nanitics have died of old age. The colony they raised carries on without them.";
@@ -103,15 +127,16 @@ function renderBrood() {
 
   const cost = eggCost(game);
   const space = broodSpace();
+  const emerging = pendingCaste();
   el("eggCost").textContent = space > 0
-    ? "A " + CASTES[game.nextCaste].name.toLowerCase() + " egg costs " +
+    ? "A " + CASTES[emerging].name.toLowerCase() + " egg costs " +
       fmt(cost.amount) + " " + cost.resource + ". Chamber space: " + fmt(space) + "."
     : "The nest is full at " + fmt(populationCap(game)) +
       ". Only excavators can be laid now — they dig their own chambers.";
 
   const ready = canLay();
   el("btnLay").disabled = !ready;
-  el("btnLay").textContent = "Lay an egg (" + CASTES[game.nextCaste].name + ")";
+  el("btnLay").textContent = "Lay an egg (" + CASTES[emerging].name + ")";
   el("btnLay10").disabled = !ready;
   el("btnLay10").textContent = "Lay ×" + Math.min(10, Math.max(1, broodSlots()));
   el("btnLayMax").disabled = !ready;
@@ -151,6 +176,7 @@ function render() {
   el("valEggs").textContent = fmt(game.eggs.length);
   el("valTime").textContent = fmtTime(game.stats.playtime);
 
+  renderBadges();
   renderQueen();
   renderBrood();
   if (activeTab === "ants") renderAnts();
@@ -184,6 +210,10 @@ buildUpgrades(render);
 buildAchievements();
 buildSettings({
   refresh: render,
+  applyTheme: () => {
+    applyTheme();
+    render();
+  },
   exportSave: () => window.prompt("Copy your save code:", exportSave()),
   importSave: () => {
     const text = window.prompt("Paste a save code:");
@@ -200,6 +230,9 @@ buildSettings({
 
 drawSprite(el("queenSprite"), "queen", 4);
 load();
+applyTheme();
+markSeen("upgrades", affordableUpgrades());
+markSeen("achievements", game.achievements.length);
 selectTab("ants");
 
 let lastFrame = Date.now();

@@ -23,8 +23,10 @@ import {
   exileUnlocked,
   game,
   levelPoints,
+  markSeen,
   maxExilable,
   POINTS_PER_LEVEL,
+  setQueenName,
   setSetting
 } from "./game.js";
 import { spriteFor } from "./sprites.js";
@@ -39,7 +41,8 @@ export function fmt(n) {
   const tier = Math.floor(Math.log10(n) / 3);
   if (tier >= SUFFIXES.length) return n.toExponential(2);
   const scaled = n / Math.pow(1000, tier);
-  return (scaled < 100 ? scaled.toFixed(1) : scaled.toFixed(0)) + SUFFIXES[tier];
+  const digits = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+  return scaled.toFixed(digits) + SUFFIXES[tier];
 }
 
 export function fmtTime(seconds) {
@@ -254,6 +257,10 @@ export function buildUpgrades(onChange) {
     setSetting("hideLocked", event.target.checked);
     renderUpgrades();
   };
+  el("hideOwned").onchange = event => {
+    setSetting("hideOwned", event.target.checked);
+    renderUpgrades();
+  };
 }
 
 export function renderUpgrades() {
@@ -266,11 +273,13 @@ export function renderUpgrades() {
     if (isOwned) owned++;
     if (!isOpen) locked++;
 
-    ui.card.hidden = !isOpen && game.settings.hideLocked;
+    ui.card.hidden = (!isOpen && game.settings.hideLocked) || (isOwned && game.settings.hideOwned);
     ui.card.classList.toggle("owned", isOwned);
     ui.card.classList.toggle("locked", !isOpen);
     ui.card.disabled = isOwned || !isOpen || game.food < upgrade.cost;
     ui.cost.textContent = isOwned ? "owned" : fmt(upgrade.cost) + " food";
+    ui.cost.classList.toggle("affordable", !isOwned && isOpen && game.food >= upgrade.cost);
+    ui.cost.classList.toggle("owned-tag", isOwned);
 
     if (!isOpen) {
       const req = upgrade.req;
@@ -286,6 +295,25 @@ export function renderUpgrades() {
   el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
   el("hideLocked").checked = !!game.settings.hideLocked;
+  el("hideOwned").checked = !!game.settings.hideOwned;
+  markSeen("upgrades", affordableUpgrades());
+}
+
+export function affordableUpgrades() {
+  let ready = 0;
+  for (const upgrade of UPGRADES) {
+    if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) continue;
+    if (game.food >= upgrade.cost) ready++;
+  }
+  return ready;
+}
+
+export function upgradeBadge() {
+  return Math.max(0, affordableUpgrades() - (game.seen.upgrades || 0));
+}
+
+export function achievementBadge() {
+  return Math.max(0, game.achievements.length - (game.seen.achievements || 0));
 }
 
 // -------------------------------------------------------- achievements tab
@@ -322,6 +350,7 @@ export function renderAchievements() {
     Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * level * 100) + "% hatch speed";
   const progress = (game.achievementPoints - levelPoints(level)) / POINTS_PER_LEVEL;
   el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
+  markSeen("achievements", game.achievements.length);
 }
 
 // ------------------------------------------------------------ settings tab
@@ -330,8 +359,12 @@ export function buildSettings(handlers) {
     setSetting("exileEnabled", event.target.checked);
     handlers.refresh();
   };
-  el("setHideLocked").onchange = event => {
-    setSetting("hideLocked", event.target.checked);
+  el("setTheme").onchange = event => {
+    setSetting("theme", event.target.value);
+    handlers.applyTheme();
+  };
+  el("setQueenName").oninput = event => {
+    setQueenName(event.target.value);
     handlers.refresh();
   };
   el("btnExport").onclick = handlers.exportSave;
@@ -341,7 +374,8 @@ export function buildSettings(handlers) {
 
 export function renderSettings() {
   el("setExile").checked = !!game.settings.exileEnabled;
-  el("setHideLocked").checked = !!game.settings.hideLocked;
+  el("setTheme").value = game.settings.theme || "dark";
+  if (document.activeElement !== el("setQueenName")) el("setQueenName").value = game.queenName || "";
   el("exileStatus").textContent = exileUnlocked()
     ? "Unlocked — exile controls appear on the Ants tab."
     : "Locked until your first forager emerges.";

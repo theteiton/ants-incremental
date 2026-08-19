@@ -18,9 +18,9 @@ import {
   upgradeUnlocked
 } from "./ants.js";
 
-export const SAVE_KEY = "ants_save_v3";
-export const LEGACY_SAVE_KEYS = ["ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 3;
+export const SAVE_KEY = "ants_save_v4";
+export const LEGACY_SAVE_KEYS = ["ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 4;
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
 export const POINTS_PER_LEVEL = 5;
@@ -75,7 +75,9 @@ function blankGame() {
     achievementLevel: 0,
     peakPopulation: 0,
     naniticsDied: false,
-    settings: { exileEnabled: true, hideLocked: false },
+    queenName: "",
+    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark" },
+    seen: { upgrades: 0, achievements: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
     lastSave: Date.now()
   };
@@ -176,6 +178,19 @@ export function exile(casteId, count) {
   game.ants[casteId] -= allowed;
   game.stats.exiled += allowed;
   return allowed;
+}
+
+export function setQueenName(name) {
+  game.queenName = String(name || "").slice(0, 24);
+  return game.queenName;
+}
+
+export function queenTitle() {
+  return game.queenName ? "Queen " + game.queenName : "The queen";
+}
+
+export function markSeen(key, count) {
+  game.seen[key] = count;
 }
 
 export function setSetting(key, value) {
@@ -311,6 +326,15 @@ function migrate(data) {
     if (data.stats) data.stats.exiled = 0;
     data.version = 3;
   }
+  if (data.version === 3) {
+    data.queenName = "";
+    data.settings = Object.assign({ exileEnabled: true, hideLocked: false }, data.settings, {
+      hideOwned: false,
+      theme: "dark"
+    });
+    data.seen = { upgrades: 0, achievements: 0 };
+    data.version = 4;
+  }
   return data;
 }
 
@@ -342,6 +366,7 @@ export function load() {
   game.ants = Object.assign(fresh.ants, data.ants);
   game.stats = Object.assign(fresh.stats, data.stats);
   game.settings = Object.assign(fresh.settings, data.settings);
+  game.seen = Object.assign(fresh.seen, data.seen);
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
