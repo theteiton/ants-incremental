@@ -128,6 +128,34 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 ---
 
+## Playtest feedback — 19 August 2026
+
+Raised in Discord by Feliza, Gyroth and amsel. Nothing here is implemented yet. Grouped by kind, not priority.
+
+**Bugs and wrong-looking things.**
+
+- `fmt()` loses too much precision. 1862 displays as `1.9K`; it reads as an error rather than rounding.
+- The brood says it will lay a Forager, then five Nanitics emerge. The founding phase needs to say so on the button and in the text — Feliza hit this and could not work out what happened.
+- Costs are drawn in red whether or not you can afford them, and the word "owned" is red too. Red should mean unaffordable; affordable should read as affordable.
+- The nurse sprite's egg looks like a white shield, or an eye. Art is being redrawn by hand later, so leave it alone for now.
+
+**Interface requests.**
+
+- Hide *owned* upgrades, not just locked ones. Both Gyroth and Feliza asked; Feliza wants the toggles in one place only — on the Upgrades tab, not duplicated in Settings.
+- A marker on the Upgrades and Achievements tabs when something new is available, so the tabs do not need checking constantly. A small dot or star, explicitly not a spammy notification.
+- Use the horizontal space on desktop. The layout is mobile-friendly and leaves a PC screen mostly empty. Feliza is asking for media queries.
+- Light and dark themes, and possibly others.
+- The incubation bar shows the whole batch, and players expect it to track a single egg. Feliza read it as one egg and was confused. Per-egg or per-batch bars, without filling the screen with them.
+- Let the queen be named. "Queen Amelia" instead of "The Queen". The colony still only ever has one queen.
+
+**Open design questions.**
+
+- **Nurses feel useless.** amsel: hatching faster does not matter when you are waiting minutes on food anyway. Gyroth: they would matter if incubation took longer, or if eggs hatched one at a time instead of all at once. Both routes slow the pace, which is the tension.
+- **A new ant type.** amsel proposed one with compounding food gain and a growth time that rises, or a pheromone ant that boosts other castes. Gyroth read it as a variant that could hatch out of an ordinary forager egg. Working name: Big Forager.
+- Nanitic lifespan: Gyroth suggested one hour, current value is two.
+
+---
+
 ## The test loop
 
 Every change ships to GitHub Pages at `https://theteiton.github.io/ants-incremental/`. Before saying a change is done, confirm the game still loads and the first sixty seconds still play. A change that breaks the opening is worse than no change.
