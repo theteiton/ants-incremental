@@ -41,9 +41,13 @@ export function fmt(n) {
   if (n < 0) return "-" + fmt(-n);
   if (n < 10) return (Math.round(n * 10) / 10).toString();
   if (n < 1000) return Math.floor(n).toString();
-  const tier = Math.floor(Math.log10(n) / 3);
+  let tier = Math.floor(Math.log10(n) / 3);
+  let scaled = n / Math.pow(1000, tier);
+  if (scaled >= 999.5) {
+    tier++;
+    scaled /= 1000;
+  }
   if (tier >= SUFFIXES.length) return n.toExponential(2);
-  const scaled = n / Math.pow(1000, tier);
   const digits = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
   return scaled.toFixed(digits) + SUFFIXES[tier];
 }

@@ -10,6 +10,7 @@
   --good: #7fa653;
   --danger: #d1352a;
   --glow: #24120f;
+  --btn-text: #1c0f0d;
 }
 
 :root[data-theme="light"] {
@@ -24,6 +25,7 @@
   --good: #4f7a2e;
   --danger: #b3261e;
   --glow: #fffdfb;
+  --btn-text: #fff7f5;
 }
 
 :root[data-theme="soil"] {
@@ -38,6 +40,7 @@
   --good: #8aa653;
   --danger: #c25a2a;
   --glow: #33220f;
+  --btn-text: #1c0f0d;
 }
 
 * { box-sizing: border-box; }
@@ -120,7 +123,7 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
 
 button {
   font: inherit;
-  color: #1c0f0d;
+  color: var(--btn-text);
   background: var(--accent);
   border: none;
   border-radius: 8px;
