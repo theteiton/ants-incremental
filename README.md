@@ -2,6 +2,8 @@
 
 A browser-based ant colony incremental game. Vanilla HTML, CSS and JavaScript — no build step, no framework, no dependencies, no network calls. Everything runs in the tab.
 
+**[▶ Play it here](https://theteiton.github.io/ants-incremental/)** — nothing to download or install.
+
 ## The game
 
 You play a mated queen who has already landed. Her first act is to shed her wings, which frees a finite pool of body reserves — 100 units, and she will never get more. Those reserves buy her first eggs.
@@ -37,7 +39,7 @@ Roughly two hours of play to a colony of 1,000 workers. The opening moves quickl
 
 ## Running it locally
 
-The game loads its JavaScript as ES modules, so serve the folder over HTTP rather than opening the file directly:
+The published page above is the easiest way to play. To run a working copy, serve the folder over HTTP rather than opening the file directly — the game loads its JavaScript as ES modules, which browsers will not load from a `file://` path:
 
 ```bash
 python -m http.server 8000
