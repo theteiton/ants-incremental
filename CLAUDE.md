@@ -41,9 +41,11 @@ These are not preferences. Breaking them breaks the deployment.
 ```
 index.html          entry point, root, do not move
 style.css           all styling
-js/game.js          state object, tick loop, save/load
-js/ants.js          castes, production, costs
-js/ui.js            DOM rendering and event handlers
+js/game.js          state object, tick loop, save/load, exiling
+js/ants.js          castes, production, costs, upgrades
+js/panels.js        tab panel rendering, shared fmt()
+js/sprites.js       pixel art drawn onto canvas
+js/ui.js            tab shell, header, brood controls, frame loop
 CLAUDE.md           this file
 README.md
 ```
@@ -57,7 +59,7 @@ Keep to this layout. If a file grows past roughly 400 lines, tell me and suggest
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v2`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v3`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
@@ -88,25 +90,39 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 19 August 2026.
+Last updated 19 August 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
 
-**Soldiers are inert.** They gate at 400 and have an achievement, but raid events do not exist, so a soldier produces nothing and buying one is a pure loss. Raids are an open design decision.
+**Egg cost is per caste**, each with its own curve — forager `1.5 x n^1.75`, excavator `15 x n^1.8`, nurse `60 x n^1.7`, soldier `200 x n^1.6`. One caste's count never moves another's price. The price counts eggs already in the brood as well as hatched ants, so laying a batch at once costs exactly what laying them one at a time would. Before that, a batch of 100 cost 50.5% less than the same 100 bought singly.
 
-**Upgrades.** 20 of them, one-time food purchases, each unlocked by a caste count — 3 nanitic, 6 forager, 4 excavator, 4 nurse — plus 3 unlocked by total population. They raise caste output, cap per excavator, hatch rate, or global food.
+**Exiling** removes ants from a caste with no refund. It is blocked when it would drop the cap below the current population, so excavators cannot be dumped to strand a colony above its cap. Nanitics cannot be exiled, a Settings toggle disables the feature, and it unlocks with the first forager. Because exiling lowers population, caste unlocks read a high-water mark — with a live count, exiling would re-lock castes already earned.
+
+**Nanitics die of old age at two hours.** Their base output is 0.9 against a forager's 1.0, which is high for ants described as feeble; it buys the fast opening. They stay capped at 5 and never scale with forager upgrades.
+
+**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. Theme is red. Each caste and the queen have a pixel sprite drawn in JS onto a canvas.
+
+**Upgrades.** 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and a toggle hides them. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
 
 **Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
 
 **Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
 
-**Pacing.** Egg cost is banded by population: exponent 0.95 below 20 ants, 2.25 up to 100, 2.3 above. Incubation is 10s. Milestones under strong simulated play, so a human runs slower:
+**Background tabs are credited.** `requestAnimationFrame` does not fire in a hidden tab, so the frame loop feeds the whole elapsed gap through `tick()` in chunks, clamped to the same eight hour cap as offline progress. Capping a frame at one second instead threw away 99.8% of a ten minute absence.
+
+**Pacing.** Incubation is 10s. Milestones under strong simulated play, so a human runs slower:
 
 | ants | 20 | 50 | 100 | 250 | 500 | 1000 |
 |---|---|---|---|---|---|---|
-| time | 2m | 3m | 7m | 20m | 41m | 89m |
+| time | 1.6m | 5.5m | 11.7m | 33m | 64m | 101m |
 
-**Not built.** Prestige (the nuptial flight), raid events, and any offline-progress UI beyond the silent catch-up on load.
+Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
+
+**Not built.** Prestige (the nuptial flight) and raid events.
+
+**Soldiers are inert.** They gate at 400 and have an achievement, but with no raids they produce nothing. Their row in the Ants tab says so rather than letting anyone buy them blind.
+
+**Nurses have diminishing returns by construction.** Hatch *rate* is linear in nurse count, so hatch *time* is hyperbolic: the first nurse cuts 2.0s, the tenth 0.22s, the twentieth 0.07s. Not a bug, but it reads as broken. Making nurses raise brood capacity instead of speed is the open idea.
 
 **Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
 
