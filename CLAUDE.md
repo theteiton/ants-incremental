@@ -91,7 +91,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 19 August 2026. Published and playable at the Pages URL below.
+Last updated 20 August 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
 
@@ -105,9 +105,15 @@ Last updated 19 August 2026. Published and playable at the Pages URL below.
 
 **Big Foragers.** A rare variant that hatches from ordinary forager eggs and cannot be laid deliberately. The k-th is guaranteed by the 3.5^k-th forager since the last one, with a chance that rises toward that threshold, so in practice the roll fires well before the guarantee — about ten appear over 750 forager hatches. Each produces 5x a forager's base and grows +5% per minute alive to a cap of 3x, so she starts strong and ages into something stronger. They are not exilable and stay hidden in the roster until the first one appears.
 
-**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. Theme is red. Each caste and the queen have a pixel sprite drawn in JS onto a canvas.
+**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to twelve, then a count of the rest.
 
-**Upgrades.** 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and a toggle hides them. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
+**Themes** are dark, light and soil, chosen in Settings and saved with the colony. Every colour comes from a variable on `:root` — including the background glow and the text on primary buttons. Hard-coding either breaks a theme: a fixed dark glow put a near-black blotch on the light background, and fixed dark button text left 0.29 luminance against light-theme red.
+
+**The queen can be named** in Settings and is addressed as Queen <name>. One queen per colony, always.
+
+**Upgrades.** 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
+
+**Display rules.** `fmt()` keeps three significant figures — 1862 reads as 1.86K, not 1.9K — and rolls the suffix over when rounding carries (999999 is 1.00M, not 1000K). Costs read green when affordable and muted when not; red never means "you can afford this".
 
 **Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
 
