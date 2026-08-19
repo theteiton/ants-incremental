@@ -75,7 +75,7 @@ function blankGame() {
     achievementLevel: 0,
     peakPopulation: 0,
     naniticsDied: false,
-    settings: { exileEnabled: true },
+    settings: { exileEnabled: true, hideLocked: false },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
     lastSave: Date.now()
   };
@@ -178,6 +178,44 @@ export function exile(casteId, count) {
   return allowed;
 }
 
+export function setSetting(key, value) {
+  game.settings[key] = value;
+  return game.settings[key];
+}
+
+export function exportSave() {
+  save();
+  return btoa(unescape(encodeURIComponent(JSON.stringify(game))));
+}
+
+export function importSave(text) {
+  let data;
+  try {
+    data = JSON.parse(decodeURIComponent(escape(atob(String(text).trim()))));
+  } catch (err) {
+    return false;
+  }
+  if (!data || typeof data !== "object" || !data.ants) return false;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (err) {
+    return false;
+  }
+  load();
+  return true;
+}
+
+export function hardReset() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
+  } catch (err) {
+    // a blocked localStorage still resets the in-memory colony below
+  }
+  Object.assign(game, blankGame());
+  return true;
+}
+
 export function buyUpgrade(id) {
   const upgrade = UPGRADES.find(u => u.id === id);
   if (!upgrade) return false;
@@ -269,7 +307,7 @@ function migrate(data) {
   if (data.version === 2) {
     data.peakPopulation = 0;
     data.naniticsDied = false;
-    data.settings = { exileEnabled: true };
+    data.settings = { exileEnabled: true, hideLocked: false };
     if (data.stats) data.stats.exiled = 0;
     data.version = 3;
   }
