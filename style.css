@@ -92,6 +92,18 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.lay-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lay-buttons button:not(:first-child) {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
 #casteChoice {
   display: flex;
   flex-wrap: wrap;
@@ -141,9 +153,97 @@ ul {
   background: var(--good);
 }
 
+.tally {
+  float: right;
+  color: var(--accent);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.egg-summary {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.bonus {
+  margin: 8px 0 0;
+  color: var(--good);
+  font-size: 13px;
+}
+
+#upgradeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.upgrade {
+  display: block;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 10px;
+}
+
+.upgrade:not(:disabled) { border-color: var(--accent); }
+
+.upgrade-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.upgrade-cost {
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.upgrade-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+#achievementList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.achievement {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  opacity: 0.4;
+}
+
+.achievement.earned {
+  opacity: 1;
+  border-color: var(--good);
+}
+
+.achievement b { display: block; font-size: 13px; }
+
+.achievement span {
+  display: block;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.achievement i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--accent);
+}
+
 #casteList li {
   display: grid;
-  grid-template-columns: 110px 1fr auto;
+  grid-template-columns: 110px 1fr auto auto;
   gap: 10px;
   align-items: baseline;
   padding: 6px 0;
@@ -159,9 +259,17 @@ ul {
   color: var(--dim);
 }
 
+.caste-output {
+  font-size: 12px;
+  color: var(--good);
+  white-space: nowrap;
+}
+
 .caste-count {
   font-size: 18px;
   font-weight: 700;
+  min-width: 56px;
+  text-align: right;
 }
 
 [hidden] { display: none !important; }
