@@ -37,31 +37,26 @@ export const BASE_POPULATION_CAP = 30;
 export const CAP_PER_EXCAVATOR = 6;
 export const RESERVE_EGG_COST = 20;
 export const EXCAVATOR_OVERFLOW = 3;
+export const NANITIC_LIFESPAN = 7200;
 export const HATCH_PER_NURSE = 0.25;
 export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
 export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
 
 const FOOD_PER_SECOND = {
-  nanitic: 0.45,
+  nanitic: 0.9,
   forager: 1,
   excavator: 0,
   nurse: 0,
   soldier: 0
 };
 
-const EGG_COST_BANDS = buildBands([
-  { upTo: 20, exponent: 0.95, base: 1.6 },
-  { upTo: 100, exponent: 2.25 },
-  { upTo: Infinity, exponent: 2.3 }
-]);
+export const CASTE_COSTS = {
+  forager: { base: 1.5, exponent: 1.75 },
+  excavator: { base: 15, exponent: 1.8 },
+  nurse: { base: 60, exponent: 1.7 },
+  soldier: { base: 200, exponent: 1.6 }
+};
 
-function buildBands(bands) {
-  for (let i = 1; i < bands.length; i++) {
-    const prev = bands[i - 1];
-    bands[i].base = prev.base * Math.pow(prev.upTo, prev.exponent - bands[i].exponent);
-  }
-  return bands;
-}
 
 export const UPGRADES = [
   { id: "nanitic_1", name: "Callow Cuticle", req: { caste: "nanitic", count: 3 }, cost: 30,
@@ -79,34 +74,34 @@ export const UPGRADES = [
     desc: "Milked aphids yield honeydew. Forager food +100%.", effect: { type: "casteFood", caste: "forager", add: 1 } },
   { id: "forager_4", name: "Deep Middens", req: { caste: "forager", count: 90 }, cost: 25000,
     desc: "Nothing edible is wasted. Forager food +150%.", effect: { type: "casteFood", caste: "forager", add: 1.5 } },
-  { id: "forager_5", name: "Trunk Trails", req: { caste: "forager", count: 220 }, cost: 90000,
+  { id: "forager_5", name: "Trunk Trails", req: { caste: "forager", count: 150 }, cost: 70000,
     desc: "Cleared highways speed every trip. Forager food +200%.", effect: { type: "casteFood", caste: "forager", add: 2 } },
-  { id: "forager_6", name: "Canopy Routes", req: { caste: "forager", count: 550 }, cost: 600000,
+  { id: "forager_6", name: "Canopy Routes", req: { caste: "forager", count: 400 }, cost: 400000,
     desc: "The colony harvests the whole tree. Forager food +300%.", effect: { type: "casteFood", caste: "forager", add: 3 } },
 
   { id: "excavator_1", name: "Loose Soil", req: { caste: "excavator", count: 3 }, cost: 1200,
     desc: "Easier digging. Each excavator holds 2 more ants.", effect: { type: "excavatorCap", add: 2 } },
   { id: "excavator_2", name: "Vaulted Galleries", req: { caste: "excavator", count: 15 }, cost: 9000,
     desc: "Arched roofs stop collapses. +3 cap per excavator.", effect: { type: "excavatorCap", add: 3 } },
-  { id: "excavator_3", name: "Deep Shafts", req: { caste: "excavator", count: 60 }, cost: 60000,
+  { id: "excavator_3", name: "Deep Shafts", req: { caste: "excavator", count: 22 }, cost: 90000,
     desc: "The nest reaches the water table. +6 cap per excavator.", effect: { type: "excavatorCap", add: 6 } },
-  { id: "excavator_4", name: "Cathedral Chambers", req: { caste: "excavator", count: 150 }, cost: 400000,
+  { id: "excavator_4", name: "Cathedral Chambers", req: { caste: "excavator", count: 55 }, cost: 500000,
     desc: "Halls big enough to lose a queen in. +12 cap per excavator.", effect: { type: "excavatorCap", add: 12 } },
 
   { id: "nurse_1", name: "Warm Brood Pile", req: { caste: "nurse", count: 3 }, cost: 15000,
     desc: "Eggs are moved to follow the sun. Nurses hatch faster.", effect: { type: "nurseHatch", add: 0.15 } },
-  { id: "nurse_2", name: "Trophallaxis", req: { caste: "nurse", count: 15 }, cost: 60000,
+  { id: "nurse_2", name: "Trophallaxis", req: { caste: "nurse", count: 12 }, cost: 50000,
     desc: "Mouth-to-mouth feeding of the brood.", effect: { type: "nurseHatch", add: 0.25 } },
-  { id: "nurse_3", name: "Fungal Bedding", req: { caste: "nurse", count: 50 }, cost: 250000,
+  { id: "nurse_3", name: "Fungal Bedding", req: { caste: "nurse", count: 30 }, cost: 220000,
     desc: "Antibiotic mulch keeps the brood clean.", effect: { type: "nurseHatch", add: 0.4 } },
-  { id: "nurse_4", name: "Brood Nurseries", req: { caste: "nurse", count: 120 }, cost: 1.2e6,
+  { id: "nurse_4", name: "Brood Nurseries", req: { caste: "nurse", count: 70 }, cost: 1.5e6,
     desc: "Dedicated chambers sorted by age.", effect: { type: "nurseHatch", add: 0.6 } },
 
   { id: "colony_1", name: "Colony Cohesion", req: { caste: "population", count: 60 }, cost: 12000,
     desc: "A colony that acts as one body. All food +25%.", effect: { type: "globalFood", mult: 1.25 } },
-  { id: "colony_2", name: "Pheromone Network", req: { caste: "population", count: 250 }, cost: 120000,
+  { id: "colony_2", name: "Pheromone Network", req: { caste: "population", count: 300 }, cost: 150000,
     desc: "Chemical memory spans the whole nest. All food +50%.", effect: { type: "globalFood", mult: 1.5 } },
-  { id: "colony_3", name: "Living Bridges", req: { caste: "population", count: 600 }, cost: 900000,
+  { id: "colony_3", name: "Living Bridges", req: { caste: "population", count: 580 }, cost: 650000,
     desc: "Ants become the infrastructure. All food +100%.", effect: { type: "globalFood", mult: 2 } }
 ];
 
@@ -188,17 +183,30 @@ export function hatchRate(game) {
   return (1 + perNurse * game.ants.nurse) * achievementHatchBonus(game);
 }
 
-export function eggCost(game) {
+export function broodCount(game, casteId) {
+  let n = 0;
+  for (const egg of game.eggs) if (egg.caste === casteId) n++;
+  return n;
+}
+
+export function casteStock(game, casteId) {
+  return game.ants[casteId] + broodCount(game, casteId);
+}
+
+export function eggCost(game, casteId) {
   if (game.emerged === 0) {
     return { resource: "reserves", amount: RESERVE_EGG_COST };
   }
-  const pop = population(game);
-  const band = EGG_COST_BANDS.find(b => pop < b.upTo) || EGG_COST_BANDS[EGG_COST_BANDS.length - 1];
-  return { resource: "food", amount: band.base * Math.pow(pop, band.exponent) };
+  const caste = casteId || game.nextCaste;
+  const curve = CASTE_COSTS[caste];
+  return {
+    resource: "food",
+    amount: curve.base * Math.pow(casteStock(game, caste) + 1, curve.exponent)
+  };
 }
 
 export function isUnlocked(game, casteId) {
-  return population(game) >= CASTES[casteId].unlockAt;
+  return Math.max(game.peakPopulation || 0, population(game)) >= CASTES[casteId].unlockAt;
 }
 
 export function layableCastes() {

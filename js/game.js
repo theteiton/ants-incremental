@@ -4,6 +4,10 @@ import {
   eggCost,
   emergingCaste,
   EXCAVATOR_OVERFLOW,
+  BASE_POPULATION_CAP,
+  CASTE_COSTS,
+  casteStock,
+  NANITIC_LIFESPAN,
   foodPerSecond,
   hatchRate,
   isUnlocked,
@@ -14,9 +18,9 @@ import {
   upgradeUnlocked
 } from "./ants.js";
 
-export const SAVE_KEY = "ants_save_v2";
-export const LEGACY_SAVE_KEYS = ["ants_save_v1"];
-export const SAVE_VERSION = 2;
+export const SAVE_KEY = "ants_save_v3";
+export const LEGACY_SAVE_KEYS = ["ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 3;
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
 export const POINTS_PER_LEVEL = 5;
@@ -69,7 +73,10 @@ function blankGame() {
     achievements: [],
     achievementPoints: 0,
     achievementLevel: 0,
-    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0 },
+    peakPopulation: 0,
+    naniticsDied: false,
+    settings: { exileEnabled: true, hideLocked: false },
+    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
     lastSave: Date.now()
   };
 }
@@ -125,9 +132,88 @@ export function layEggs(count) {
 }
 
 export function affordableEggs() {
-  const cost = eggCost(game);
-  if (cost.amount <= 0) return broodSlots();
-  return Math.min(broodSlots(), Math.floor(game[cost.resource] / cost.amount));
+  const slots = broodSlots();
+  if (slots <= 0) return 0;
+  const first = eggCost(game);
+  if (first.resource === "reserves") {
+    return Math.min(slots, Math.floor(game.reserves / first.amount));
+  }
+  const curve = CASTE_COSTS[game.nextCaste];
+  let budget = game.food;
+  let stock = casteStock(game, game.nextCaste);
+  let count = 0;
+  while (count < slots) {
+    const price = curve.base * Math.pow(stock + 1, curve.exponent);
+    if (price > budget) break;
+    budget -= price;
+    stock++;
+    count++;
+  }
+  return count;
+}
+
+export function exileUnlocked() {
+  return game.ants.forager > 0 || game.stats.exiled > 0;
+}
+
+export function canExile(casteId) {
+  return game.settings.exileEnabled && exileUnlocked() && CASTES[casteId].layable;
+}
+
+export function maxExilable(casteId) {
+  if (!canExile(casteId)) return 0;
+  const held = game.ants[casteId];
+  if (casteId !== "excavator") return held;
+  const perExcavator = (populationCap(game) - BASE_POPULATION_CAP) / Math.max(1, game.ants.excavator);
+  const slack = populationCap(game) - population(game) - game.eggs.length;
+  if (perExcavator <= 1) return held;
+  return Math.max(0, Math.min(held, Math.floor(slack / (perExcavator - 1))));
+}
+
+export function exile(casteId, count) {
+  const allowed = Math.min(Math.floor(count), maxExilable(casteId));
+  if (!(allowed > 0)) return 0;
+  game.ants[casteId] -= allowed;
+  game.stats.exiled += allowed;
+  return allowed;
+}
+
+export function setSetting(key, value) {
+  game.settings[key] = value;
+  return game.settings[key];
+}
+
+export function exportSave() {
+  save();
+  return btoa(unescape(encodeURIComponent(JSON.stringify(game))));
+}
+
+export function importSave(text) {
+  let data;
+  try {
+    data = JSON.parse(decodeURIComponent(escape(atob(String(text).trim()))));
+  } catch (err) {
+    return false;
+  }
+  if (!data || typeof data !== "object" || !data.ants) return false;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (err) {
+    return false;
+  }
+  load();
+  return true;
+}
+
+export function hardReset() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
+  } catch (err) {
+    // a blocked localStorage still resets the in-memory colony below
+  }
+  Object.assign(game, blankGame());
+  return true;
 }
 
 export function buyUpgrade(id) {
@@ -185,6 +271,12 @@ export function tick(dt) {
     }
   }
 
+  if (!game.naniticsDied && game.stats.playtime >= NANITIC_LIFESPAN && game.ants.nanitic > 0) {
+    game.ants.nanitic = 0;
+    game.naniticsDied = true;
+  }
+
+  game.peakPopulation = Math.max(game.peakPopulation, population(game));
   if (!isUnlocked(game, game.nextCaste)) game.nextCaste = "forager";
   checkAchievements();
 }
@@ -211,6 +303,13 @@ function migrate(data) {
       playtime: 0
     };
     data.version = 2;
+  }
+  if (data.version === 2) {
+    data.peakPopulation = 0;
+    data.naniticsDied = false;
+    data.settings = { exileEnabled: true, hideLocked: false };
+    if (data.stats) data.stats.exiled = 0;
+    data.version = 3;
   }
   return data;
 }
@@ -242,6 +341,8 @@ export function load() {
   Object.assign(game, fresh, data);
   game.ants = Object.assign(fresh.ants, data.ants);
   game.stats = Object.assign(fresh.stats, data.stats);
+  game.settings = Object.assign(fresh.settings, data.settings);
+  game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
   game.achievements = Array.isArray(data.achievements) ? data.achievements : [];
