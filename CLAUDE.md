@@ -57,7 +57,7 @@ Keep to this layout. If a file grows past roughly 400 lines, tell me and suggest
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v1`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v2`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
@@ -83,6 +83,32 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 **Unlocks are gated by colony population, not by purchasing upgrades.** 25 ants unlocks Excavators, 100 unlocks Nurses, 400 unlocks Soldiers.
 
 **Prestige is the nuptial flight.** Not built yet. Do not build it until I ask.
+
+---
+
+## Current state
+
+Last updated 19 August 2026.
+
+**Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
+
+**Soldiers are inert.** They gate at 400 and have an achievement, but raid events do not exist, so a soldier produces nothing and buying one is a pure loss. Raids are an open design decision.
+
+**Upgrades.** 20 of them, one-time food purchases, each unlocked by a caste count — 3 nanitic, 6 forager, 4 excavator, 4 nurse — plus 3 unlocked by total population. They raise caste output, cap per excavator, hatch rate, or global food.
+
+**Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
+
+**Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
+
+**Pacing.** Egg cost is banded by population: exponent 0.95 below 20 ants, 2.25 up to 100, 2.3 above. Incubation is 10s. Milestones under strong simulated play, so a human runs slower:
+
+| ants | 20 | 50 | 100 | 250 | 500 | 1000 |
+|---|---|---|---|---|---|---|
+| time | 2m | 3m | 7m | 20m | 41m | 89m |
+
+**Not built.** Prestige (the nuptial flight), raid events, and any offline-progress UI beyond the silent catch-up on load.
+
+**Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
 
 ---
 
