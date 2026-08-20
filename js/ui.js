@@ -22,8 +22,11 @@ import {
   game,
   hardReset,
   importSave,
+  feedableEggs,
   layEggs,
   load,
+  proteinUnlocked,
+  setSetting,
   markSeen,
   OFFLINE_CAP,
   queenTitle,
@@ -156,6 +159,16 @@ function renderBrood() {
       : CASTES[id].name + " — " + CASTES[id].unlockAt + " ants";
   });
 
+  const feedRow = el("feedBroodRow");
+  feedRow.hidden = !proteinUnlocked();
+  if (!feedRow.hidden) {
+    const on = game.settings.feedBrood !== false;
+    el("feedBrood").checked = on;
+    el("feedBroodLabel").textContent = on
+      ? "Feed eggs protein — " + fmt(feedableEggs()) + " eggs can hatch twice as fast"
+      : "Feed eggs protein — off, eggs cost food only";
+  }
+
   const eggs = game.eggs;
   const slots = broodCapacity(game);
   const tended = Math.min(eggs.length, slots);
@@ -193,7 +206,7 @@ function renderSlots(eggs, slots, tended) {
     const egg = i < tended ? eggs[i] : null;
     row.classList.toggle("empty", !egg);
     row.querySelector(".slot-caste").textContent = egg
-      ? CASTES[emergingCaste(game, egg)].name
+      ? CASTES[emergingCaste(game, egg)].name + (egg.fed ? " ·fed" : "")
       : "empty";
     row.querySelector(".bar i").style.width =
       egg ? Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1) + "%" : "0%";
@@ -278,6 +291,11 @@ function render() {
   else if (activeTab === "achievements") renderAchievements();
   else if (activeTab === "settings") renderSettings();
 }
+
+el("feedBrood").onchange = event => {
+  setSetting("feedBrood", event.target.checked);
+  render();
+};
 
 el("btnShed").onclick = () => {
   shedWings();

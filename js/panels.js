@@ -117,6 +117,8 @@ export function buildAnts(onChange) {
 
 function casteEffectText(id) {
   const held = game.ants[id];
+  const fight = combatPerCaste(game, id);
+  const armed = held > 0 && fight > 0 ? " · " + fmt(held * fight) + " fighting strength" : "";
   if (id === "excavator") {
     const per = held > 0 ? (populationCap(game) - 30) / held : 0;
     return held > 0 ? "+" + fmt(per * held) + " cap (" + fmt(per) + " each)" + armed : "";
@@ -132,10 +134,6 @@ function casteEffectText(id) {
       ? fmt(held * combatPerSoldier(game)) + " fighting strength (" + fmt(combatPerSoldier(game)) + " each)"
       : "";
   }
-  const fight = combatPerCaste(game, id);
-  const armed = held > 0 && fight > 0
-    ? " · " + fmt(held * fight) + " fighting strength"
-    : "";
   if (id === "bigforager") {
     return held > 0
       ? fmt(bigForagerOutput(game)) + "/s total (" + fmt(bigForagerOutput(game) / held) + " each, rising with age)"

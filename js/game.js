@@ -96,7 +96,7 @@ function blankGame() {
     peakPopulation: 0,
     naniticsDied: false,
     queenName: "",
-    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all" },
+    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
     seen: { upgrades: 0, achievements: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
     lastSave: Date.now()
@@ -143,7 +143,7 @@ export function layEgg() {
   if (!canLay()) return false;
   const cost = eggCost(game);
   game[cost.resource] -= cost.amount;
-  const fed = game.protein >= EGG_PROTEIN_COST;
+  const fed = game.settings.feedBrood !== false && game.protein >= EGG_PROTEIN_COST;
   if (fed) game.protein -= EGG_PROTEIN_COST;
   game.eggs.push({ caste: game.nextCaste, progress: 0, fed });
   return true;
@@ -174,6 +174,15 @@ export function affordableEggs() {
     count++;
   }
   return count;
+}
+
+export function proteinUnlocked() {
+  return game.protein > 0 || game.raidsWon > 0 || game.raidsLost > 0;
+}
+
+export function feedableEggs() {
+  if (game.settings.feedBrood === false) return 0;
+  return Math.floor(game.protein / EGG_PROTEIN_COST);
 }
 
 export function exileUnlocked() {

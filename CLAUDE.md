@@ -118,7 +118,7 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Display rules.** `fmt()` keeps three significant figures — 1862 reads as 1.86K, not 1.9K — and rolls the suffix over when rounding carries (999999 is 1.00M, not 1000K). Costs read green when affordable and muted when not; red never means "you can afford this".
 
-**Protein** is the second resource, and only raids produce it. Laying an egg spends one protein when there is any, and that egg develops twice as fast; with no protein eggs still lay at normal speed, so a colony that loses its soldiers is slowed rather than blocked. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
+**Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
 
 **Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
 
