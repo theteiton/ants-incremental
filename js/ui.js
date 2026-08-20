@@ -205,7 +205,7 @@ function renderBrood() {
   renderSlots(eggs, slots, tended);
 }
 
-const SLOT_LIMIT = 12;
+const SLOT_LIMIT = 5;
 function renderSlots(eggs, slots, tended) {
   const box = el("eggSlots");
   const shown = Math.min(slots, SLOT_LIMIT);
@@ -229,7 +229,8 @@ function renderSlots(eggs, slots, tended) {
   }
   el("slotOverflow").hidden = slots <= SLOT_LIMIT;
   el("slotOverflow").textContent = slots > SLOT_LIMIT
-    ? "and " + (slots - SLOT_LIMIT) + " more slots working" : "";
+    ? "and " + fmt(slots - SLOT_LIMIT) + " more slots working out of sight"
+    : "";
 }
 
 function renderRaid() {

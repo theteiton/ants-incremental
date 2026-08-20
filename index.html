@@ -27,7 +27,8 @@
 </p>
 
 <main>
-  <div class="split">
+  <div class="columns">
+  <div class="col status">
   <section class="panel queen-panel" id="queenPanel">
     <canvas id="queenSprite" class="sprite queen-sprite"></canvas>
     <div>
@@ -35,13 +36,28 @@
       <p id="queenText"></p>
       <button id="btnShed">Shed her wings</button>
     </div>
-    <div class="inspector" id="inspector">
-      <b id="inspectTitle">Point at anything</b>
-      <span id="inspectBody"></span>
-      <span class="inspect-note" id="inspectNote"></span>
-    </div>
   </section>
 
+  <section class="panel raid-panel" id="raidPanel" hidden>
+    <h2>The nest under threat</h2>
+    <p id="raidCountdown"></p>
+    <div class="raid-scales">
+      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
+      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+    </div>
+    <p class="raid-report" id="raidReport"></p>
+    <p class="raid-hunt" id="raidHunt" hidden></p>
+    <p class="raid-notice" id="raidNotice" hidden></p>
+  </section>
+
+  <section class="panel inspector" id="inspector">
+    <b id="inspectTitle">Point at anything</b>
+    <span id="inspectBody"></span>
+    <span class="inspect-note" id="inspectNote"></span>
+  </section>
+  </div>
+
+  <div class="col action">
   <section class="panel" id="broodPanel" hidden>
     <h2>Brood</h2>
     <p id="eggCost"></p>
@@ -58,20 +74,6 @@
     <div id="eggSlots"></div>
     <p class="dim" id="slotOverflow" hidden></p>
   </section>
-  </div>
-
-  <section class="panel raid-panel" id="raidPanel" hidden>
-    <h2>The nest under threat</h2>
-    <p id="raidCountdown"></p>
-    <div class="raid-scales">
-      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
-      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
-    </div>
-    <p class="raid-report" id="raidReport"></p>
-    <p class="raid-hunt" id="raidHunt" hidden></p>
-    <p class="raid-notice" id="raidNotice" hidden></p>
-  </section>
-
   <nav class="tabs">
     <button id="tabButton-ants">Ants</button>
     <button id="tabButton-upgrades">Upgrades<span class="badge" id="badge-upgrades" hidden></span></button>
@@ -140,6 +142,8 @@
       <button id="btnReset" class="danger">Erase colony</button>
     </div>
   </section>
+  </div>
+  </div>
 </main>
 
 <div class="modal" id="exileModal" hidden>

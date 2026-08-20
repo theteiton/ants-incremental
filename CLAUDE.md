@@ -111,9 +111,11 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Big Foragers.** A rare variant that hatches from ordinary forager eggs and cannot be laid deliberately. The k-th is guaranteed by the 3.5^k-th forager since the last one, with a chance that rises toward that threshold, so in practice the roll fires well before the guarantee — about ten appear over 750 forager hatches. Each produces 5x a forager's base and grows +5% per minute alive to a cap of 3x, so she starts strong and ages into something stronger. They are not exilable and stay hidden in the roster until the first one appears.
 
-**The inspector** sits under the queen: hover any ant, upgrade or achievement track and it explains what the thing does and what it still needs. It keeps showing the last thing pointed at, so the text does not vanish when the mouse moves away or the tab changes.
+**The layout is two columns on a wide screen.** The left is the status column, top to bottom: the queen, the raid box, then the inspector. The right is the column you act in: the brood above the tabs, and the brood panel is the same width as the tab panels below it. Below 1000px the whole thing stacks in that order.
 
-**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to twelve, then a count of the rest.
+**The inspector** sits at the bottom of the status column: hover any ant, upgrade or achievement track and it explains what the thing does and what it still needs. It keeps showing the last thing pointed at, so the text does not vanish when the mouse moves away or the tab changes.
+
+**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to five, then a count of the slots working out of sight.
 
 **Themes** are dark, light and soil, chosen in Settings and saved with the colony. Every colour comes from a variable on `:root` — including the background glow and the text on primary buttons. Hard-coding either breaks a theme: a fixed dark glow put a near-black blotch on the light background, and fixed dark button text left 0.29 luminance against light-theme red.
 
