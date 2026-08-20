@@ -51,6 +51,16 @@ export function fmt(n) {
   return scaled.toFixed(digits) + SUFFIXES[tier];
 }
 
+// factors in a formula need their real value, not fmt()'s three significant
+// figures — a 1.25 multiplier must never read as 1.3
+export function fmtFactor(n) {
+  if (!isFinite(n)) return "0";
+  if (Math.abs(n) >= 1000) return fmt(n);
+  if (n !== 0 && Math.abs(n) < 0.1) return String(Math.round(n * 1000) / 1000);
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
 export function fmtTime(seconds) {
   const total = Math.floor(seconds);
   const hours = Math.floor(total / 3600);
@@ -126,7 +136,7 @@ export function buildAnts(onChange) {
     const count = document.createElement("div");
     count.className = "caste-count";
 
-    row.append(exileCell, art, body, count);
+    row.append(art, body, count, exileCell);
     list.appendChild(row);
 
     watch(row, {
@@ -185,8 +195,10 @@ export function renderAnts() {
     ui.count.textContent = fmt(held);
 
     const allowed = maxExilable(id);
-    const show = exileUnlocked() && game.settings.exileEnabled && CASTES[id].layable;
-    ui.exileCell.hidden = !show;
+    // the cell stays on every row so the sprites and counts line up; only the
+    // button goes for castes that cannot be exiled at all
+    ui.exileCell.hidden = !(exileUnlocked() && game.settings.exileEnabled);
+    ui.exileButton.hidden = !CASTES[id].layable;
     ui.exileButton.disabled = allowed <= 0;
     ui.exileButton.title = allowed > 0
       ? "Exile up to " + fmt(allowed) + " " + CASTES[id].name

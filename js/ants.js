@@ -37,7 +37,7 @@ export const CASTES = {
   }
 };
 
-export const NANITIC_GENERATION = 5;
+export const NANITIC_GENERATION = 4;
 export const EGG_TIME = 24;
 export const BASE_POPULATION_CAP = 30;
 export const CAP_PER_EXCAVATOR = 6;
@@ -74,12 +74,14 @@ export const CASTE_COSTS = {
 
 
 export const UPGRADES = [
-  { id: "nanitic_1", name: "Callow Cuticle", req: { caste: "nanitic", count: 3 }, cost: 30,
-    desc: "Thin-shelled nanitics forage twice as hard.", effect: { type: "casteFood", caste: "nanitic", add: 1 } },
-  { id: "nanitic_2", name: "Hunger of the First", req: { caste: "nanitic", count: 5 }, cost: 120,
-    desc: "The first generation works itself to the bone.", effect: { type: "casteFood", caste: "nanitic", add: 2 } },
-  { id: "nanitic_3", name: "Living Larder", req: { caste: "population", count: 15 }, cost: 500,
-    desc: "Nanitics store food in their own crops.", effect: { type: "casteFood", caste: "nanitic", add: 4 } },
+  { id: "nanitic_1", name: "Callow Cuticle", req: { caste: "nanitic", count: 1 }, cost: 30,
+    desc: "Thin-shelled nanitics forage twice as hard.", effect: { type: "casteFlat", caste: "nanitic", add: 0.9 } },
+  { id: "nanitic_2", name: "Hunger of the First", req: { caste: "nanitic", count: 2 }, cost: 120,
+    desc: "The first generation works itself to the bone.", effect: { type: "casteFlat", caste: "nanitic", add: 1.2 } },
+  { id: "nanitic_3", name: "Living Larder", req: { caste: "nanitic", count: 3 }, cost: 500,
+    desc: "Nanitics store food in their own crops.", effect: { type: "casteMult", caste: "nanitic", mult: 1.5 } },
+  { id: "nanitic_4", name: "Borrowed Time", req: { caste: "nanitic", count: 4 }, cost: 1200,
+    desc: "They will not live to see the colony they build.", effect: { type: "casteMult", caste: "nanitic", mult: 2 } },
 
   { id: "forager_1", name: "Scent Trails", req: { caste: "forager", count: 3 }, cost: 260,
     desc: "Foragers mark the route home. Forager food +50%.", effect: { type: "casteFood", caste: "forager", add: 0.5 } },
@@ -180,8 +182,17 @@ export function visibleUpgrades(game) {
   return UPGRADES.filter(u => !upgradeOwned(game, u) && upgradeUnlocked(game, u));
 }
 
-export function effectTotal(game, type) {
-  return sumEffect(game, type);
+export function effectTotal(game, type, caste) {
+  return sumEffect(game, type, caste);
+}
+
+export function baseFood(casteId) {
+  return FOOD_PER_SECOND[casteId] || 0;
+}
+
+// the upgrade half of the food multiplier, without the achievement half
+export function globalUpgradeMultiplier(game) {
+  return productEffect(game, "globalFood");
 }
 
 function sumEffect(game, type, caste) {
@@ -196,14 +207,21 @@ function sumEffect(game, type, caste) {
   return total;
 }
 
-function productEffect(game, type) {
+function productEffect(game, type, caste) {
   let total = 1;
   for (const upgrade of UPGRADES) {
     if (upgrade.effect.type !== type) continue;
+    if (caste && upgrade.effect.caste !== caste) continue;
     if (!upgradeOwned(game, upgrade)) continue;
     total *= upgrade.effect.mult;
   }
   return total;
+}
+
+// does this caste have any multiplier upgrades at all? the formula only shows
+// the term when there is one to show
+export function casteHasMultiplier(casteId) {
+  return UPGRADES.some(u => u.effect.type === "casteMult" && u.effect.caste === casteId);
 }
 
 export function achievementFoodBonus(game) {
@@ -214,10 +232,22 @@ export function achievementHatchBonus(game) {
   return 1 + ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel;
 }
 
+// flat food added to a caste's base: casteFood upgrades are stored as a share of
+// the base, casteFlat upgrades as the food itself
+export function casteFlatBonus(game, casteId) {
+  const base = FOOD_PER_SECOND[casteId] || 0;
+  return base * sumEffect(game, "casteFood", casteId) + sumEffect(game, "casteFlat", casteId);
+}
+
+export function casteMultiplier(game, casteId) {
+  return productEffect(game, "casteMult", casteId);
+}
+
 export function casteFoodPerSecond(game, casteId) {
   const base = FOOD_PER_SECOND[casteId];
   if (!base) return 0;
-  return base * (1 + sumEffect(game, "casteFood", casteId)) * globalFoodMultiplier(game);
+  return (base + casteFlatBonus(game, casteId)) *
+    casteMultiplier(game, casteId) * globalFoodMultiplier(game);
 }
 
 export function globalFoodMultiplier(game) {
@@ -236,7 +266,7 @@ export function bigForagerMultiplier(game, bornAt) {
 
 export function bigForagerOutput(game) {
   if (!game.bigForagers || game.bigForagers.length === 0) return 0;
-  const each = BIG_FORAGER_BASE * (1 + sumEffect(game, "casteFood", "forager")) * globalFoodMultiplier(game);
+  const each = BIG_FORAGER_BASE * casteFoodPerSecond(game, "forager");
   let total = 0;
   for (const bornAt of game.bigForagers) total += each * bigForagerMultiplier(game, bornAt);
   return total;

@@ -8,7 +8,7 @@ A browser-based ant colony incremental game. Vanilla HTML, CSS and JavaScript �
 
 You play a mated queen who has already landed. Her first act is to shed her wings, which frees a finite pool of body reserves — 100 units, and she will never get more. Those reserves buy her first eggs.
 
-The first five workers to emerge are **nanitics**: undersized, feeble foragers. This is not a balance bug, it is how real founding colonies work. Once they are out the reserves stop mattering forever, the colony feeds itself, and the nanitics themselves die of old age two hours later.
+She shed four wings, so the first four workers to emerge are **nanitics**: undersized, feeble foragers. This is not a balance bug, it is how real founding colonies work. Once they are out the reserves stop mattering forever, the colony feeds itself, and the nanitics themselves die of old age two hours later.
 
 From there you choose what each egg becomes.
 
@@ -46,11 +46,20 @@ Ignoring soldiers entirely is slow and bloody rather than fatal — a colony can
 
 ### Upgrades
 
-Twenty-eight one-time purchases across two branches, **Colony** and **Combat**, shown as sub-tabs. Every upgrade is listed at all times: locked ones say exactly what they still need, and available ones show what they will do to your *current* rates rather than a percentage that reads larger than it is.
+Twenty-nine one-time purchases across two branches, **Colony** and **Combat**, shown as sub-tabs. Every upgrade is listed at all times: locked ones say exactly what they still need, and available ones show what they will do to your *current* rates rather than a percentage that reads larger than it is.
+
+Every rate in the game is built the same way — a base that upgrades add flat amounts to, multiplied by whatever scales the whole thing — and hovering an upgrade shows that formula with live numbers, naming the one factor it moves:
+
+```
+each forager = (base 1 + yield 1.25) × colony 1.25 × achievements 1.48 = 4.2/s
+adds 0.50 to forager yield → 1.25 → 1.75
+```
 
 ### Achievements
 
 Fourteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level worth **+3% food and +1% hatch speed**, up to level 20. Tracks read your peak values, so a bad raid never takes a tier back.
+
+Each track carries a ladder of pips, one per tier and filled for the ones you have earned, so you can see how far up every ladder you are without clicking. A track that has gained a tier since you last looked at it shows a dot, and the dot clears when you point at that track — so the tab tells you *which* achievement you just earned, not merely that you earned one.
 
 ### Pace
 

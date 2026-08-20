@@ -75,7 +75,7 @@ Keep to this layout. If a file grows past roughly 400 lines, tell me and suggest
 
 This is settled. Do not redesign it. If you think something is wrong, say so in one sentence.
 
-**Founding phase.** The game opens with a mated queen who has already landed. First click sheds her wings and grants a finite pool of `reserves` that never regenerates. Eggs cost reserves. When the first workers emerge, reserves become permanently irrelevant.
+**Founding phase.** The game opens with a mated queen who has already landed. First click sheds her wings and grants a finite pool of `reserves` that never regenerates. She has four wings, so four nanitics. Eggs cost reserves. When the first workers emerge, reserves become permanently irrelevant.
 
 **Nanitics.** The first worker generation is undersized and weak. This is intentional and biologically accurate — it is not a balance bug.
 
@@ -99,13 +99,15 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 Last updated 20 August 2026. Published and playable at the Pages URL below.
 
-**Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
+**Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first four workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
 
 **Egg cost is per caste**, each with its own curve — forager `1.5 x n^1.75`, excavator `15 x n^1.8`, nurse `60 x n^1.7`, soldier `200 x n^1.6`. One caste's count never moves another's price. The price counts eggs already in the brood as well as hatched ants, so laying a batch at once costs exactly what laying them one at a time would. Before that, a batch of 100 cost 50.5% less than the same 100 bought singly.
 
 **Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
 
-**Nanitics die of old age at two hours.** Their base output is 0.9 against a forager's 1.0, which is high for ants described as feeble; it buys the fast opening. They stay capped at 5 and never scale with forager upgrades.
+**Nanitics die of old age at two hours.** Their base output is 0.9 against a forager's 1.0, which is high for ants described as feeble; it buys the fast opening. They are capped at 4 — one per wing the queen shed — and never scale with forager upgrades. Her 100 reserves still buy five eggs at 20 each, so the fifth hatches as the chosen caste rather than a nanitic.
+
+**The four nanitic upgrades are gated 1 / 2 / 3 / 4**, because a four-ant generation can never satisfy a gate above four. Two add flat food to the base (+0.9, +1.2) and two multiply it (×1.5, ×2), giving 9.0 each at full upgrades. Four nanitics at 9.0 is 36/s, exactly what five at 7.2 delivered before, so the opening's ceiling did not move when the fifth nanitic did.
 
 **Brood slots.** Only a few eggs develop at once; the rest queue. Base is 3 slots, each nurse adds 0.25 and the nurse upgrades raise that. Incubation is 24s per egg. This exists because hatching speed was never the bottleneck — food was — so nurses were dead weight. Measured: a run that never buys nurses reaches 1,000 ants in 160 minutes with the brood saturated 99% of the time; buying them when the brood backs up reaches it in 108. Do not raise the base slot count much; every point of it makes nurses matter less, and at base 5 with 15s incubation they were worth 3 minutes across a whole run.
 
@@ -123,13 +125,17 @@ Monsters scale with peak population and grow 5% per raid won. Measured over a fu
 
 **Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
 
-**Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 28 one-time purchases — 20 Colony bought with food, 8 Combat of which five cost protein — each unlocked by a caste count, a total population, or surviving a raid. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
+**Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 29 one-time purchases — 21 Colony bought with food, 8 Combat of which five cost protein — each unlocked by a caste count, a total population, or surviving a raid. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
 
-**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (28 / 20 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. Measured over a full run, a 2,500-ant colony reaches 72 tiers and level 14.
+**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (29 / 21 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. Measured over a full run, a 2,500-ant colony reaches 72 tiers and level 14.
 
 **Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
 
 **The layout is two columns on a wide screen.** The left is the status column, top to bottom: the queen, the raid box, then the inspector. The right is the column you act in: the brood above the tabs, and the brood panel is the same width as the tab panels below it. Below 1000px the whole thing stacks in that order.
+
+**Every rate is `(base + flat) × multipliers`.** Hovering an upgrade shows its layer's formula with live numbers, the one factor that upgrade moves, and the before and after — `each forager = (base 1 + yield 1.25) × colony 1.25 × achievements 1.48 = 4.2/s`. Effects come in four kinds: `casteFlat` adds food to a caste's base, `casteFood` does the same but is stored as a share of that base, `casteMult` multiplies one caste, `globalFood` multiplies everything. A new upgrade must be tagged with the factor it moves or the formula stops matching the game. `fmtFactor()` prints those factors, because `fmt()` keeps three significant figures and would read a 1.25 multiplier as 1.3.
+
+**Achievement tracks carry a dot and a pip ladder.** A track that gained a tier since you last pointed at *that track* shows a dot, cleared by hovering the row rather than by opening the tab — so the tab says which tracks moved, not merely that something did. Under each track is one pip per tier, filled for earned, so completed tiers read at a glance. `seen.tracks` records the per-track tier last looked at; a save written before it existed is seeded from current tiers, or every track lights at once.
 
 **The inspector** sits at the bottom of the status column: hover any ant, upgrade or achievement track and it explains what the thing does and what it still needs. It keeps showing the last thing pointed at, so the text does not vanish when the mouse moves away or the tab changes.
 
@@ -168,8 +174,22 @@ Raised in Discord by Feliza, Gyroth and amsel. Most is now done; what remains is
 **Still open.**
 
 - The nurse sprite's egg reads as a white shield. Art is being redrawn by hand, so leave it.
-- Soldiers still do nothing; raids remain unbuilt.
 - amsel also floated a pheromone ant that boosts other castes. Not designed.
+
+---
+
+## Playtest feedback — 20 August 2026
+
+Gyroth and amsel both reached 1K+ ants. Done since: four nanitics, achievement dots and pip ladders, "Feed the brood protein" (the old wording read as something eating the eggs), the feed toggle moved above the slots it changes, the exile button moved right so every sprite and count lines up, and the formula display on upgrades.
+
+**Still open, in the order they matter.**
+
+- **The raid death spiral.** `monsterPower` scales on `peakPopulation`, which never falls, and `DEATH_ORDER` kills soldiers first and foragers second — the fighters, then the earners. Salvage is proportional to defence, so a collapsed colony salvages nothing. From 1,000 ants it is roughly ten raids to 107 and twenty to 11, with the timer never stopping; Gyroth reached 80 defeats. Banked food does rebuild, because egg cost follows `casteStock` down, but nothing in the UI says so. Needs threat that decays, a raid pause below some population, or a salvage floor.
+- **Excavators are over-tuned.** At 29 cap each they are the cheapest population, the cheapest way past a gate and, with Gallery Wardens, cheap strength: excavator #172 costs 158K against forager #2430 at 1.26M. Gyroth ranked them first of four and finished with a 5K cap he did not need.
+- **Big foragers fade.** Their count grows logarithmically — each threshold is 3.5× the last — while foragers grow linearly, so at 2.43K foragers eight of them are about 4% of production. Raising their multiplier does not fix that shape.
+- Cancelling or destroying queued eggs, no refund. The brood is strict FIFO, so amsel's nurse eggs sat behind 600 forager eggs. Cancelling fixes the misclick; it does not fix priority, which is a separate feature.
+- Scouts that forage outside the nest for protein — overlaps what soldiers already do between raids, so it needs its own constraint.
+- More achievement bonus types. Deferred by decision until a few prestige layers exist.
 
 ---
 

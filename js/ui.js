@@ -61,8 +61,9 @@ import {
 } from "./upgrades.js";
 import {
   buildAchievements,
+  newTrackCount,
   renderAchievements,
-  totalTiers
+  seedSeenTracks
 } from "./achievements.js";
 import { drawSprite } from "./sprites.js";
 
@@ -110,7 +111,7 @@ function applyTheme() {
 
 function renderBadges() {
   const upgrades = upgradeBadge();
-  const achievements = Math.max(0, totalTiers(game) - (game.seen.achievements || 0));
+  const achievements = newTrackCount(game);
   el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
   el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
 }
@@ -181,8 +182,8 @@ function renderBrood() {
     const on = game.settings.feedBrood !== false;
     el("feedBrood").checked = on;
     el("feedBroodLabel").textContent = on
-      ? "Feed eggs protein — " + fmt(feedableEggs()) + " eggs can hatch twice as fast"
-      : "Feed eggs protein — off, eggs cost food only";
+      ? "Feed the brood protein — " + fmt(feedableEggs()) + " eggs can hatch twice as fast"
+      : "Feed the brood protein — off, eggs cost food only";
   }
 
   const eggs = game.eggs;
@@ -307,10 +308,7 @@ function render() {
   renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
-  else if (activeTab === "achievements") {
-    renderAchievements(game);
-    markSeen("achievements", totalTiers(game));
-  }
+  else if (activeTab === "achievements") renderAchievements(game);
   else if (activeTab === "settings") renderSettings();
 }
 
@@ -373,7 +371,7 @@ load();
 claimSave();
 applyTheme();
 markSeen("upgrades", affordableUpgrades());
-markSeen("achievements", 0);
+seedSeenTracks(game);
 selectTab("ants");
 
 let lastFrame = Date.now();

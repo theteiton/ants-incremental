@@ -1,12 +1,21 @@
 import {
+  achievementFoodBonus,
   BASE_BROOD_SLOTS,
+  BASE_POPULATION_CAP,
+  baseFood,
   broodCapacity,
+  CAP_PER_EXCAVATOR,
   CASTES,
-  EGG_TIME,
+  casteFlatBonus,
+  casteFoodPerSecond,
+  casteHasMultiplier,
+  casteMultiplier,
+  effectTotal,
   foodPerSecond,
-  incubationTime,
+  globalUpgradeMultiplier,
   peakCasteCount,
   populationCap,
+  slotsPerNurse,
   UPGRADES,
   upgradeBranch,
   upgradeCurrency,
@@ -14,9 +23,16 @@ import {
   upgradeOwned,
   upgradeUnlocked
 } from "./ants.js";
-import { combatPower, monsterPower, raidRewards } from "./raids.js";
+import {
+  combatPerSoldier,
+  combatPower,
+  HUNT_PROTEIN_PER_SOLDIER,
+  monsterPower,
+  raidRewards,
+  SOLDIER_COMBAT
+} from "./raids.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
-import { fmt, watch } from "./panels.js";
+import { fmt, fmtFactor, watch } from "./panels.js";
 
 const el = id => document.getElementById(id);
 
@@ -35,6 +51,139 @@ export function upgradeLockText(game, upgrade) {
 // ---------------------------------------------------------------- ants tab
 
 const upgradeCards = {};
+
+// Every rate in the game has the same shape: a base that upgrades add flat
+// amounts to, multiplied by whatever scales the whole thing. These read that
+// shape back out with live numbers, and name the one factor an upgrade moves.
+const f = fmtFactor;
+
+function casteName(id) {
+  return CASTES[id].name.toLowerCase();
+}
+
+function foodFormula(game, caste) {
+  const vigour = casteHasMultiplier(caste)
+    ? " × vigour " + f(casteMultiplier(game, caste))
+    : "";
+  return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
+    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour +
+    " × colony " + f(globalUpgradeMultiplier(game)) +
+    " × achievements " + f(achievementFoodBonus(game)) +
+    " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
+}
+
+function capFormula(game) {
+  return "cap = base " + BASE_POPULATION_CAP +
+    " + per excavator " + f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) +
+    " × excavators " + fmt(game.ants.excavator) +
+    " = " + fmt(populationCap(game));
+}
+
+function broodFormula(game) {
+  return "brood = base " + (BASE_BROOD_SLOTS + effectTotal(game, "broodSlots")) +
+    " + per nurse " + f(slotsPerNurse(game)) +
+    " × nurses " + fmt(game.ants.nurse) +
+    " = " + broodCapacity(game) + " slots";
+}
+
+function soldierFormula(game) {
+  return "each soldier = base " + SOLDIER_COMBAT +
+    " × power " + f(1 + effectTotal(game, "soldierPower")) +
+    " = " + fmt(combatPerSoldier(game)) + " strength";
+}
+
+function armsFormula(game, caste, type) {
+  return "each " + casteName(caste) + " = " + f(effectTotal(game, type)) +
+    " strength, " + fmt(game.ants[caste]) + " of them = " +
+    fmt(game.ants[caste] * effectTotal(game, type));
+}
+
+function proteinFormula(game) {
+  return "hunting = soldiers " + fmt(game.ants.soldier) +
+    " × base " + f(HUNT_PROTEIN_PER_SOLDIER) +
+    " × yield " + f(1 + effectTotal(game, "proteinYield")) +
+    " = " + f(game.ants.soldier * HUNT_PROTEIN_PER_SOLDIER *
+      (1 + effectTotal(game, "proteinYield"))) + "/s";
+}
+
+// returns [the formula as it stands, what this upgrade moves inside it]
+function formulaLines(upgrade, probe) {
+  const effect = upgrade.effect;
+  const type = effect.type;
+
+  if (type === "casteFood" || type === "casteFlat") {
+    const caste = effect.caste;
+    const added = type === "casteFlat" ? effect.add : baseFood(caste) * effect.add;
+    return [
+      foodFormula(game, caste),
+      "adds " + f(added) + " to " + casteName(caste) + " yield → " +
+        f(casteFlatBonus(game, caste)) + " → " + f(casteFlatBonus(probe, caste))
+    ];
+  }
+  if (type === "casteMult") {
+    const caste = effect.caste;
+    return [
+      foodFormula(game, caste),
+      "raises " + casteName(caste) + " vigour → " +
+        f(casteMultiplier(game, caste)) + " → " + f(casteMultiplier(probe, caste))
+    ];
+  }
+  if (type === "globalFood") {
+    return [
+      "all food × colony " + f(globalUpgradeMultiplier(game)) +
+        " × achievements " + f(achievementFoodBonus(game)),
+      "raises the colony bonus — " + f(globalUpgradeMultiplier(game)) +
+        " → " + f(globalUpgradeMultiplier(probe))
+    ];
+  }
+  if (type === "excavatorCap") {
+    return [
+      capFormula(game),
+      "adds " + f(effect.add) + " to per excavator — " +
+        f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) + " → " +
+        f(CAP_PER_EXCAVATOR + effectTotal(probe, "excavatorCap"))
+    ];
+  }
+  if (type === "nurseSlots") {
+    return [
+      broodFormula(game),
+      "adds " + f(effect.add) + " to per nurse — " + f(slotsPerNurse(game)) +
+        " → " + f(slotsPerNurse(probe))
+    ];
+  }
+  if (type === "broodSlots") {
+    return [
+      broodFormula(game),
+      "adds " + f(effect.add) + " to the base — " +
+        (BASE_BROOD_SLOTS + effectTotal(game, "broodSlots")) + " → " +
+        (BASE_BROOD_SLOTS + effectTotal(probe, "broodSlots"))
+    ];
+  }
+  if (type === "soldierPower") {
+    return [
+      soldierFormula(game),
+      "raises soldier power — " + f(1 + effectTotal(game, "soldierPower")) +
+        " → " + f(1 + effectTotal(probe, "soldierPower"))
+    ];
+  }
+  if (type === "combatForager" || type === "combatExcavator" || type === "combatNurse") {
+    const caste = type === "combatForager" ? "forager"
+      : type === "combatExcavator" ? "excavator" : "nurse";
+    return [
+      armsFormula(game, caste, type),
+      "adds " + f(effect.add) + " to " + casteName(caste) + " strength — " +
+        f(effectTotal(game, type)) + " → " + f(effectTotal(probe, type))
+    ];
+  }
+  if (type === "proteinYield") {
+    return [
+      proteinFormula(game),
+      "raises protein yield — " + f(1 + effectTotal(game, "proteinYield")) +
+        " → " + f(1 + effectTotal(probe, "proteinYield"))
+    ];
+  }
+  return [];
+}
 
 function previewUpgrade(upgrade) {
   const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
@@ -55,7 +204,7 @@ function previewUpgrade(upgrade) {
     if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";
     return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
   }
-  if (upgrade.effect.type === "casteFood") {
+  if (type === "casteFood" || type === "casteFlat" || type === "casteMult") {
     const caste = upgrade.effect.caste;
     if (game.ants[caste] === 0) {
       return "Does nothing while you have no " + CASTES[caste].name.toLowerCase() + "s.";
@@ -107,7 +256,9 @@ export function buildUpgrades(onChange) {
         if (upgradeOwned(game, upgrade)) return "Already bought.";
         const locked = upgradeLockText(game, upgrade);
         if (locked) return locked;
-        return "Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) + ". " + previewUpgrade(upgrade);
+        const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
+        return ["Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) + "."]
+          .concat(formulaLines(upgrade, probe), previewUpgrade(upgrade)).join("\n");
       },
       warn: false
     });

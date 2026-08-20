@@ -83,7 +83,7 @@ function blankGame() {
     naniticsDied: false,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
-    seen: { upgrades: 0, achievements: 0 },
+    seen: { upgrades: 0, tracks: null },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0 },
     lastSave: Date.now()
   };

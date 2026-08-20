@@ -125,7 +125,11 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
 }
 .inspector b { font-size: 16px; color: var(--accent-soft); }
 .inspector span { font-size: 14px; color: var(--dim); line-height: 1.5; }
-.inspect-note { color: var(--good) !important; font-size: 14px !important; }
+.inspect-note {
+  color: var(--good) !important;
+  font-size: 14px !important;
+  white-space: pre-line;
+}
 .inspect-note.warn { color: var(--accent) !important; }
 .queen-sprite { flex: none; }
 
@@ -169,7 +173,7 @@ button.danger { background: var(--danger); color: #fff; }
 .bar {
   display: block;
   height: 4px;
-  background: #0d0908;
+  background: var(--line);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -271,14 +275,14 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 .caste-row {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 12px;
   align-items: center;
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
 .caste-row:first-child { border-top: none; }
-.exile-cell { min-width: 62px; }
+.exile-cell { min-width: 62px; text-align: right; }
 .exile-button {
   background: transparent;
   border: 1px solid var(--line);
@@ -345,6 +349,26 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .track.maxed { border-color: var(--good); }
 .track-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.track-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.track-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--good);
+  flex: none;
+}
+.track.fresh { border-color: var(--good); }
+.track-pips { display: flex; flex-wrap: wrap; gap: 3px; }
+.track-pips i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.track-pips i.earned { background: var(--accent); }
+.track.maxed .track-pips i.earned { background: var(--good); }
 .track-head b { font-size: 13px; }
 .track-tier { font-size: 11px; color: var(--accent-soft); white-space: nowrap; }
 .track-next { font-size: 11px; color: var(--dim); }

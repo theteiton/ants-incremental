@@ -148,6 +148,34 @@ export function totalTiers(game) {
   return total;
 }
 
+export function trackSeenTier(game, track) {
+  const seen = game.seen.tracks;
+  return seen ? seen[track.id] || 0 : trackTier(game, track);
+}
+
+export function trackIsNew(game, track) {
+  return trackTier(game, track) > trackSeenTier(game, track);
+}
+
+export function newTrackCount(game) {
+  let count = 0;
+  for (const track of ACHIEVEMENT_TRACKS) if (trackIsNew(game, track)) count++;
+  return count;
+}
+
+export function markTrackSeen(game, track) {
+  if (game.seen.tracks) game.seen.tracks[track.id] = trackTier(game, track);
+}
+
+// a save written before per-track dots existed has nothing to compare against;
+// treat everything already earned as already seen rather than lighting all fourteen
+export function seedSeenTracks(game) {
+  if (game.seen.tracks) return;
+  const seen = {};
+  for (const track of ACHIEVEMENT_TRACKS) seen[track.id] = trackTier(game, track);
+  game.seen.tracks = seen;
+}
+
 export function achievementLevelFor(points) {
   return Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
 }
@@ -164,23 +192,37 @@ export function buildAchievements(game) {
     const row = document.createElement("li");
     row.className = "track";
     row.innerHTML =
-      '<span class="track-head"><b></b><span class="track-tier"></span></span>' +
+      '<span class="track-head"><span class="track-name"><b></b>' +
+      '<span class="track-dot" hidden></span></span><span class="track-tier"></span></span>' +
+      '<span class="track-pips"></span>' +
       '<span class="bar"><i></i></span>' +
       '<span class="track-next"></span>';
     row.querySelector("b").textContent = track.name;
+    const pips = row.querySelector(".track-pips");
+    track.thresholds.forEach(() => pips.appendChild(document.createElement("i")));
     watch(row, {
       title: track.name,
       body: track.desc,
       note: () => {
         const next = trackNext(game, track);
         const tier = trackTier(game, track);
-        if (next === null) return "Every tier earned — " + tier + " points from this one.";
-        return "Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
+        const earned = track.thresholds.slice(0, tier).map(fmt);
+        const listed = earned.length > 6 ? "…, " + earned.slice(-6).join(", ") : earned.join(", ");
+        const done = tier === 0
+          ? "No tiers yet."
+          : tier + (tier === 1 ? " tier: " : " tiers: ") + listed + ".";
+        if (next === null) return done + " Every tier on this track is earned.";
+        return done + " Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
           " — you have " + fmt(track.value(game)) + ".";
       }
     });
+    const clearDot = () => markTrackSeen(game, track);
+    row.addEventListener("mouseenter", clearDot);
+    row.addEventListener("click", clearDot);
     trackRows[track.id] = {
       row,
+      dot: row.querySelector(".track-dot"),
+      pips,
       tier: row.querySelector(".track-tier"),
       bar: row.querySelector(".bar i"),
       next: row.querySelector(".track-next")
@@ -194,7 +236,13 @@ export function renderAchievements(game) {
     const ui = trackRows[track.id];
     const tier = trackTier(game, track);
     const next = trackNext(game, track);
+    const fresh = trackIsNew(game, track);
     ui.row.classList.toggle("maxed", next === null);
+    ui.row.classList.toggle("fresh", fresh);
+    ui.dot.hidden = !fresh;
+    for (let i = 0; i < ui.pips.children.length; i++) {
+      ui.pips.children[i].className = i < tier ? "earned" : "";
+    }
     ui.tier.textContent = "tier " + tier + " / " + track.thresholds.length;
     ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
     ui.next.textContent = next === null

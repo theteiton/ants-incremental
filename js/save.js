@@ -138,7 +138,8 @@ export function applySave(game, fresh, data) {
   game.ants = Object.assign(fresh.ants, data.ants);
   game.stats = Object.assign(fresh.stats, data.stats);
   game.settings = Object.assign(fresh.settings, data.settings);
-  game.seen = Object.assign(fresh.seen, data.seen);
+  const seen = data.seen || {};
+  game.seen = { upgrades: seen.upgrades || 0, tracks: seen.tracks || null };
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
