@@ -32,35 +32,28 @@ import {
   resolveRaid as resolveRaidFor
 } from "./raids.js";
 import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
+import {
+  applySave,
+  claimSave,
+  clearSaves,
+  decodeSave,
+  encodeSave,
+  holdsSave,
+  readSave,
+  SAVE_VERSION,
+  stashSave,
+  writeSave
+} from "./save.js";
 
-export const SAVE_KEY = "ants_save_v5";
-export const LEGACY_SAVE_KEYS = ["ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 5;
+export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
+
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
-export const LOCK_KEY = "ants_lock";
 
-// the tab the player most recently opened owns the save; older tabs go quiet
-// rather than overwriting it when they close
-const sessionId = String(Date.now()) + "." + Math.random().toString(36).slice(2);
-
-export function claimSave() {
-  try {
-    localStorage.setItem(LOCK_KEY, sessionId);
-  } catch (err) {
-    return false;
-  }
-  return true;
+export function save() {
+  return writeSave(game);
 }
 
-export function holdsSave() {
-  try {
-    const owner = localStorage.getItem(LOCK_KEY);
-    return owner === null || owner === sessionId;
-  } catch (err) {
-    return true;
-  }
-}
 
 
 function blankGame() {
@@ -224,33 +217,19 @@ export function setSetting(key, value) {
 
 export function exportSave() {
   save();
-  return btoa(unescape(encodeURIComponent(JSON.stringify(game))));
+  return encodeSave(game);
 }
 
 export function importSave(text) {
-  let data;
-  try {
-    data = JSON.parse(decodeURIComponent(escape(atob(String(text).trim()))));
-  } catch (err) {
-    return false;
-  }
-  if (!data || typeof data !== "object" || !data.ants) return false;
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  } catch (err) {
-    return false;
-  }
+  const data = decodeSave(text);
+  if (!data) return false;
+  if (!stashSave(data)) return false;
   load();
   return true;
 }
 
 export function hardReset() {
-  try {
-    localStorage.removeItem(SAVE_KEY);
-    for (const key of LEGACY_SAVE_KEYS) localStorage.removeItem(key);
-  } catch (err) {
-    // a blocked localStorage still resets the in-memory colony below
-  }
+  clearSaves();
   Object.assign(game, blankGame());
   return true;
 }
@@ -343,102 +322,16 @@ export function tick(dt) {
   checkAchievements();
 }
 
-export function save() {
-  if (!holdsSave()) return false;
-  game.lastSave = Date.now();
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(game));
-  } catch (err) {
-    return false;
-  }
-  return true;
-}
-
-function migrate(data) {
-  if (data.version === 1) {
-    data.upgrades = [];
-    data.achievements = [];
-    data.achievementPoints = 0;
-    data.achievementLevel = 0;
-    data.stats = {
-      foodEarned: typeof data.food === "number" ? data.food : 0,
-      eggsHatched: typeof data.emerged === "number" ? data.emerged : 0,
-      playtime: 0
-    };
-    data.version = 2;
-  }
-  if (data.version === 2) {
-    data.peakPopulation = 0;
-    data.naniticsDied = false;
-    data.settings = { exileEnabled: true, hideLocked: false };
-    if (data.stats) data.stats.exiled = 0;
-    data.version = 3;
-  }
-  if (data.version === 3) {
-    data.queenName = "";
-    data.settings = Object.assign({ exileEnabled: true, hideLocked: false }, data.settings, {
-      hideOwned: false,
-      theme: "dark"
-    });
-    data.seen = { upgrades: 0, achievements: 0 };
-    data.bigForagers = [];
-    data.foragersSinceBig = 0;
-    if (data.ants) data.ants.bigforager = 0;
-    data.version = 4;
-  }
-  if (data.version === 4) {
-    data.protein = 0;
-    data.raidTimer = RAID_INTERVAL;
-    data.raidsWon = 0;
-    data.raidsLost = 0;
-    data.lastRaid = null;
-    data.version = 5;
-  }
-  return data;
-}
-
-function readSave() {
-  const keys = [SAVE_KEY].concat(LEGACY_SAVE_KEYS);
-  for (const key of keys) {
-    let raw = null;
-    try {
-      raw = localStorage.getItem(key);
-    } catch (err) {
-      return null;
-    }
-    if (!raw) continue;
-    try {
-      return migrate(JSON.parse(raw));
-    } catch (err) {
-      return null;
-    }
-  }
-  return null;
-}
 
 export function load() {
   const data = readSave();
   if (!data) return 0;
 
-  const fresh = blankGame();
-  Object.assign(game, fresh, data);
-  game.ants = Object.assign(fresh.ants, data.ants);
-  game.stats = Object.assign(fresh.stats, data.stats);
-  game.settings = Object.assign(fresh.settings, data.settings);
-  game.seen = Object.assign(fresh.seen, data.seen);
-  game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
-  game.protein = data.protein || 0;
-  game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
-  game.foragersSinceBig = data.foragersSinceBig || 0;
+  applySave(game, blankGame(), data);
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
-  game.peakCastes = Object.assign({}, data.peakCastes || {});
   for (const id in game.ants) {
     if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
   }
-  game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
-  game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
-  game.achievements = Array.isArray(data.achievements) ? data.achievements : [];
-  game.version = SAVE_VERSION;
   recountAchievements();
 
   const elapsed = Math.min(Math.max(0, (Date.now() - game.lastSave) / 1000), OFFLINE_CAP);

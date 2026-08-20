@@ -41,7 +41,8 @@ These are not preferences. Breaking them breaks the deployment.
 ```
 index.html          entry point, root, do not move
 style.css           all styling
-js/game.js          state object, tick loop, save/load, exiling
+js/game.js          state object, tick loop, exiling
+js/save.js          save keys, migrations, the one-tab lock, import and export
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
 js/panels.js        shared fmt(), the inspector, ants and settings panels
