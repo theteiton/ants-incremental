@@ -22,7 +22,9 @@ import {
   game,
   hardReset,
   importSave,
+  claimSave,
   feedableEggs,
+  holdsSave,
   layEggs,
   load,
   proteinUnlocked,
@@ -282,6 +284,7 @@ function render() {
   el("valProtein").textContent = fmt(game.protein);
   el("valTime").textContent = fmtTime(game.stats.playtime);
 
+  el("takeover").hidden = holdsSave();
   renderBadges();
   renderQueen();
   renderBrood();
@@ -291,6 +294,12 @@ function render() {
   else if (activeTab === "achievements") renderAchievements();
   else if (activeTab === "settings") renderSettings();
 }
+
+el("btnTakeOver").onclick = () => {
+  // claim without saving: this tab is the stale one, the other holds the real progress
+  claimSave();
+  window.location.reload();
+};
 
 el("feedBrood").onchange = event => {
   setSetting("feedBrood", event.target.checked);
@@ -342,6 +351,7 @@ buildSettings({
 
 drawSprite(el("queenSprite"), "queen", 4);
 load();
+claimSave();
 applyTheme();
 markSeen("upgrades", affordableUpgrades());
 markSeen("achievements", game.achievements.length);

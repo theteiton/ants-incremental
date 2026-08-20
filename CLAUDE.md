@@ -146,7 +146,7 @@ Monsters scale with peak population and grow 5% per raid won. Measured over a fu
 
 **Salvage is proportional to the fight you put up.** A lost raid returns protein scaled by how much defence you mustered, so a colony with no combat at all gets nothing from the corpse. Keep a losing colony able to recover if these numbers change.
 
-**Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
+**Only one tab writes the save.** Opening the game claims a `localStorage` lock keyed to that tab; the most recently opened tab owns it and every older tab stops saving, so a forgotten background tab can no longer overwrite real progress when it closes. The stale tab shows a red banner with a "Play here instead" button, which reclaims the lock and reloads from the authoritative save rather than pushing its own state over it. A lone tab with no lock present always saves, so a fresh browser is unaffected.
 
 ---
 
@@ -160,7 +160,6 @@ Raised in Discord by Feliza, Gyroth and amsel. Most is now done; what remains is
 
 - The nurse sprite's egg reads as a white shield. Art is being redrawn by hand, so leave it.
 - Soldiers still do nothing; raids remain unbuilt.
-- Two tabs open at once still clobber each other's saves.
 - amsel also floated a pheromone ant that boosts other castes. Not designed.
 
 ---

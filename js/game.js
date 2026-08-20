@@ -37,6 +37,29 @@ export const SAVE_VERSION = 5;
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
 export const POINTS_PER_LEVEL = 5;
+export const LOCK_KEY = "ants_lock";
+
+// the tab the player most recently opened owns the save; older tabs go quiet
+// rather than overwriting it when they close
+const sessionId = String(Date.now()) + "." + Math.random().toString(36).slice(2);
+
+export function claimSave() {
+  try {
+    localStorage.setItem(LOCK_KEY, sessionId);
+  } catch (err) {
+    return false;
+  }
+  return true;
+}
+
+export function holdsSave() {
+  try {
+    const owner = localStorage.getItem(LOCK_KEY);
+    return owner === null || owner === sessionId;
+  } catch (err) {
+    return true;
+  }
+}
 
 export const ACHIEVEMENTS = [
   { id: "pop_1", name: "She Is Not Alone", desc: "Reach 1 ant.", points: 1, check: g => population(g) >= 1 },
@@ -355,6 +378,7 @@ export function tick(dt) {
 }
 
 export function save() {
+  if (!holdsSave()) return false;
   game.lastSave = Date.now();
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(game));

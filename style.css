@@ -178,6 +178,20 @@ button.danger { background: var(--danger); color: #fff; }
 .raid-scales b.losing { color: var(--danger); }
 .raid-report { font-size: 13px; margin: 0; }
 
+.takeover {
+  margin: 0;
+  padding: 12px 20px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+.takeover button { background: #fff; color: var(--danger); padding: 6px 14px; font-size: 13px; }
+
 .subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .subtabs button {
   background: transparent;
