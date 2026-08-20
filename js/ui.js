@@ -4,6 +4,8 @@ import {
   EGG_TIME,
   emergingCaste,
   incubationTime,
+  NANITIC_LIFESPAN,
+  nextEggCaste,
   NANITIC_GENERATION,
   eggCost,
   foodPerSecond,
@@ -52,8 +54,11 @@ import {
   renderAchievements,
   renderAnts,
   renderSettings,
+  renderInspector,
   renderUpgrades,
-  upgradeBadge
+  setInspect,
+  upgradeBadge,
+  watch
 } from "./panels.js";
 import { drawSprite } from "./sprites.js";
 
@@ -92,7 +97,7 @@ function buildCasteChoice() {
 }
 
 function pendingCaste() {
-  return game.emerged < NANITIC_GENERATION ? "nanitic" : game.nextCaste;
+  return nextEggCaste(game);
 }
 
 function applyTheme() {
@@ -121,6 +126,11 @@ function renderQueen() {
     el("queenText").textContent =
       "Her wing muscles are being metabolised into eggs. The first " + NANITIC_GENERATION +
       " workers will emerge as undersized nanitics whatever caste is chosen — nothing else will feed this brood.";
+  } else if (game.ants.nanitic > 0) {
+    const left = Math.max(0, NANITIC_LIFESPAN - game.stats.playtime);
+    el("queenText").textContent =
+      "The first workers have emerged. Her reserves no longer matter; the colony feeds her now. " +
+      "The founding nanitics die of old age in " + fmtTime(left) + ".";
   } else if (game.naniticsDied) {
     el("queenText").textContent =
       "The founding nanitics have died of old age. The colony they raised carries on without them.";
@@ -208,7 +218,7 @@ function renderSlots(eggs, slots, tended) {
     const egg = i < tended ? eggs[i] : null;
     row.classList.toggle("empty", !egg);
     row.querySelector(".slot-caste").textContent = egg
-      ? CASTES[emergingCaste(game, egg)].name + (egg.fed ? " ·fed" : "")
+      ? CASTES[emergingCaste(game, egg, i)].name + (egg.fed ? " ·fed" : "")
       : "empty";
     row.querySelector(".bar i").style.width =
       egg ? Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1) + "%" : "0%";
@@ -286,6 +296,7 @@ function render() {
 
   el("takeover").hidden = holdsSave();
   renderBadges();
+  renderInspector();
   renderQueen();
   renderBrood();
   renderRaid();
@@ -354,7 +365,7 @@ load();
 claimSave();
 applyTheme();
 markSeen("upgrades", affordableUpgrades());
-markSeen("achievements", game.achievements.length);
+markSeen("achievements", 0);
 selectTab("ants");
 
 let lastFrame = Date.now();

@@ -3,8 +3,10 @@ import {
   ACHIEVEMENT_HATCH_PER_LEVEL,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
+  peakCasteCount,
   upgradeBranch,
   upgradeCurrency,
+  upgradeNeedsRaid,
   broodCapacity,
   CASTES,
   casteCount,
@@ -22,7 +24,12 @@ import {
 } from "./ants.js";
 import { combatPerCaste, combatPerSoldier, combatPower, monsterPower, raidRewards } from "./raids.js";
 import {
-  ACHIEVEMENTS,
+  ACHIEVEMENT_TRACKS,
+  MAX_ACHIEVEMENT_LEVEL,
+  totalTiers,
+  trackNext,
+  trackProgress,
+  trackTier,
   buyUpgrade,
   canExile,
   exile,
@@ -66,6 +73,48 @@ export function fmtTime(seconds) {
 
 const el = id => document.getElementById(id);
 
+let lastInspected = null;
+
+export function setInspect(entry) {
+  lastInspected = entry;
+  renderInspector();
+}
+
+export function renderInspector() {
+  const box = el("inspector");
+  if (!box) return;
+  const entry = lastInspected;
+  if (!entry) {
+    el("inspectTitle").textContent = "Point at anything";
+    el("inspectBody").textContent =
+      "Hover an ant, an upgrade or an achievement and what it does appears here.";
+    el("inspectNote").textContent = "";
+    return;
+  }
+  el("inspectTitle").textContent = entry.title || "";
+  el("inspectBody").textContent = typeof entry.body === "function" ? entry.body() : entry.body || "";
+  const note = typeof entry.note === "function" ? entry.note() : entry.note || "";
+  el("inspectNote").textContent = note;
+  el("inspectNote").className = entry.warn ? "inspect-note warn" : "inspect-note";
+}
+
+export function watch(element, entry) {
+  element.addEventListener("mouseenter", () => setInspect(entry));
+  element.addEventListener("focus", () => setInspect(entry));
+}
+
+export function upgradeLockText(game, upgrade) {
+  const parts = [];
+  if (upgradeNeedsRaid(game, upgrade)) parts.push("survive your first raid");
+  const req = upgrade.req;
+  const have = peakCasteCount(game, req.caste);
+  if (req.count > 0 && have < req.count) {
+    const label = req.caste === "population" ? "ants" : CASTES[req.caste].name.toLowerCase() + "s";
+    parts.push("needs " + fmt(req.count) + " " + label + " (you have " + fmt(have) + ")");
+  }
+  return parts.length ? "Locked: " + parts.join(", and ") : "";
+}
+
 // ---------------------------------------------------------------- ants tab
 const casteRows = {};
 let onColonyChange = () => {};
@@ -103,6 +152,11 @@ export function buildAnts(onChange) {
     row.append(exileCell, art, body, count);
     list.appendChild(row);
 
+    watch(row, {
+      title: CASTES[id].name,
+      body: CASTES[id].role,
+      note: () => casteEffectText(id) || "None in the colony yet."
+    });
     casteRows[id] = {
       row,
       exileCell,
@@ -253,6 +307,12 @@ function previewUpgrade(upgrade) {
     if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";
     return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
   }
+  if (upgrade.effect.type === "casteFood") {
+    const caste = upgrade.effect.caste;
+    if (game.ants[caste] === 0) {
+      return "Does nothing while you have no " + CASTES[caste].name.toLowerCase() + "s.";
+    }
+  }
   const before = foodPerSecond(game);
   const after = foodPerSecond(probe);
   if (before <= 0) return "No effect until you have that caste";
@@ -292,6 +352,17 @@ export function buildUpgrades(onChange) {
     card.onclick = () => {
       if (buyUpgrade(upgrade.id)) (onChange || onColonyChange)();
     };
+    watch(card, {
+      title: upgrade.name,
+      body: upgrade.desc,
+      note: () => {
+        if (upgradeOwned(game, upgrade)) return "Already bought.";
+        const locked = upgradeLockText(game, upgrade);
+        if (locked) return locked;
+        return "Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) + ". " + previewUpgrade(upgrade);
+      },
+      warn: false
+    });
     upgradeCards[upgrade.id] = {
       card,
       cost: card.querySelector(".upgrade-cost"),
@@ -335,16 +406,8 @@ export function renderUpgrades() {
     ui.cost.classList.toggle("affordable", !isOwned && isOpen && game[currency] >= upgrade.cost);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
-    if (!isOpen) {
-      const req = upgrade.req;
-      const label = req.caste === "population" ? "ants" : CASTES[req.caste].name.toLowerCase() + "s";
-      ui.lock.textContent = "Locked: needs " + fmt(req.count) + " " + label +
-        " (you have " + fmt(casteCount(game, req.caste)) + ")";
-      ui.effect.textContent = "";
-    } else {
-      ui.lock.textContent = "";
-      ui.effect.textContent = isOwned ? "" : previewUpgrade(upgrade);
-    }
+    ui.lock.textContent = isOwned ? "" : upgradeLockText(game, upgrade);
+    ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
   });
   el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
@@ -371,44 +434,69 @@ export function upgradeBadge() {
 }
 
 export function achievementBadge() {
-  return Math.max(0, game.achievements.length - (game.seen.achievements || 0));
+  return Math.max(0, totalTiers(game) - (game.seen.achievements || 0));
 }
 
 // -------------------------------------------------------- achievements tab
-const achievementChips = {};
+const trackRows = {};
 
 export function buildAchievements() {
   const list = el("achievementList");
-  ACHIEVEMENTS.forEach(achievement => {
-    const chip = document.createElement("li");
-    chip.className = "achievement";
-    chip.innerHTML = "<b></b><span></span><i></i>";
-    chip.querySelector("b").textContent = achievement.name;
-    chip.querySelector("span").textContent = achievement.desc;
-    chip.querySelector("i").textContent = achievement.points + " pts";
-    achievementChips[achievement.id] = chip;
-    list.appendChild(chip);
+  ACHIEVEMENT_TRACKS.forEach(track => {
+    const row = document.createElement("li");
+    row.className = "track";
+    row.innerHTML =
+      '<span class="track-head"><b></b><span class="track-tier"></span></span>' +
+      '<span class="bar"><i></i></span>' +
+      '<span class="track-next"></span>';
+    row.querySelector("b").textContent = track.name;
+    watch(row, {
+      title: track.name,
+      body: track.desc,
+      note: () => {
+        const next = trackNext(game, track);
+        const tier = trackTier(game, track);
+        if (next === null) return "Every tier earned — " + tier + " points from this one.";
+        return "Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
+          " — you have " + fmt(track.value(game)) + ".";
+      }
+    });
+    trackRows[track.id] = {
+      row,
+      tier: row.querySelector(".track-tier"),
+      bar: row.querySelector(".bar i"),
+      next: row.querySelector(".track-next")
+    };
+    list.appendChild(row);
   });
 }
 
 export function renderAchievements() {
-  ACHIEVEMENTS.forEach(achievement => {
-    achievementChips[achievement.id].classList.toggle(
-      "earned",
-      game.achievements.indexOf(achievement.id) >= 0
-    );
+  ACHIEVEMENT_TRACKS.forEach(track => {
+    const ui = trackRows[track.id];
+    const tier = trackTier(game, track);
+    const next = trackNext(game, track);
+    ui.row.classList.toggle("maxed", next === null);
+    ui.tier.textContent = "tier " + tier + " / " + track.thresholds.length;
+    ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
+    ui.next.textContent = next === null
+      ? "Every tier earned."
+      : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
   });
-  const level = game.achievementLevel;
-  el("achievementLevel").textContent = "Level " + level;
-  el("achievementPoints").textContent =
-    game.achievementPoints + " points — " +
-    (levelPoints(level + 1) - game.achievementPoints) + " to next level";
+
+  const points = totalTiers(game);
+  const level = Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
+  const capped = level >= MAX_ACHIEVEMENT_LEVEL;
+  el("achievementLevel").textContent = "Level " + level + (capped ? " (max)" : "");
+  el("achievementPoints").textContent = capped
+    ? points + " tiers earned across " + ACHIEVEMENT_TRACKS.length + " tracks"
+    : points + " tiers earned — " + Math.max(0, levelPoints(level + 1) - points) + " to the next level";
   el("achievementBonus").textContent =
     "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * level * 100) + "% food, +" +
     Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * level * 100) + "% hatch speed";
-  const progress = (game.achievementPoints - levelPoints(level)) / POINTS_PER_LEVEL;
+  const progress = capped ? 1 : (points - levelPoints(level)) / POINTS_PER_LEVEL;
   el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
-  markSeen("achievements", game.achievements.length);
+  markSeen("achievements", points);
 }
 
 // ------------------------------------------------------------ settings tab

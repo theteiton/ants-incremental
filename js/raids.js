@@ -108,6 +108,7 @@ export function resolveRaid(game) {
 
   if (won) {
     game.protein += reward.protein;
+    game.stats.proteinEarned = (game.stats.proteinEarned || 0) + reward.protein;
     game.food += reward.food;
     game.stats.foodEarned += reward.food;
     game.raidsWon++;
@@ -120,6 +121,7 @@ export function resolveRaid(game) {
   const dead = killAnts(game, toll);
   const salvage = Math.round(reward.protein * (defence / power));
   game.protein += salvage;
+  game.stats.proteinEarned = (game.stats.proteinEarned || 0) + salvage;
   game.raidsLost++;
   game.lastRaid = { won: false, power, protein: salvage, food: 0, dead };
   return game.lastRaid;

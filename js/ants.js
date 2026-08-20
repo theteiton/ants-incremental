@@ -21,7 +21,7 @@ export const CASTES = {
     name: "Nurse",
     unlockAt: 100,
     layable: true,
-    role: "Tends the brood, hatching eggs faster."
+    role: "Tends the brood, so more eggs develop at once."
   },
   bigforager: {
     name: "Big Forager",
@@ -33,7 +33,7 @@ export const CASTES = {
     name: "Soldier",
     unlockAt: 400,
     layable: true,
-    role: "Defends the nest against raids."
+    role: "Fights raids, and hunts between them for protein."
   }
 };
 
@@ -78,7 +78,7 @@ export const UPGRADES = [
     desc: "Thin-shelled nanitics forage twice as hard.", effect: { type: "casteFood", caste: "nanitic", add: 1 } },
   { id: "nanitic_2", name: "Hunger of the First", req: { caste: "nanitic", count: 5 }, cost: 120,
     desc: "The first generation works itself to the bone.", effect: { type: "casteFood", caste: "nanitic", add: 2 } },
-  { id: "nanitic_3", name: "Living Larder", req: { caste: "nanitic", count: 5 }, cost: 500,
+  { id: "nanitic_3", name: "Living Larder", req: { caste: "population", count: 15 }, cost: 500,
     desc: "Nanitics store food in their own crops.", effect: { type: "casteFood", caste: "nanitic", add: 4 } },
 
   { id: "forager_1", name: "Scent Trails", req: { caste: "forager", count: 3 }, cost: 260,
@@ -124,9 +124,9 @@ export const UPGRADES = [
   { id: "protein_2", name: "Hunting Parties", req: { caste: "soldier", count: 10 }, cost: 80, currency: "protein", branch: "combat",
     desc: "Kills are stripped to the shell. Raids yield 50% more protein.", effect: { type: "proteinYield", add: 0.5 } },
   { id: "protein_3", name: "Chitin Plating", req: { caste: "soldier", count: 25 }, cost: 250, currency: "protein", branch: "combat",
-    desc: "Thickened armour. Soldiers fight twice as hard again.", effect: { type: "soldierPower", add: 1 } },
+    desc: "Thickened armour. Soldier strength +100%.", effect: { type: "soldierPower", add: 1 } },
   { id: "protein_4", name: "Butchery", req: { caste: "soldier", count: 50 }, cost: 700, currency: "protein", branch: "combat",
-    desc: "Nothing of the carcass is left. Raids yield twice the protein.", effect: { type: "proteinYield", add: 1 } },
+    desc: "Nothing of the carcass is left. Raid protein +100%.", effect: { type: "proteinYield", add: 1 } },
   { id: "protein_5", name: "Royal Larder", req: { caste: "soldier", count: 100 }, cost: 2000, currency: "protein", branch: "combat",
     desc: "Stored meat feeds the brood. Three more eggs develop at once.", effect: { type: "broodSlots", add: 3 } },
 
@@ -156,9 +156,20 @@ export function upgradeBranch(upgrade) {
   return upgrade.branch || "colony";
 }
 
+export function peakCasteCount(game, key) {
+  const live = casteCount(game, key);
+  if (key === "population") return Math.max(game.peakPopulation || 0, live);
+  const peaks = game.peakCastes || {};
+  return Math.max(peaks[key] || 0, live);
+}
+
+export function upgradeNeedsRaid(game, upgrade) {
+  return !!upgrade.afterFirstRaid && (game.raidsWon || 0) + (game.raidsLost || 0) === 0;
+}
+
 export function upgradeUnlocked(game, upgrade) {
-  if (upgrade.afterFirstRaid && (game.raidsWon || 0) + (game.raidsLost || 0) === 0) return false;
-  return casteCount(game, upgrade.req.caste) >= upgrade.req.count;
+  if (upgradeNeedsRaid(game, upgrade)) return false;
+  return peakCasteCount(game, upgrade.req.caste) >= upgrade.req.count;
 }
 
 export function upgradeCurrency(upgrade) {
@@ -275,7 +286,7 @@ export function eggCost(game, casteId) {
     return { resource: "reserves", amount: RESERVE_EGG_COST };
   }
   const caste = casteId || game.nextCaste;
-  const curve = CASTE_COSTS[caste];
+  const curve = CASTE_COSTS[caste] || CASTE_COSTS.forager;
   return {
     resource: "food",
     amount: curve.base * Math.pow(casteStock(game, caste) + 1, curve.exponent)
@@ -290,6 +301,11 @@ export function layableCastes() {
   return Object.keys(CASTES).filter(id => CASTES[id].layable);
 }
 
-export function emergingCaste(game, egg) {
-  return game.emerged < NANITIC_GENERATION ? "nanitic" : egg.caste;
+export function emergingCaste(game, egg, queuePosition) {
+  const before = game.emerged + (queuePosition || 0);
+  return before < NANITIC_GENERATION ? "nanitic" : egg.caste;
+}
+
+export function nextEggCaste(game) {
+  return game.emerged + game.eggs.length < NANITIC_GENERATION ? "nanitic" : game.nextCaste;
 }

@@ -108,6 +108,8 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Big Foragers.** A rare variant that hatches from ordinary forager eggs and cannot be laid deliberately. The k-th is guaranteed by the 3.5^k-th forager since the last one, with a chance that rises toward that threshold, so in practice the roll fires well before the guarantee — about ten appear over 750 forager hatches. Each produces 5x a forager's base and grows +5% per minute alive to a cap of 3x, so she starts strong and ages into something stronger. They are not exilable and stay hidden in the roster until the first one appears.
 
+**The inspector** sits under the queen: hover any ant, upgrade or achievement track and it explains what the thing does and what it still needs. It keeps showing the last thing pointed at, so the text does not vanish when the mouse moves away or the tab changes.
+
 **Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to twelve, then a count of the rest.
 
 **Themes** are dark, light and soil, chosen in Settings and saved with the colony. Every colour comes from a variable on `:root` — including the background glow and the text on primary buttons. Hard-coding either breaks a theme: a fixed dark glow put a near-black blotch on the light background, and fixed dark button text left 0.29 luminance against light-theme red.
@@ -120,7 +122,9 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
 
-**Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
+**Achievements are tracks that keep levelling**, not one-off badges. Twelve tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. A colony around 400 ants sits near 39 tiers and level 7.
+
+**Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
 
 **Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
 

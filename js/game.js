@@ -27,6 +27,7 @@ import {
   raidCountdown as countdownFor,
   raidImminent as imminentFor,
   raidsUnlocked,
+  combatPower,
   huntRate,
   resolveRaid as resolveRaidFor
 } from "./raids.js";
@@ -61,39 +62,110 @@ export function holdsSave() {
   }
 }
 
-export const ACHIEVEMENTS = [
-  { id: "pop_1", name: "She Is Not Alone", desc: "Reach 1 ant.", points: 1, check: g => population(g) >= 1 },
-  { id: "pop_5", name: "The Nanitic Five", desc: "Reach 5 ants.", points: 1, check: g => population(g) >= 5 },
-  { id: "pop_10", name: "A Working Nest", desc: "Reach 10 ants.", points: 2, check: g => population(g) >= 10 },
-  { id: "pop_25", name: "Diggers Wanted", desc: "Reach 25 ants.", points: 2, check: g => population(g) >= 25 },
-  { id: "pop_50", name: "Half a Hundred", desc: "Reach 50 ants.", points: 3, check: g => population(g) >= 50 },
-  { id: "pop_100", name: "Century of Ants", desc: "Reach 100 ants.", points: 3, check: g => population(g) >= 100 },
-  { id: "pop_250", name: "Serious Colony", desc: "Reach 250 ants.", points: 4, check: g => population(g) >= 250 },
-  { id: "pop_500", name: "Mound Builder", desc: "Reach 500 ants.", points: 5, check: g => population(g) >= 500 },
-  { id: "pop_1000", name: "Thousand Strong", desc: "Reach 1,000 ants.", points: 6, check: g => population(g) >= 1000 },
+const DECADES = (from, to) => {
+  const out = [];
+  for (let e = from; e <= to; e++) out.push(Math.pow(10, e));
+  return out;
+};
 
-  { id: "food_1", name: "First Crumbs", desc: "Gather 100 food in total.", points: 1, check: g => g.stats.foodEarned >= 100 },
-  { id: "food_2", name: "Full Larder", desc: "Gather 10,000 food in total.", points: 2, check: g => g.stats.foodEarned >= 1e4 },
-  { id: "food_3", name: "Granary", desc: "Gather 1,000,000 food in total.", points: 3, check: g => g.stats.foodEarned >= 1e6 },
-  { id: "food_4", name: "Glut", desc: "Gather 100,000,000 food in total.", points: 4, check: g => g.stats.foodEarned >= 1e8 },
-  { id: "food_5", name: "Bottomless Nest", desc: "Gather 10,000,000,000 food in total.", points: 5, check: g => g.stats.foodEarned >= 1e10 },
+const STEPS = (list, from, to) => list.concat(DECADES(from, to));
 
-  { id: "egg_1", name: "Brood Tender", desc: "Hatch 10 eggs.", points: 2, check: g => g.stats.eggsHatched >= 10 },
-  { id: "egg_2", name: "Endless Laying", desc: "Hatch 100 eggs.", points: 3, check: g => g.stats.eggsHatched >= 100 },
-  { id: "egg_3", name: "Queen Unceasing", desc: "Hatch 1,000 eggs.", points: 4, check: g => g.stats.eggsHatched >= 1000 },
+// every achievement is a track that keeps levelling instead of a one-off badge
+export const ACHIEVEMENT_TRACKS = [
+  { id: "population", name: "Colony size", unit: "ants",
+    desc: "The largest colony you have raised.",
+    value: g => Math.max(g.peakPopulation || 0, population(g)),
+    thresholds: STEPS([1, 5, 10, 25, 50, 100, 250, 500], 3, 12) },
 
-  { id: "forager_a", name: "Trail Blazers", desc: "Keep 50 foragers.", points: 2, check: g => g.ants.forager >= 50 },
-  { id: "forager_b", name: "Harvest Army", desc: "Keep 250 foragers.", points: 4, check: g => g.ants.forager >= 250 },
-  { id: "excavator_a", name: "Tunnel Crew", desc: "Keep 25 excavators.", points: 2, check: g => g.ants.excavator >= 25 },
-  { id: "excavator_b", name: "Architects", desc: "Keep 100 excavators.", points: 4, check: g => g.ants.excavator >= 100 },
-  { id: "nurse_a", name: "Nursery Shift", desc: "Keep 25 nurses.", points: 2, check: g => g.ants.nurse >= 25 },
-  { id: "nurse_b", name: "Brood Guard", desc: "Keep 100 nurses.", points: 4, check: g => g.ants.nurse >= 100 },
-  { id: "soldier_a", name: "Standing Army", desc: "Raise your first soldier.", points: 3, check: g => g.ants.soldier >= 1 },
+  { id: "food", name: "Food gathered", unit: "food",
+    desc: "Every crumb the colony has ever brought home.",
+    value: g => g.stats.foodEarned,
+    thresholds: DECADES(2, 24) },
 
-  { id: "upg_1", name: "Adaptation", desc: "Buy 5 upgrades.", points: 2, check: g => g.upgrades.length >= 5 },
-  { id: "upg_2", name: "Selective Pressure", desc: "Buy 10 upgrades.", points: 3, check: g => g.upgrades.length >= 10 },
-  { id: "upg_3", name: "Perfected Colony", desc: "Buy all 20 upgrades.", points: 5, check: g => g.upgrades.length >= UPGRADES.length }
+  { id: "eggs", name: "Eggs hatched", unit: "eggs",
+    desc: "Workers raised from egg to adult.",
+    value: g => g.stats.eggsHatched,
+    thresholds: STEPS([10, 50], 2, 12) },
+
+  { id: "forager", name: "Foragers", unit: "foragers",
+    desc: "The most foragers the colony has held at once.",
+    value: g => peakOf(g, "forager"),
+    thresholds: STEPS([5, 25, 50, 100, 250, 500], 3, 10) },
+
+  { id: "excavator", name: "Excavators", unit: "excavators",
+    desc: "The most diggers the colony has held at once.",
+    value: g => peakOf(g, "excavator"),
+    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+
+  { id: "nurse", name: "Nurses", unit: "nurses",
+    desc: "The most nurses the colony has held at once.",
+    value: g => peakOf(g, "nurse"),
+    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+
+  { id: "bigforager", name: "Big Foragers", unit: "big foragers",
+    desc: "Oversized foragers that hatched by chance.",
+    value: g => peakOf(g, "bigforager"),
+    thresholds: [1, 2, 3, 5, 8, 12, 20, 30, 50, 80] },
+
+  { id: "soldier", name: "Soldiers", unit: "soldiers",
+    desc: "The standing army at its largest.",
+    value: g => peakOf(g, "soldier"),
+    thresholds: STEPS([1, 5, 10, 25, 50], 2, 8) },
+
+  { id: "raids", name: "Raids won", unit: "raids",
+    desc: "Attackers killed at the nest gate.",
+    value: g => g.raidsWon || 0,
+    thresholds: STEPS([1, 3, 5, 10, 25, 50], 2, 7) },
+
+  { id: "strength", name: "Fighting strength", unit: "strength",
+    desc: "The most fighting strength the colony has fielded.",
+    value: g => g.peakStrength || 0,
+    thresholds: STEPS([25, 100, 500], 3, 12) },
+
+  { id: "protein", name: "Protein gathered", unit: "protein",
+    desc: "Everything the soldiers have dragged home.",
+    value: g => g.stats.proteinEarned || 0,
+    thresholds: STEPS([10, 50], 2, 12) },
+
+  { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
+    desc: "Adaptations the colony has paid for.",
+    value: g => g.upgrades.length,
+    thresholds: [1, 3, 5, 8, 12, 16, 20, 24, 28] }
 ];
+
+function peakOf(game, caste) {
+  const peaks = game.peakCastes || {};
+  return Math.max(peaks[caste] || 0, game.ants[caste] || 0);
+}
+
+export function trackTier(game, track) {
+  const value = track.value(game);
+  let tier = 0;
+  while (tier < track.thresholds.length && value >= track.thresholds[tier]) tier++;
+  return tier;
+}
+
+export function trackNext(game, track) {
+  const tier = trackTier(game, track);
+  return tier < track.thresholds.length ? track.thresholds[tier] : null;
+}
+
+export function trackProgress(game, track) {
+  const next = trackNext(game, track);
+  if (next === null) return 1;
+  const tier = trackTier(game, track);
+  const floor = tier > 0 ? track.thresholds[tier - 1] : 0;
+  const value = track.value(game);
+  return Math.max(0, Math.min(1, (value - floor) / (next - floor)));
+}
+
+export function totalTiers(game) {
+  let total = 0;
+  for (const track of ACHIEVEMENT_TRACKS) total += trackTier(game, track);
+  return total;
+}
+
+export const MAX_ACHIEVEMENT_LEVEL = 20;
 
 function blankGame() {
   return {
@@ -117,11 +189,13 @@ function blankGame() {
     achievementPoints: 0,
     achievementLevel: 0,
     peakPopulation: 0,
+    peakCastes: {},
+    peakStrength: 0,
     naniticsDied: false,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
     seen: { upgrades: 0, achievements: 0 },
-    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
+    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0 },
     lastSave: Date.now()
   };
 }
@@ -301,25 +375,17 @@ export function levelPoints(level) {
 }
 
 export function checkAchievements() {
-  let earned = 0;
-  for (const achievement of ACHIEVEMENTS) {
-    if (game.achievements.indexOf(achievement.id) >= 0) continue;
-    if (!achievement.check(game)) continue;
-    game.achievements.push(achievement.id);
-    earned++;
-  }
-  if (earned === 0) return earned;
+  const before = game.achievementPoints;
   recountAchievements();
-  return earned;
+  return game.achievementPoints - before;
 }
 
 function recountAchievements() {
-  let points = 0;
-  for (const achievement of ACHIEVEMENTS) {
-    if (game.achievements.indexOf(achievement.id) >= 0) points += achievement.points;
-  }
-  game.achievementPoints = points;
-  game.achievementLevel = Math.floor(points / POINTS_PER_LEVEL);
+  game.achievementPoints = totalTiers(game);
+  game.achievementLevel = Math.min(
+    MAX_ACHIEVEMENT_LEVEL,
+    Math.floor(game.achievementPoints / POINTS_PER_LEVEL)
+  );
 }
 
 function rollBigForager() {
@@ -363,9 +429,16 @@ export function tick(dt) {
   }
 
   game.peakPopulation = Math.max(game.peakPopulation, population(game));
+  for (const id in game.ants) {
+    if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
+  }
+  const strength = combatPower(game);
+  if (strength > (game.peakStrength || 0)) game.peakStrength = strength;
 
   if (raidsUnlocked(game)) {
-    game.protein += huntRate(game) * dt;
+    const hunted = huntRate(game) * dt;
+    game.protein += hunted;
+    game.stats.proteinEarned += hunted;
     game.raidTimer -= dt;
     while (game.raidTimer <= 0) {
       resolveRaidFor(game);
@@ -465,6 +538,10 @@ export function load() {
   game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
+  game.peakCastes = Object.assign({}, data.peakCastes || {});
+  for (const id in game.ants) {
+    if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
+  }
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
   game.achievements = Array.isArray(data.achievements) ? data.achievements : [];
