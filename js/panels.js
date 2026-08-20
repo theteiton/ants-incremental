@@ -3,10 +3,7 @@ import {
   ACHIEVEMENT_HATCH_PER_LEVEL,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
-  peakCasteCount,
-  upgradeBranch,
   upgradeCurrency,
-  upgradeNeedsRaid,
   broodCapacity,
   CASTES,
   casteCount,
@@ -22,23 +19,15 @@ import {
   upgradeOwned,
   upgradeUnlocked
 } from "./ants.js";
-import { combatPerCaste, combatPerSoldier, combatPower, monsterPower, raidRewards } from "./raids.js";
+import { combatPerCaste, combatPerSoldier } from "./raids.js";
 import {
-  ACHIEVEMENT_TRACKS,
-  MAX_ACHIEVEMENT_LEVEL,
-  totalTiers,
-  trackNext,
-  trackProgress,
-  trackTier,
   buyUpgrade,
   canExile,
   exile,
   exileUnlocked,
   game,
-  levelPoints,
   markSeen,
   maxExilable,
-  POINTS_PER_LEVEL,
   setQueenName,
   setSetting
 } from "./game.js";
@@ -103,19 +92,7 @@ export function watch(element, entry) {
   element.addEventListener("focus", () => setInspect(entry));
 }
 
-export function upgradeLockText(game, upgrade) {
-  const parts = [];
-  if (upgradeNeedsRaid(game, upgrade)) parts.push("survive your first raid");
-  const req = upgrade.req;
-  const have = peakCasteCount(game, req.caste);
-  if (req.count > 0 && have < req.count) {
-    const label = req.caste === "population" ? "ants" : CASTES[req.caste].name.toLowerCase() + "s";
-    parts.push("needs " + fmt(req.count) + " " + label + " (you have " + fmt(have) + ")");
-  }
-  return parts.length ? "Locked: " + parts.join(", and ") : "";
-}
 
-// ---------------------------------------------------------------- ants tab
 const casteRows = {};
 let onColonyChange = () => {};
 
@@ -286,219 +263,6 @@ function updateExileDialog() {
 }
 
 // ------------------------------------------------------------ upgrades tab
-const upgradeCards = {};
-
-function previewUpgrade(upgrade) {
-  const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
-  const type = upgrade.effect.type;
-  if (type === "excavatorCap") {
-    return "Cap " + fmt(populationCap(game)) + " to " + fmt(populationCap(probe));
-  }
-  if (type === "soldierPower" || type === "combatForager" ||
-      type === "combatExcavator" || type === "combatNurse") {
-    return "Fighting strength " + fmt(combatPower(game)) + " to " + fmt(combatPower(probe));
-  }
-  if (type === "proteinYield") {
-    const power = monsterPower(game);
-    return "Raid protein " + fmt(raidRewards(game, power).protein) +
-      " to " + fmt(raidRewards(probe, power).protein);
-  }
-  if (type === "broodSlots" || type === "nurseSlots") {
-    if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";
-    return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
-  }
-  if (upgrade.effect.type === "casteFood") {
-    const caste = upgrade.effect.caste;
-    if (game.ants[caste] === 0) {
-      return "Does nothing while you have no " + CASTES[caste].name.toLowerCase() + "s.";
-    }
-  }
-  const before = foodPerSecond(game);
-  const after = foodPerSecond(probe);
-  if (before <= 0) return "No effect until you have that caste";
-  const gain = ((after / before - 1) * 100).toFixed(0);
-  return fmt(before) + "/s to " + fmt(after) + "/s (+" + gain + "% overall)";
-}
-
-const BRANCHES = [
-  { id: "all", name: "All" },
-  { id: "colony", name: "Colony" },
-  { id: "combat", name: "Combat" }
-];
-
-export function buildUpgrades(onChange) {
-  const filters = el("upgradeFilters");
-  BRANCHES.forEach(branch => {
-    const button = document.createElement("button");
-    button.textContent = branch.name;
-    button.dataset.branch = branch.id;
-    button.onclick = () => {
-      setSetting("upgradeFilter", branch.id);
-      renderUpgrades();
-    };
-    filters.appendChild(button);
-  });
-  const list = el("upgradeList");
-  UPGRADES.forEach(upgrade => {
-    const card = document.createElement("button");
-    card.className = "upgrade";
-    card.innerHTML =
-      '<span class="upgrade-head"><b></b><span class="upgrade-cost"></span></span>' +
-      '<span class="upgrade-desc"></span>' +
-      '<span class="upgrade-effect"></span>' +
-      '<span class="upgrade-lock"></span>';
-    card.querySelector("b").textContent = upgrade.name;
-    card.querySelector(".upgrade-desc").textContent = upgrade.desc;
-    card.onclick = () => {
-      if (buyUpgrade(upgrade.id)) (onChange || onColonyChange)();
-    };
-    watch(card, {
-      title: upgrade.name,
-      body: upgrade.desc,
-      note: () => {
-        if (upgradeOwned(game, upgrade)) return "Already bought.";
-        const locked = upgradeLockText(game, upgrade);
-        if (locked) return locked;
-        return "Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) + ". " + previewUpgrade(upgrade);
-      },
-      warn: false
-    });
-    upgradeCards[upgrade.id] = {
-      card,
-      cost: card.querySelector(".upgrade-cost"),
-      effect: card.querySelector(".upgrade-effect"),
-      lock: card.querySelector(".upgrade-lock")
-    };
-    list.appendChild(card);
-  });
-  el("hideLocked").onchange = event => {
-    setSetting("hideLocked", event.target.checked);
-    renderUpgrades();
-  };
-  el("hideOwned").onchange = event => {
-    setSetting("hideOwned", event.target.checked);
-    renderUpgrades();
-  };
-}
-
-export function renderUpgrades() {
-  let owned = 0;
-  let locked = 0;
-  UPGRADES.forEach(upgrade => {
-    const ui = upgradeCards[upgrade.id];
-    const isOwned = upgradeOwned(game, upgrade);
-    const isOpen = upgradeUnlocked(game, upgrade);
-    if (isOwned) owned++;
-    if (!isOpen) locked++;
-
-    const branch = upgradeBranch(upgrade);
-    const filter = game.settings.upgradeFilter || "all";
-    ui.card.classList.toggle("combat", branch === "combat");
-    ui.card.classList.toggle("colony", branch === "colony");
-    ui.card.hidden = (!isOpen && game.settings.hideLocked) ||
-      (isOwned && game.settings.hideOwned) ||
-      (filter !== "all" && branch !== filter);
-    ui.card.classList.toggle("owned", isOwned);
-    ui.card.classList.toggle("locked", !isOpen);
-    const currency = upgradeCurrency(upgrade);
-    ui.card.disabled = isOwned || !isOpen || game[currency] < upgrade.cost;
-    ui.cost.textContent = isOwned ? "owned" : fmt(upgrade.cost) + " " + currency;
-    ui.cost.classList.toggle("affordable", !isOwned && isOpen && game[currency] >= upgrade.cost);
-    ui.cost.classList.toggle("owned-tag", isOwned);
-
-    ui.lock.textContent = isOwned ? "" : upgradeLockText(game, upgrade);
-    ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
-  });
-  el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
-  el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
-  el("hideLocked").checked = !!game.settings.hideLocked;
-  el("hideOwned").checked = !!game.settings.hideOwned;
-  const filter = game.settings.upgradeFilter || "all";
-  for (const button of el("upgradeFilters").children) {
-    button.classList.toggle("active", button.dataset.branch === filter);
-  }
-  markSeen("upgrades", affordableUpgrades());
-}
-
-export function affordableUpgrades() {
-  let ready = 0;
-  for (const upgrade of UPGRADES) {
-    if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) continue;
-    if (game[upgradeCurrency(upgrade)] >= upgrade.cost) ready++;
-  }
-  return ready;
-}
-
-export function upgradeBadge() {
-  return Math.max(0, affordableUpgrades() - (game.seen.upgrades || 0));
-}
-
-export function achievementBadge() {
-  return Math.max(0, totalTiers(game) - (game.seen.achievements || 0));
-}
-
-// -------------------------------------------------------- achievements tab
-const trackRows = {};
-
-export function buildAchievements() {
-  const list = el("achievementList");
-  ACHIEVEMENT_TRACKS.forEach(track => {
-    const row = document.createElement("li");
-    row.className = "track";
-    row.innerHTML =
-      '<span class="track-head"><b></b><span class="track-tier"></span></span>' +
-      '<span class="bar"><i></i></span>' +
-      '<span class="track-next"></span>';
-    row.querySelector("b").textContent = track.name;
-    watch(row, {
-      title: track.name,
-      body: track.desc,
-      note: () => {
-        const next = trackNext(game, track);
-        const tier = trackTier(game, track);
-        if (next === null) return "Every tier earned — " + tier + " points from this one.";
-        return "Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
-          " — you have " + fmt(track.value(game)) + ".";
-      }
-    });
-    trackRows[track.id] = {
-      row,
-      tier: row.querySelector(".track-tier"),
-      bar: row.querySelector(".bar i"),
-      next: row.querySelector(".track-next")
-    };
-    list.appendChild(row);
-  });
-}
-
-export function renderAchievements() {
-  ACHIEVEMENT_TRACKS.forEach(track => {
-    const ui = trackRows[track.id];
-    const tier = trackTier(game, track);
-    const next = trackNext(game, track);
-    ui.row.classList.toggle("maxed", next === null);
-    ui.tier.textContent = "tier " + tier + " / " + track.thresholds.length;
-    ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
-    ui.next.textContent = next === null
-      ? "Every tier earned."
-      : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
-  });
-
-  const points = totalTiers(game);
-  const level = Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
-  const capped = level >= MAX_ACHIEVEMENT_LEVEL;
-  el("achievementLevel").textContent = "Level " + level + (capped ? " (max)" : "");
-  el("achievementPoints").textContent = capped
-    ? points + " tiers earned across " + ACHIEVEMENT_TRACKS.length + " tracks"
-    : points + " tiers earned — " + Math.max(0, levelPoints(level + 1) - points) + " to the next level";
-  el("achievementBonus").textContent =
-    "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * level * 100) + "% food, +" +
-    Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * level * 100) + "% hatch speed";
-  const progress = capped ? 1 : (points - levelPoints(level)) / POINTS_PER_LEVEL;
-  el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
-  markSeen("achievements", points);
-}
-
 // ------------------------------------------------------------ settings tab
 export function buildSettings(handlers) {
   el("setExile").onchange = event => {

@@ -44,7 +44,9 @@ style.css           all styling
 js/game.js          state object, tick loop, save/load, exiling
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
-js/panels.js        tab panel rendering, shared fmt()
+js/panels.js        shared fmt(), the inspector, ants and settings panels
+js/upgrades.js      upgrade panel, effect previews, lock text
+js/achievements.js  achievement tracks, tiers, levels, achievement panel
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
 CLAUDE.md           this file
@@ -122,7 +124,7 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
 
-**Achievements are tracks that keep levelling**, not one-off badges. Twelve tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. A colony around 400 ants sits near 39 tiers and level 7.
+**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (28 / 20 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. A colony around 400 ants sits near 39 tiers and level 7.
 
 **Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
 

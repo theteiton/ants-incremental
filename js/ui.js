@@ -42,24 +42,28 @@ import {
   tick
 } from "./game.js";
 import {
-  achievementBadge,
-  affordableUpgrades,
-  buildAchievements,
   buildAnts,
   buildExileDialog,
   buildSettings,
-  buildUpgrades,
   fmt,
   fmtTime,
-  renderAchievements,
   renderAnts,
-  renderSettings,
   renderInspector,
-  renderUpgrades,
+  renderSettings,
   setInspect,
-  upgradeBadge,
   watch
 } from "./panels.js";
+import {
+  affordableUpgrades,
+  buildUpgrades,
+  renderUpgrades,
+  upgradeBadge
+} from "./upgrades.js";
+import {
+  buildAchievements,
+  renderAchievements,
+  totalTiers
+} from "./achievements.js";
 import { drawSprite } from "./sprites.js";
 
 const el = id => document.getElementById(id);
@@ -106,7 +110,7 @@ function applyTheme() {
 
 function renderBadges() {
   const upgrades = upgradeBadge();
-  const achievements = achievementBadge();
+  const achievements = Math.max(0, totalTiers(game) - (game.seen.achievements || 0));
   el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
   el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
 }
@@ -302,7 +306,10 @@ function render() {
   renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
-  else if (activeTab === "achievements") renderAchievements();
+  else if (activeTab === "achievements") {
+    renderAchievements(game);
+    markSeen("achievements", totalTiers(game));
+  }
   else if (activeTab === "settings") renderSettings();
 }
 
@@ -339,7 +346,7 @@ buildCasteChoice();
 buildAnts(render);
 buildExileDialog();
 buildUpgrades(render);
-buildAchievements();
+buildAchievements(game);
 buildSettings({
   refresh: render,
   applyTheme: () => {

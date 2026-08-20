@@ -1,0 +1,217 @@
+import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
+import { fmt, watch } from "./panels.js";
+
+const el = id => document.getElementById(id);
+
+export const POINTS_PER_LEVEL = 5;
+export const MAX_ACHIEVEMENT_LEVEL = 20;
+
+const DECADES = (from, to) => {
+  const out = [];
+  for (let e = from; e <= to; e++) out.push(Math.pow(10, e));
+  return out;
+};
+
+const STEPS = (list, from, to) => list.concat(DECADES(from, to));
+
+// widening steps that finish exactly on the number of upgrades that exist
+export function upgradeSteps(total) {
+  const steps = [];
+  let value = 1;
+  let gap = 2;
+  while (value < total) {
+    steps.push(value);
+    value += gap;
+    gap += 2;
+  }
+  if (steps[steps.length - 1] !== total) steps.push(total);
+  return steps;
+}
+
+function peakOf(game, caste) {
+  const peaks = game.peakCastes || {};
+  return Math.max(peaks[caste] || 0, game.ants[caste] || 0);
+}
+
+function ownedIn(game, branch) {
+  if (!branch) return game.upgrades.length;
+  let owned = 0;
+  for (const id of game.upgrades) {
+    const upgrade = UPGRADE_INDEX[id];
+    if (upgrade && (upgrade.branch || "colony") === branch) owned++;
+  }
+  return owned;
+}
+
+const UPGRADE_INDEX = {};
+const BRANCH_TOTALS = { all: UPGRADES.length, colony: 0, combat: 0 };
+for (const upgrade of UPGRADES) {
+  UPGRADE_INDEX[upgrade.id] = upgrade;
+  BRANCH_TOTALS[upgradeBranch(upgrade)]++;
+}
+
+export const ACHIEVEMENT_TRACKS = [
+  { id: "population", name: "Colony size", unit: "ants",
+    desc: "The largest colony you have raised.",
+    value: g => Math.max(g.peakPopulation || 0, population(g)),
+    thresholds: STEPS([1, 5, 10, 25, 50, 100, 250, 500], 3, 12) },
+
+  { id: "food", name: "Food gathered", unit: "food",
+    desc: "Every crumb the colony has ever brought home.",
+    value: g => g.stats.foodEarned,
+    thresholds: DECADES(2, 24) },
+
+  { id: "eggs", name: "Eggs hatched", unit: "eggs",
+    desc: "Workers raised from egg to adult.",
+    value: g => g.stats.eggsHatched,
+    thresholds: STEPS([10, 50], 2, 12) },
+
+  { id: "forager", name: "Foragers", unit: "foragers",
+    desc: "The most foragers the colony has held at once.",
+    value: g => peakOf(g, "forager"),
+    thresholds: STEPS([5, 25, 50, 100, 250, 500], 3, 10) },
+
+  { id: "excavator", name: "Excavators", unit: "excavators",
+    desc: "The most diggers the colony has held at once.",
+    value: g => peakOf(g, "excavator"),
+    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+
+  { id: "nurse", name: "Nurses", unit: "nurses",
+    desc: "The most nurses the colony has held at once.",
+    value: g => peakOf(g, "nurse"),
+    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+
+  { id: "bigforager", name: "Big Foragers", unit: "big foragers",
+    desc: "Oversized foragers that hatched by chance.",
+    value: g => peakOf(g, "bigforager"),
+    thresholds: [1, 2, 3, 5, 8, 12, 20, 30, 50, 80] },
+
+  { id: "soldier", name: "Soldiers", unit: "soldiers",
+    desc: "The standing army at its largest.",
+    value: g => peakOf(g, "soldier"),
+    thresholds: STEPS([1, 5, 10, 25, 50], 2, 8) },
+
+  { id: "raids", name: "Raids won", unit: "raids",
+    desc: "Attackers killed at the nest gate.",
+    value: g => g.raidsWon || 0,
+    thresholds: STEPS([1, 3, 5, 10, 25, 50], 2, 7) },
+
+  { id: "strength", name: "Fighting strength", unit: "strength",
+    desc: "The most fighting strength the colony has fielded.",
+    value: g => g.peakStrength || 0,
+    thresholds: STEPS([25, 100, 500], 3, 12) },
+
+  { id: "protein", name: "Protein gathered", unit: "protein",
+    desc: "Everything the soldiers have dragged home.",
+    value: g => g.stats.proteinEarned || 0,
+    thresholds: STEPS([10, 50], 2, 12) },
+
+  { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
+    desc: "Every adaptation the colony has paid for.",
+    value: g => ownedIn(g, null),
+    thresholds: upgradeSteps(BRANCH_TOTALS.all) },
+
+  { id: "upgrades_colony", name: "Colony upgrades", unit: "colony upgrades",
+    desc: "Adaptations from the Colony branch.",
+    value: g => ownedIn(g, "colony"),
+    thresholds: upgradeSteps(BRANCH_TOTALS.colony) },
+
+  { id: "upgrades_combat", name: "Combat upgrades", unit: "combat upgrades",
+    desc: "Adaptations from the Combat branch.",
+    value: g => ownedIn(g, "combat"),
+    thresholds: upgradeSteps(BRANCH_TOTALS.combat) }
+];
+
+export function trackTier(game, track) {
+  const value = track.value(game);
+  let tier = 0;
+  while (tier < track.thresholds.length && value >= track.thresholds[tier]) tier++;
+  return tier;
+}
+
+export function trackNext(game, track) {
+  const tier = trackTier(game, track);
+  return tier < track.thresholds.length ? track.thresholds[tier] : null;
+}
+
+export function trackProgress(game, track) {
+  const next = trackNext(game, track);
+  if (next === null) return 1;
+  const tier = trackTier(game, track);
+  const floor = tier > 0 ? track.thresholds[tier - 1] : 0;
+  return Math.max(0, Math.min(1, (track.value(game) - floor) / (next - floor)));
+}
+
+export function totalTiers(game) {
+  let total = 0;
+  for (const track of ACHIEVEMENT_TRACKS) total += trackTier(game, track);
+  return total;
+}
+
+export function achievementLevelFor(points) {
+  return Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
+}
+
+export function levelPoints(level) {
+  return POINTS_PER_LEVEL * level;
+}
+
+const trackRows = {};
+
+export function buildAchievements(game) {
+  const list = el("achievementList");
+  ACHIEVEMENT_TRACKS.forEach(track => {
+    const row = document.createElement("li");
+    row.className = "track";
+    row.innerHTML =
+      '<span class="track-head"><b></b><span class="track-tier"></span></span>' +
+      '<span class="bar"><i></i></span>' +
+      '<span class="track-next"></span>';
+    row.querySelector("b").textContent = track.name;
+    watch(row, {
+      title: track.name,
+      body: track.desc,
+      note: () => {
+        const next = trackNext(game, track);
+        const tier = trackTier(game, track);
+        if (next === null) return "Every tier earned — " + tier + " points from this one.";
+        return "Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
+          " — you have " + fmt(track.value(game)) + ".";
+      }
+    });
+    trackRows[track.id] = {
+      row,
+      tier: row.querySelector(".track-tier"),
+      bar: row.querySelector(".bar i"),
+      next: row.querySelector(".track-next")
+    };
+    list.appendChild(row);
+  });
+}
+
+export function renderAchievements(game) {
+  ACHIEVEMENT_TRACKS.forEach(track => {
+    const ui = trackRows[track.id];
+    const tier = trackTier(game, track);
+    const next = trackNext(game, track);
+    ui.row.classList.toggle("maxed", next === null);
+    ui.tier.textContent = "tier " + tier + " / " + track.thresholds.length;
+    ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
+    ui.next.textContent = next === null
+      ? "Every tier earned."
+      : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
+  });
+
+  const points = totalTiers(game);
+  const level = Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
+  const capped = level >= MAX_ACHIEVEMENT_LEVEL;
+  el("achievementLevel").textContent = "Level " + level + (capped ? " (max)" : "");
+  el("achievementPoints").textContent = capped
+    ? points + " tiers earned across " + ACHIEVEMENT_TRACKS.length + " tracks"
+    : points + " tiers earned — " + Math.max(0, levelPoints(level + 1) - points) + " to the next level";
+  el("achievementBonus").textContent =
+    "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * level * 100) + "% food, +" +
+    Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * level * 100) + "% hatch speed";
+  const progress = capped ? 1 : (points - levelPoints(level)) / POINTS_PER_LEVEL;
+  el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
+}

@@ -31,13 +31,13 @@ import {
   huntRate,
   resolveRaid as resolveRaidFor
 } from "./raids.js";
+import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
 
 export const SAVE_KEY = "ants_save_v5";
 export const LEGACY_SAVE_KEYS = ["ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
 export const SAVE_VERSION = 5;
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
-export const POINTS_PER_LEVEL = 5;
 export const LOCK_KEY = "ants_lock";
 
 // the tab the player most recently opened owns the save; older tabs go quiet
@@ -62,110 +62,6 @@ export function holdsSave() {
   }
 }
 
-const DECADES = (from, to) => {
-  const out = [];
-  for (let e = from; e <= to; e++) out.push(Math.pow(10, e));
-  return out;
-};
-
-const STEPS = (list, from, to) => list.concat(DECADES(from, to));
-
-// every achievement is a track that keeps levelling instead of a one-off badge
-export const ACHIEVEMENT_TRACKS = [
-  { id: "population", name: "Colony size", unit: "ants",
-    desc: "The largest colony you have raised.",
-    value: g => Math.max(g.peakPopulation || 0, population(g)),
-    thresholds: STEPS([1, 5, 10, 25, 50, 100, 250, 500], 3, 12) },
-
-  { id: "food", name: "Food gathered", unit: "food",
-    desc: "Every crumb the colony has ever brought home.",
-    value: g => g.stats.foodEarned,
-    thresholds: DECADES(2, 24) },
-
-  { id: "eggs", name: "Eggs hatched", unit: "eggs",
-    desc: "Workers raised from egg to adult.",
-    value: g => g.stats.eggsHatched,
-    thresholds: STEPS([10, 50], 2, 12) },
-
-  { id: "forager", name: "Foragers", unit: "foragers",
-    desc: "The most foragers the colony has held at once.",
-    value: g => peakOf(g, "forager"),
-    thresholds: STEPS([5, 25, 50, 100, 250, 500], 3, 10) },
-
-  { id: "excavator", name: "Excavators", unit: "excavators",
-    desc: "The most diggers the colony has held at once.",
-    value: g => peakOf(g, "excavator"),
-    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
-
-  { id: "nurse", name: "Nurses", unit: "nurses",
-    desc: "The most nurses the colony has held at once.",
-    value: g => peakOf(g, "nurse"),
-    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
-
-  { id: "bigforager", name: "Big Foragers", unit: "big foragers",
-    desc: "Oversized foragers that hatched by chance.",
-    value: g => peakOf(g, "bigforager"),
-    thresholds: [1, 2, 3, 5, 8, 12, 20, 30, 50, 80] },
-
-  { id: "soldier", name: "Soldiers", unit: "soldiers",
-    desc: "The standing army at its largest.",
-    value: g => peakOf(g, "soldier"),
-    thresholds: STEPS([1, 5, 10, 25, 50], 2, 8) },
-
-  { id: "raids", name: "Raids won", unit: "raids",
-    desc: "Attackers killed at the nest gate.",
-    value: g => g.raidsWon || 0,
-    thresholds: STEPS([1, 3, 5, 10, 25, 50], 2, 7) },
-
-  { id: "strength", name: "Fighting strength", unit: "strength",
-    desc: "The most fighting strength the colony has fielded.",
-    value: g => g.peakStrength || 0,
-    thresholds: STEPS([25, 100, 500], 3, 12) },
-
-  { id: "protein", name: "Protein gathered", unit: "protein",
-    desc: "Everything the soldiers have dragged home.",
-    value: g => g.stats.proteinEarned || 0,
-    thresholds: STEPS([10, 50], 2, 12) },
-
-  { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
-    desc: "Adaptations the colony has paid for.",
-    value: g => g.upgrades.length,
-    thresholds: [1, 3, 5, 8, 12, 16, 20, 24, 28] }
-];
-
-function peakOf(game, caste) {
-  const peaks = game.peakCastes || {};
-  return Math.max(peaks[caste] || 0, game.ants[caste] || 0);
-}
-
-export function trackTier(game, track) {
-  const value = track.value(game);
-  let tier = 0;
-  while (tier < track.thresholds.length && value >= track.thresholds[tier]) tier++;
-  return tier;
-}
-
-export function trackNext(game, track) {
-  const tier = trackTier(game, track);
-  return tier < track.thresholds.length ? track.thresholds[tier] : null;
-}
-
-export function trackProgress(game, track) {
-  const next = trackNext(game, track);
-  if (next === null) return 1;
-  const tier = trackTier(game, track);
-  const floor = tier > 0 ? track.thresholds[tier - 1] : 0;
-  const value = track.value(game);
-  return Math.max(0, Math.min(1, (value - floor) / (next - floor)));
-}
-
-export function totalTiers(game) {
-  let total = 0;
-  for (const track of ACHIEVEMENT_TRACKS) total += trackTier(game, track);
-  return total;
-}
-
-export const MAX_ACHIEVEMENT_LEVEL = 20;
 
 function blankGame() {
   return {
@@ -371,7 +267,7 @@ export function buyUpgrade(id) {
 }
 
 export function levelPoints(level) {
-  return POINTS_PER_LEVEL * level;
+  return levelPointsFor(level);
 }
 
 export function checkAchievements() {
@@ -382,10 +278,7 @@ export function checkAchievements() {
 
 function recountAchievements() {
   game.achievementPoints = totalTiers(game);
-  game.achievementLevel = Math.min(
-    MAX_ACHIEVEMENT_LEVEL,
-    Math.floor(game.achievementPoints / POINTS_PER_LEVEL)
-  );
+  game.achievementLevel = achievementLevelFor(game.achievementPoints);
 }
 
 function rollBigForager() {
