@@ -88,6 +88,8 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 **Prestige is the nuptial flight.** Not built yet. Do not build it until I ask.
 
+**No automation before prestige.** Nothing lays an egg, buys an upgrade, picks a caste or exiles an ant on the player's behalf. Every one of those stays a click. Automation is what prestige layer 1 upgrades will sell, so do not spend it early — passive production, hatching, raids and hunting are not automation, they are the game running.
+
 ---
 
 ## Current state
@@ -134,7 +136,7 @@ The opening is slower than it was (20 ants in 2.9m against 1.6m) because brood s
 
 Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
 
-**Not built.** Prestige (the nuptial flight) and raid events.
+**Not built.** Prestige (the nuptial flight), and any automation, which belongs to prestige layer 1.
 
 **Raids.** From 400 population a monster attacks every six minutes. Soldiers fight at 25 each from birth; every other caste fights at nothing until the Combat branch arms them — Alarm Pheromone gives foragers 1, Gallery Wardens gives excavators 10, Brood Defenders gives nurses 2, and big foragers fight at triple a forager. The branch only appears after the colony has survived its first attack, and the first three raids come at a quarter, half and three quarters strength so there is time to react. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
 
