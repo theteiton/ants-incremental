@@ -97,13 +97,13 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 20 August 2026 (raids). Published and playable at the Pages URL below.
+Last updated 20 August 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
 
 **Egg cost is per caste**, each with its own curve — forager `1.5 x n^1.75`, excavator `15 x n^1.8`, nurse `60 x n^1.7`, soldier `200 x n^1.6`. One caste's count never moves another's price. The price counts eggs already in the brood as well as hatched ants, so laying a batch at once costs exactly what laying them one at a time would. Before that, a batch of 100 cost 50.5% less than the same 100 bought singly.
 
-**Exiling** removes ants from a caste with no refund. It is blocked when it would drop the cap below the current population, so excavators cannot be dumped to strand a colony above its cap. Nanitics cannot be exiled, a Settings toggle disables the feature, and it unlocks with the first forager. Because exiling lowers population, caste unlocks read a high-water mark — with a live count, exiling would re-lock castes already earned.
+**Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
 
 **Nanitics die of old age at two hours.** Their base output is 0.9 against a forager's 1.0, which is high for ants described as feeble; it buys the fast opening. They stay capped at 5 and never scale with forager upgrades.
 
@@ -111,51 +111,51 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **Big Foragers.** A rare variant that hatches from ordinary forager eggs and cannot be laid deliberately. The k-th is guaranteed by the 3.5^k-th forager since the last one, with a chance that rises toward that threshold, so in practice the roll fires well before the guarantee — about ten appear over 750 forager hatches. Each produces 5x a forager's base and grows +5% per minute alive to a cap of 3x, so she starts strong and ages into something stronger. They are not exilable and stay hidden in the roster until the first one appears.
 
+**Exiling** removes ants from a caste with no refund. It is blocked when it would drop the cap below the current population, so excavators cannot be dumped to strand a colony above its cap. Nanitics cannot be exiled, a Settings toggle disables the feature, and it unlocks with the first forager. Because exiling lowers population, caste unlocks read a high-water mark — with a live count, exiling would re-lock castes already earned.
+
+**Raids.** From 400 population a monster attacks every six minutes. Soldiers fight at 25 each from birth; every other caste fights at nothing until the Combat branch arms them — Alarm Pheromone gives foragers 1, Gallery Wardens gives excavators 10, Brood Defenders gives nurses 2, and big foragers fight at triple a forager. The branch only appears after the colony has survived its first attack, and the first three raids come at a quarter, half and three quarters strength so there is time to react. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
+
+**Soldiers hunt between raids.** While no attack is near they are out of the nest bringing back protein every second; inside the last thirty seconds they come home and the hunting stops. Workers never leave, which is why they only ever fight defensively.
+
+Monsters scale with peak population and grow 5% per raid won. Measured over a full run: 6% soldiers wins 19 of 32 raids and reaches 1,000 ants in about 80 minutes, 10% wins all 32, and a colony that never lays a soldier still gets to 1,000 on worker strength alone once the Combat branch is bought — slower and bloodier, but not a wall.
+
+**Salvage is proportional to the fight you put up.** A lost raid returns protein scaled by how much defence you mustered, so a colony with no combat at all gets nothing from the corpse. Keep a losing colony able to recover if these numbers change.
+
+**Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
+
+**Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 28 one-time purchases — 20 Colony bought with food, 8 Combat of which five cost protein — each unlocked by a caste count, a total population, or surviving a raid. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
+
+**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (28 / 20 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. Measured over a full run, a 2,500-ant colony reaches 72 tiers and level 14.
+
+**Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
+
 **The layout is two columns on a wide screen.** The left is the status column, top to bottom: the queen, the raid box, then the inspector. The right is the column you act in: the brood above the tabs, and the brood panel is the same width as the tab panels below it. Below 1000px the whole thing stacks in that order.
 
 **The inspector** sits at the bottom of the status column: hover any ant, upgrade or achievement track and it explains what the thing does and what it still needs. It keeps showing the last thing pointed at, so the text does not vanish when the mouse moves away or the tab changes.
 
-**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the queen and brood controls pinned above them so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to five, then a count of the slots working out of sight.
+**Interface** is four tabs — Ants, Upgrades, Achievements, Settings — with the brood sitting above them in the same column, so eggs can be laid from any tab. A dot marks Upgrades or Achievements when something new is waiting and clears when the tab is opened. Each caste and the queen have a pixel sprite drawn in JS onto a canvas; the brood shows one bar per tended egg, up to five, then a count of the slots working out of sight.
 
 **Themes** are dark, light and soil, chosen in Settings and saved with the colony. Every colour comes from a variable on `:root` — including the background glow and the text on primary buttons. Hard-coding either breaks a theme: a fixed dark glow put a near-black blotch on the light background, and fixed dark button text left 0.29 luminance against light-theme red.
 
 **The queen can be named** in Settings and is addressed as Queen <name>. One queen per colony, always.
 
-**Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
-
 **Display rules.** `fmt()` keeps three significant figures — 1862 reads as 1.86K, not 1.9K — and rolls the suffix over when rounding carries (999999 is 1.00M, not 1000K). Costs read green when affordable and muted when not; red never means "you can afford this".
-
-**Protein** is the second resource, and raids and hunting produce it. Feeding the brood is a choice, not automatic: a toggle in the brood panel appears once protein exists, and while it is on each egg laid spends one protein and develops twice as fast. Turn it off, or run out, and eggs cost food alone at normal speed — so a colony that loses its soldiers is slowed rather than blocked. Fed eggs are marked in the brood slots. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
-
-**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (28 / 20 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. A colony around 400 ants sits near 39 tiers and level 7.
-
-**Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
-
-**Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
 
 **Background tabs are credited.** `requestAnimationFrame` does not fire in a hidden tab, so the frame loop feeds the whole elapsed gap through `tick()` in chunks, clamped to the same eight hour cap as offline progress. Capping a frame at one second instead threw away 99.8% of a ten minute absence.
 
+**Only one tab writes the save.** Opening the game claims a `localStorage` lock keyed to that tab; the most recently opened tab owns it and every older tab stops saving, so a forgotten background tab can no longer overwrite real progress when it closes. The stale tab shows a red banner with a "Play here instead" button, which reclaims the lock and reloads from the authoritative save rather than pushing its own state over it. A lone tab with no lock present always saves, so a fresh browser is unaffected.
+
 **Pacing.** Milestones under strong simulated play, so a human runs slower:
 
-| ants | 20 | 50 | 100 | 250 | 500 | 1000 |
-|---|---|---|---|---|---|---|
-| time | 2.9m | 6.9m | 13.7m | 29m | 52m | 84m |
+| ants | 20 | 50 | 100 | 250 | 500 | 1000 | 2000 |
+|---|---|---|---|---|---|---|---|
+| time | 3m | 7m | 13m | 29m | 51m | 80m | 166m |
 
 The opening is slower than it was (20 ants in 2.9m against 1.6m) because brood slots cap early throughput. That is the price of nurses mattering — the two trade directly against each other.
 
 Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
 
 **Not built.** Prestige (the nuptial flight), and any automation, which belongs to prestige layer 1.
-
-**Raids.** From 400 population a monster attacks every six minutes. Soldiers fight at 25 each from birth; every other caste fights at nothing until the Combat branch arms them — Alarm Pheromone gives foragers 1, Gallery Wardens gives excavators 10, Brood Defenders gives nurses 2, and big foragers fight at triple a forager. The branch only appears after the colony has survived its first attack, and the first three raids come at a quarter, half and three quarters strength so there is time to react. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
-
-**Soldiers hunt between raids.** While no attack is near they are out of the nest bringing back protein every second; inside the last thirty seconds they come home and the hunting stops. Workers never leave, which is why they only ever fight defensively.
-
-Monsters scale with peak population and grow 5% per raid won. Measured over a full run: 6% soldiers wins 19 of 32 raids and reaches 1,000 ants in 84 minutes, 10% wins all 32, and a colony that never lays a soldier still reaches 1,000 in 128 minutes on worker strength alone — slower, bloodier, but no longer a wall.
-
-**Salvage is proportional to the fight you put up.** A lost raid returns protein scaled by how much defence you mustered, so a colony with no combat at all gets nothing from the corpse. Keep a losing colony able to recover if these numbers change.
-
-**Only one tab writes the save.** Opening the game claims a `localStorage` lock keyed to that tab; the most recently opened tab owns it and every older tab stops saving, so a forgotten background tab can no longer overwrite real progress when it closes. The stale tab shows a red banner with a "Play here instead" button, which reclaims the lock and reloads from the authoritative save rather than pushing its own state over it. A lone tab with no lock present always saves, so a fresh browser is unaffected.
 
 ---
 
