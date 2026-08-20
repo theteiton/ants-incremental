@@ -3,10 +3,7 @@ import {
   ACHIEVEMENT_HATCH_PER_LEVEL,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
-  combatPerSoldier,
-  combatPower,
-  monsterPower,
-  raidRewards,
+  upgradeBranch,
   upgradeCurrency,
   broodCapacity,
   CASTES,
@@ -23,6 +20,7 @@ import {
   upgradeOwned,
   upgradeUnlocked
 } from "./ants.js";
+import { combatPerCaste, combatPerSoldier, combatPower, monsterPower, raidRewards } from "./raids.js";
 import {
   ACHIEVEMENTS,
   buyUpgrade,
@@ -121,12 +119,12 @@ function casteEffectText(id) {
   const held = game.ants[id];
   if (id === "excavator") {
     const per = held > 0 ? (populationCap(game) - 30) / held : 0;
-    return held > 0 ? "+" + fmt(per * held) + " cap (" + fmt(per) + " each)" : "";
+    return held > 0 ? "+" + fmt(per * held) + " cap (" + fmt(per) + " each)" + armed : "";
   }
   if (id === "nurse") {
     return held > 0
       ? "+" + fmt(broodCapacity(game) - BASE_BROOD_SLOTS) + " brood slots (" +
-        broodCapacity(game) + " tended at once)"
+        broodCapacity(game) + " tended at once)" + armed
       : "";
   }
   if (id === "soldier") {
@@ -134,13 +132,17 @@ function casteEffectText(id) {
       ? fmt(held * combatPerSoldier(game)) + " fighting strength (" + fmt(combatPerSoldier(game)) + " each)"
       : "";
   }
+  const fight = combatPerCaste(game, id);
+  const armed = held > 0 && fight > 0
+    ? " · " + fmt(held * fight) + " fighting strength"
+    : "";
   if (id === "bigforager") {
     return held > 0
       ? fmt(bigForagerOutput(game)) + "/s total (" + fmt(bigForagerOutput(game) / held) + " each, rising with age)"
       : "";
   }
   const each = casteFoodPerSecond(game, id);
-  return held > 0 ? fmt(each * held) + "/s total (" + fmt(each) + " each)" : "";
+  return held > 0 ? fmt(each * held) + "/s total (" + fmt(each) + " each)" + armed : "";
 }
 
 export function renderAnts() {
@@ -240,8 +242,8 @@ function previewUpgrade(upgrade) {
   if (type === "excavatorCap") {
     return "Cap " + fmt(populationCap(game)) + " to " + fmt(populationCap(probe));
   }
-  if (type === "soldierPower") {
-    if (game.ants.soldier === 0) return "Needs soldiers to matter";
+  if (type === "soldierPower" || type === "combatForager" ||
+      type === "combatExcavator" || type === "combatNurse") {
     return "Fighting strength " + fmt(combatPower(game)) + " to " + fmt(combatPower(probe));
   }
   if (type === "proteinYield") {
@@ -260,7 +262,24 @@ function previewUpgrade(upgrade) {
   return fmt(before) + "/s to " + fmt(after) + "/s (+" + gain + "% overall)";
 }
 
+const BRANCHES = [
+  { id: "all", name: "All" },
+  { id: "colony", name: "Colony" },
+  { id: "combat", name: "Combat" }
+];
+
 export function buildUpgrades(onChange) {
+  const filters = el("upgradeFilters");
+  BRANCHES.forEach(branch => {
+    const button = document.createElement("button");
+    button.textContent = branch.name;
+    button.dataset.branch = branch.id;
+    button.onclick = () => {
+      setSetting("upgradeFilter", branch.id);
+      renderUpgrades();
+    };
+    filters.appendChild(button);
+  });
   const list = el("upgradeList");
   UPGRADES.forEach(upgrade => {
     const card = document.createElement("button");
@@ -303,7 +322,13 @@ export function renderUpgrades() {
     if (isOwned) owned++;
     if (!isOpen) locked++;
 
-    ui.card.hidden = (!isOpen && game.settings.hideLocked) || (isOwned && game.settings.hideOwned);
+    const branch = upgradeBranch(upgrade);
+    const filter = game.settings.upgradeFilter || "all";
+    ui.card.classList.toggle("combat", branch === "combat");
+    ui.card.classList.toggle("colony", branch === "colony");
+    ui.card.hidden = (!isOpen && game.settings.hideLocked) ||
+      (isOwned && game.settings.hideOwned) ||
+      (filter !== "all" && branch !== filter);
     ui.card.classList.toggle("owned", isOwned);
     ui.card.classList.toggle("locked", !isOpen);
     const currency = upgradeCurrency(upgrade);
@@ -327,6 +352,10 @@ export function renderUpgrades() {
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
   el("hideLocked").checked = !!game.settings.hideLocked;
   el("hideOwned").checked = !!game.settings.hideOwned;
+  const filter = game.settings.upgradeFilter || "all";
+  for (const button of el("upgradeFilters").children) {
+    button.classList.toggle("active", button.dataset.branch === filter);
+  }
   markSeen("upgrades", affordableUpgrades());
 }
 

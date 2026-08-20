@@ -7,16 +7,6 @@ import {
   BASE_POPULATION_CAP,
   bigForagerThreshold,
   broodCapacity,
-  combatPower,
-  DEATH_ORDER,
-  EGG_PROTEIN_COST,
-  FED_EGG_SPEED,
-  LOSS_CAP,
-  monsterPower,
-  RAID_INTERVAL,
-  RAID_WARNING,
-  raidRewards,
-  raidsUnlocked,
   upgradeCurrency,
   CASTE_COSTS,
   casteStock,
@@ -30,6 +20,16 @@ import {
   upgradeOwned,
   upgradeUnlocked
 } from "./ants.js";
+import {
+  EGG_PROTEIN_COST,
+  FED_EGG_SPEED,
+  RAID_INTERVAL,
+  raidCountdown as countdownFor,
+  raidImminent as imminentFor,
+  raidsUnlocked,
+  huntRate,
+  resolveRaid as resolveRaidFor
+} from "./raids.js";
 
 export const SAVE_KEY = "ants_save_v5";
 export const LEGACY_SAVE_KEYS = ["ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
@@ -96,7 +96,7 @@ function blankGame() {
     peakPopulation: 0,
     naniticsDied: false,
     queenName: "",
-    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark" },
+    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all" },
     seen: { upgrades: 0, achievements: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0 },
     lastSave: Date.now()
@@ -290,55 +290,6 @@ function recountAchievements() {
   game.achievementLevel = Math.floor(points / POINTS_PER_LEVEL);
 }
 
-export function raidCountdown() {
-  return Math.max(0, game.raidTimer);
-}
-
-export function raidImminent() {
-  return raidsUnlocked(game) && game.raidTimer <= RAID_WARNING;
-}
-
-function killAnts(toll) {
-  const dead = {};
-  let remaining = toll;
-  for (const caste of DEATH_ORDER) {
-    if (remaining <= 0) break;
-    const held = game.ants[caste];
-    if (held <= 0) continue;
-    const taken = Math.min(held, remaining);
-    game.ants[caste] -= taken;
-    if (caste === "bigforager") game.bigForagers.splice(0, taken);
-    dead[caste] = taken;
-    remaining -= taken;
-  }
-  return dead;
-}
-
-export function resolveRaid() {
-  const power = monsterPower(game);
-  const defence = combatPower(game);
-  const won = defence >= power;
-  const reward = raidRewards(game, power);
-
-  if (won) {
-    game.protein += reward.protein;
-    game.food += reward.food;
-    game.stats.foodEarned += reward.food;
-    game.raidsWon++;
-    game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food, dead: {} };
-    return game.lastRaid;
-  }
-
-  const shortfall = Math.min(1, (power - defence) / power);
-  const toll = Math.max(1, Math.floor(population(game) * LOSS_CAP * shortfall));
-  const dead = killAnts(toll);
-  const salvage = Math.round(reward.protein * (defence / power));
-  game.protein += salvage;
-  game.raidsLost++;
-  game.lastRaid = { won: false, power, protein: salvage, food: 0, dead };
-  return game.lastRaid;
-}
-
 function rollBigForager() {
   const threshold = bigForagerThreshold(game);
   if (game.foragersSinceBig + 1 >= threshold) return true;
@@ -382,9 +333,10 @@ export function tick(dt) {
   game.peakPopulation = Math.max(game.peakPopulation, population(game));
 
   if (raidsUnlocked(game)) {
+    game.protein += huntRate(game) * dt;
     game.raidTimer -= dt;
     while (game.raidTimer <= 0) {
-      resolveRaid();
+      resolveRaidFor(game);
       game.raidTimer += RAID_INTERVAL;
     }
   }
@@ -492,4 +444,16 @@ export function load() {
     tick(Math.min(step, elapsed - done));
   }
   return elapsed;
+}
+
+export function raidCountdown() {
+  return countdownFor(game);
+}
+
+export function raidImminent() {
+  return imminentFor(game);
+}
+
+export function resolveRaid() {
+  return resolveRaidFor(game);
 }

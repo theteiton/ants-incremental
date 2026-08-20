@@ -42,6 +42,7 @@ These are not preferences. Breaking them breaks the deployment.
 index.html          entry point, root, do not move
 style.css           all styling
 js/game.js          state object, tick loop, save/load, exiling
+js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
 js/panels.js        tab panel rendering, shared fmt()
 js/sprites.js       pixel art drawn onto canvas
@@ -111,7 +112,7 @@ Last updated 20 August 2026 (raids). Published and playable at the Pages URL bel
 
 **The queen can be named** in Settings and is addressed as Queen <name>. One queen per colony, always.
 
-**Upgrades.** 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
+**Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 20 one-time food purchases, each unlocked by a caste count, plus three by total population. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
 
 **Display rules.** `fmt()` keeps three significant figures — 1862 reads as 1.86K, not 1.9K — and rolls the suffix over when rounding carries (999999 is 1.00M, not 1000K). Costs read green when affordable and muted when not; red never means "you can afford this".
 
@@ -135,11 +136,13 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 **Not built.** Prestige (the nuptial flight) and raid events.
 
-**Raids.** From 400 population a monster attacks every six minutes. Colony fighting strength is the sum of every caste — soldiers count 10 each, foragers and excavators 0.15, nurses and nanitics 0.05 — so ordinary ants help a little and soldiers decide it. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
+**Raids.** From 400 population a monster attacks every six minutes. Soldiers fight at 25 each from birth; every other caste fights at nothing until the Combat branch arms them — Alarm Pheromone gives foragers 1, Gallery Wardens gives excavators 10, Brood Defenders gives nurses 2, and big foragers fight at triple a forager. The branch only appears after the colony has survived its first attack, and the first three raids come at a quarter, half and three quarters strength so there is time to react. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
 
-Monsters scale with peak population and grow 5% per raid won, so a fixed number of soldiers stops being enough. Around 6% of the colony is the measured optimum; 10% is worse than 6%.
+**Soldiers hunt between raids.** While no attack is near they are out of the nest bringing back protein every second; inside the last thirty seconds they come home and the hunting stops. Workers never leave, which is why they only ever fight defensively.
 
-**Ignoring raids stalls a colony, but never kills it.** A run that never lays a soldier sits at about 400 ants losing every raid. Building soldiers breaks the stall — measured, a colony pinned at 386 reached 1,313 within an hour of reacting. Keep that recoverable if these numbers change.
+Monsters scale with peak population and grow 5% per raid won. Measured over a full run: 6% soldiers wins 19 of 32 raids and reaches 1,000 ants in 84 minutes, 10% wins all 32, and a colony that never lays a soldier still reaches 1,000 in 128 minutes on worker strength alone — slower, bloodier, but no longer a wall.
+
+**Salvage is proportional to the fight you put up.** A lost raid returns protein scaled by how much defence you mustered, so a colony with no combat at all gets nothing from the corpse. Keep a losing colony able to recover if these numbers change.
 
 **Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
 

@@ -4,10 +4,6 @@ import {
   EGG_TIME,
   emergingCaste,
   incubationTime,
-  combatPower,
-  monsterPower,
-  raidsUnlocked,
-  RAID_WARNING,
   NANITIC_GENERATION,
   eggCost,
   foodPerSecond,
@@ -16,6 +12,7 @@ import {
   population,
   populationCap
 } from "./ants.js";
+import { combatPower, hunting, huntRate, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
   affordableEggs,
   broodSlots,
@@ -211,7 +208,7 @@ function renderRaid() {
   el("raidPanel").hidden = !active;
   if (!active) return;
 
-  const left = raidCountdown();
+  const left = raidCountdown(game);
   const defence = combatPower(game);
   const threat = monsterPower(game);
   el("raidDefence").textContent = fmt(defence);
@@ -223,6 +220,22 @@ function renderRaid() {
   el("raidCountdown").textContent = soon
     ? "Something is coming — " + Math.ceil(left) + "s"
     : "Next attack in " + fmtTime(left) + ".";
+
+  const out = hunting(game);
+  el("raidHunt").hidden = game.ants.soldier === 0;
+  el("raidHunt").textContent = out
+    ? "Your soldiers are out hunting — +" + fmt(huntRate(game)) + " protein a second."
+    : "Your soldiers are back at the nest for the fight.";
+
+  const notice = el("raidNotice");
+  const armed = game.upgrades.indexOf("combat_1") >= 0;
+  notice.hidden = raidsSeen(game) === 0 || armed;
+  if (!notice.hidden) {
+    notice.textContent =
+      "The colony has been attacked. Workers cannot fight until you teach them how — " +
+      "the Combat upgrades on the Upgrades tab arm your foragers, diggers and nurses. " +
+      "Soldiers hunt between attacks and come home when one is close.";
+  }
 
   const last = game.lastRaid;
   if (!last) {

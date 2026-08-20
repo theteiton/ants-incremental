@@ -51,27 +51,8 @@ export const BIG_FORAGER_FIRST = 3;
 export const BIG_FORAGER_GROWTH = 3.5;
 export const BIG_FORAGER_AGE_GAIN = 0.05;
 export const BIG_FORAGER_AGE_CAP = 3;
-export const RAID_UNLOCK = 400;
-export const RAID_INTERVAL = 360;
-export const RAID_WARNING = 30;
-export const EGG_PROTEIN_COST = 1;
-export const FED_EGG_SPEED = 2;
-export const MONSTER_BASE = 230;
-export const MONSTER_EXPONENT = 1.05;
-export const PROTEIN_PER_POWER = 0.04;
-export const FOOD_PER_POWER = 60;
-export const LOSS_CAP = 0.2;
 
-const COMBAT = {
-  soldier: 10,
-  bigforager: 0.5,
-  forager: 0.15,
-  excavator: 0.15,
-  nanitic: 0.05,
-  nurse: 0.05
-};
 
-export const DEATH_ORDER = ["soldier", "forager", "bigforager", "nanitic", "nurse", "excavator"];
 export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
 export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
 
@@ -131,15 +112,22 @@ export const UPGRADES = [
   { id: "nurse_4", name: "Brood Nurseries", req: { caste: "nurse", count: 70 }, cost: 1.5e6,
     desc: "Dedicated chambers sorted by age. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.15 } },
 
-  { id: "protein_1", name: "Sharpened Mandibles", req: { caste: "soldier", count: 3 }, cost: 25, currency: "protein",
+  { id: "combat_1", name: "Alarm Pheromone", req: { caste: "population", count: 0 }, cost: 30000, branch: "combat", afterFirstRaid: true,
+    desc: "The whole nest answers an attack. Every forager fights at 1 strength.", effect: { type: "combatForager", add: 1 } },
+  { id: "combat_2", name: "Gallery Wardens", req: { caste: "excavator", count: 20 }, cost: 120000, branch: "combat", afterFirstRaid: true,
+    desc: "Diggers block the tunnels with their bodies. Every excavator fights at 10.", effect: { type: "combatExcavator", add: 10 } },
+  { id: "combat_3", name: "Brood Defenders", req: { caste: "nurse", count: 20 }, cost: 200000, branch: "combat", afterFirstRaid: true,
+    desc: "Nurses will not leave the brood. Every nurse fights at 2.", effect: { type: "combatNurse", add: 2 } },
+
+  { id: "protein_1", name: "Sharpened Mandibles", req: { caste: "soldier", count: 3 }, cost: 25, currency: "protein", branch: "combat",
     desc: "Honed jaws bite deeper. Soldiers fight 50% harder.", effect: { type: "soldierPower", add: 0.5 } },
-  { id: "protein_2", name: "Hunting Parties", req: { caste: "soldier", count: 10 }, cost: 80, currency: "protein",
+  { id: "protein_2", name: "Hunting Parties", req: { caste: "soldier", count: 10 }, cost: 80, currency: "protein", branch: "combat",
     desc: "Kills are stripped to the shell. Raids yield 50% more protein.", effect: { type: "proteinYield", add: 0.5 } },
-  { id: "protein_3", name: "Chitin Plating", req: { caste: "soldier", count: 25 }, cost: 250, currency: "protein",
+  { id: "protein_3", name: "Chitin Plating", req: { caste: "soldier", count: 25 }, cost: 250, currency: "protein", branch: "combat",
     desc: "Thickened armour. Soldiers fight twice as hard again.", effect: { type: "soldierPower", add: 1 } },
-  { id: "protein_4", name: "Butchery", req: { caste: "soldier", count: 50 }, cost: 700, currency: "protein",
+  { id: "protein_4", name: "Butchery", req: { caste: "soldier", count: 50 }, cost: 700, currency: "protein", branch: "combat",
     desc: "Nothing of the carcass is left. Raids yield twice the protein.", effect: { type: "proteinYield", add: 1 } },
-  { id: "protein_5", name: "Royal Larder", req: { caste: "soldier", count: 100 }, cost: 2000, currency: "protein",
+  { id: "protein_5", name: "Royal Larder", req: { caste: "soldier", count: 100 }, cost: 2000, currency: "protein", branch: "combat",
     desc: "Stored meat feeds the brood. Three more eggs develop at once.", effect: { type: "broodSlots", add: 3 } },
 
   { id: "colony_1", name: "Colony Cohesion", req: { caste: "population", count: 60 }, cost: 12000,
@@ -164,7 +152,12 @@ export function upgradeOwned(game, upgrade) {
   return game.upgrades.indexOf(upgrade.id) >= 0;
 }
 
+export function upgradeBranch(upgrade) {
+  return upgrade.branch || "colony";
+}
+
 export function upgradeUnlocked(game, upgrade) {
+  if (upgrade.afterFirstRaid && (game.raidsWon || 0) + (game.raidsLost || 0) === 0) return false;
   return casteCount(game, upgrade.req.caste) >= upgrade.req.count;
 }
 
@@ -174,6 +167,10 @@ export function upgradeCurrency(upgrade) {
 
 export function visibleUpgrades(game) {
   return UPGRADES.filter(u => !upgradeOwned(game, u) && upgradeUnlocked(game, u));
+}
+
+export function effectTotal(game, type) {
+  return sumEffect(game, type);
 }
 
 function sumEffect(game, type, caste) {
@@ -214,36 +211,6 @@ export function casteFoodPerSecond(game, casteId) {
 
 export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game);
-}
-
-export function combatPerSoldier(game) {
-  return COMBAT.soldier * (1 + sumEffect(game, "soldierPower"));
-}
-
-export function combatPower(game) {
-  let power = 0;
-  for (const id in game.ants) {
-    const each = id === "soldier" ? combatPerSoldier(game) : COMBAT[id] || 0;
-    power += game.ants[id] * each;
-  }
-  return power;
-}
-
-export function monsterPower(game) {
-  const reach = Math.max(RAID_UNLOCK, game.peakPopulation || 0);
-  return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
-    (1 + 0.05 * (game.raidsWon || 0));
-}
-
-export function raidRewards(game, power) {
-  return {
-    protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER * (1 + sumEffect(game, "proteinYield")))),
-    food: power * FOOD_PER_POWER * globalFoodMultiplier(game)
-  };
-}
-
-export function raidsUnlocked(game) {
-  return Math.max(game.peakPopulation || 0, population(game)) >= RAID_UNLOCK;
 }
 
 export function bigForagerThreshold(game) {

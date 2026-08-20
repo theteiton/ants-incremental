@@ -178,6 +178,28 @@ button.danger { background: var(--danger); color: #fff; }
 .raid-scales b.losing { color: var(--danger); }
 .raid-report { font-size: 13px; margin: 0; }
 
+.subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.subtabs button {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  padding: 5px 12px;
+  font-size: 12px;
+}
+.subtabs button.active { color: var(--text); border-color: var(--accent); }
+
+.raid-hunt { font-size: 13px; margin: 8px 0 0; color: var(--good); }
+.raid-notice {
+  font-size: 13px;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--text);
+}
+.upgrade.combat { border-left: 3px solid var(--danger); }
+.upgrade.colony { border-left: 3px solid var(--accent-soft); }
+
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .tabs button {
   background: var(--panel);
