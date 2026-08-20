@@ -3,6 +3,11 @@ import {
   ACHIEVEMENT_HATCH_PER_LEVEL,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
+  combatPerSoldier,
+  combatPower,
+  monsterPower,
+  raidRewards,
+  upgradeCurrency,
   broodCapacity,
   CASTES,
   casteCount,
@@ -125,7 +130,9 @@ function casteEffectText(id) {
       : "";
   }
   if (id === "soldier") {
-    return held > 0 ? "no effect until raids exist" : "";
+    return held > 0
+      ? fmt(held * combatPerSoldier(game)) + " fighting strength (" + fmt(combatPerSoldier(game)) + " each)"
+      : "";
   }
   if (id === "bigforager") {
     return held > 0
@@ -233,8 +240,17 @@ function previewUpgrade(upgrade) {
   if (type === "excavatorCap") {
     return "Cap " + fmt(populationCap(game)) + " to " + fmt(populationCap(probe));
   }
-  if (type === "nurseSlots") {
-    if (game.ants.nurse === 0) return "Needs nurses to matter";
+  if (type === "soldierPower") {
+    if (game.ants.soldier === 0) return "Needs soldiers to matter";
+    return "Fighting strength " + fmt(combatPower(game)) + " to " + fmt(combatPower(probe));
+  }
+  if (type === "proteinYield") {
+    const power = monsterPower(game);
+    return "Raid protein " + fmt(raidRewards(game, power).protein) +
+      " to " + fmt(raidRewards(probe, power).protein);
+  }
+  if (type === "broodSlots" || type === "nurseSlots") {
+    if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";
     return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
   }
   const before = foodPerSecond(game);
@@ -290,9 +306,10 @@ export function renderUpgrades() {
     ui.card.hidden = (!isOpen && game.settings.hideLocked) || (isOwned && game.settings.hideOwned);
     ui.card.classList.toggle("owned", isOwned);
     ui.card.classList.toggle("locked", !isOpen);
-    ui.card.disabled = isOwned || !isOpen || game.food < upgrade.cost;
-    ui.cost.textContent = isOwned ? "owned" : fmt(upgrade.cost) + " food";
-    ui.cost.classList.toggle("affordable", !isOwned && isOpen && game.food >= upgrade.cost);
+    const currency = upgradeCurrency(upgrade);
+    ui.card.disabled = isOwned || !isOpen || game[currency] < upgrade.cost;
+    ui.cost.textContent = isOwned ? "owned" : fmt(upgrade.cost) + " " + currency;
+    ui.cost.classList.toggle("affordable", !isOwned && isOpen && game[currency] >= upgrade.cost);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
     if (!isOpen) {
@@ -317,7 +334,7 @@ export function affordableUpgrades() {
   let ready = 0;
   for (const upgrade of UPGRADES) {
     if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) continue;
-    if (game.food >= upgrade.cost) ready++;
+    if (game[upgradeCurrency(upgrade)] >= upgrade.cost) ready++;
   }
   return ready;
 }
@@ -398,4 +415,5 @@ export function renderSettings() {
   el("statExiled").textContent = fmt(game.stats.exiled);
   el("statFood").textContent = fmt(game.stats.foodEarned);
   el("statPeak").textContent = fmt(Math.max(game.peakPopulation, population(game)));
+  el("statRaids").textContent = game.raidsWon + " won / " + game.raidsLost + " lost";
 }

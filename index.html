@@ -14,6 +14,7 @@
     <div class="readout"><b id="valFood">0</b><i>food</i></div>
     <div class="readout"><b id="valRate">0/s</b><i>food per second</i></div>
     <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
+    <div class="readout" id="readoutProtein" hidden><b id="valProtein">0</b><i>protein</i></div>
     <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
     <div class="readout"><b id="valTime">0s</b><i>colony age</i></div>
   </div>
@@ -44,6 +45,16 @@
     <p class="dim" id="slotOverflow" hidden></p>
   </section>
   </div>
+
+  <section class="panel raid-panel" id="raidPanel" hidden>
+    <h2>The nest under threat</h2>
+    <p id="raidCountdown"></p>
+    <div class="raid-scales">
+      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
+      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+    </div>
+    <p class="raid-report" id="raidReport"></p>
+  </section>
 
   <nav class="tabs">
     <button id="tabButton-ants">Ants</button>
@@ -102,6 +113,7 @@
       <div>Ants exiled<span id="statExiled">0</span></div>
       <div>Food gathered<span id="statFood">0</span></div>
       <div>Largest colony<span id="statPeak">0</span></div>
+      <div>Raids<span id="statRaids">0 won / 0 lost</span></div>
     </div>
 
     <h2>Save</h2>

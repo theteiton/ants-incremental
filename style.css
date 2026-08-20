@@ -171,6 +171,13 @@ button.danger { background: var(--danger); color: #fff; }
 .slot.empty { opacity: 0.35; }
 .slot .bar { height: 6px; }
 
+.raid-panel.imminent { border-color: var(--danger); }
+.raid-scales { display: flex; gap: 24px; margin-bottom: 10px; }
+.raid-scales div { display: flex; flex-direction: column; }
+.raid-scales b { font-size: 20px; font-weight: 700; color: var(--good); }
+.raid-scales b.losing { color: var(--danger); }
+.raid-report { font-size: 13px; margin: 0; }
+
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .tabs button {
   background: var(--panel);

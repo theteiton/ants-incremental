@@ -51,6 +51,27 @@ export const BIG_FORAGER_FIRST = 3;
 export const BIG_FORAGER_GROWTH = 3.5;
 export const BIG_FORAGER_AGE_GAIN = 0.05;
 export const BIG_FORAGER_AGE_CAP = 3;
+export const RAID_UNLOCK = 400;
+export const RAID_INTERVAL = 360;
+export const RAID_WARNING = 30;
+export const EGG_PROTEIN_COST = 1;
+export const FED_EGG_SPEED = 2;
+export const MONSTER_BASE = 230;
+export const MONSTER_EXPONENT = 1.05;
+export const PROTEIN_PER_POWER = 0.04;
+export const FOOD_PER_POWER = 60;
+export const LOSS_CAP = 0.2;
+
+const COMBAT = {
+  soldier: 10,
+  bigforager: 0.5,
+  forager: 0.15,
+  excavator: 0.15,
+  nanitic: 0.05,
+  nurse: 0.05
+};
+
+export const DEATH_ORDER = ["soldier", "forager", "bigforager", "nanitic", "nurse", "excavator"];
 export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
 export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
 
@@ -110,6 +131,17 @@ export const UPGRADES = [
   { id: "nurse_4", name: "Brood Nurseries", req: { caste: "nurse", count: 70 }, cost: 1.5e6,
     desc: "Dedicated chambers sorted by age. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.15 } },
 
+  { id: "protein_1", name: "Sharpened Mandibles", req: { caste: "soldier", count: 3 }, cost: 25, currency: "protein",
+    desc: "Honed jaws bite deeper. Soldiers fight 50% harder.", effect: { type: "soldierPower", add: 0.5 } },
+  { id: "protein_2", name: "Hunting Parties", req: { caste: "soldier", count: 10 }, cost: 80, currency: "protein",
+    desc: "Kills are stripped to the shell. Raids yield 50% more protein.", effect: { type: "proteinYield", add: 0.5 } },
+  { id: "protein_3", name: "Chitin Plating", req: { caste: "soldier", count: 25 }, cost: 250, currency: "protein",
+    desc: "Thickened armour. Soldiers fight twice as hard again.", effect: { type: "soldierPower", add: 1 } },
+  { id: "protein_4", name: "Butchery", req: { caste: "soldier", count: 50 }, cost: 700, currency: "protein",
+    desc: "Nothing of the carcass is left. Raids yield twice the protein.", effect: { type: "proteinYield", add: 1 } },
+  { id: "protein_5", name: "Royal Larder", req: { caste: "soldier", count: 100 }, cost: 2000, currency: "protein",
+    desc: "Stored meat feeds the brood. Three more eggs develop at once.", effect: { type: "broodSlots", add: 3 } },
+
   { id: "colony_1", name: "Colony Cohesion", req: { caste: "population", count: 60 }, cost: 12000,
     desc: "A colony that acts as one body. All food +25%.", effect: { type: "globalFood", mult: 1.25 } },
   { id: "colony_2", name: "Pheromone Network", req: { caste: "population", count: 300 }, cost: 150000,
@@ -134,6 +166,10 @@ export function upgradeOwned(game, upgrade) {
 
 export function upgradeUnlocked(game, upgrade) {
   return casteCount(game, upgrade.req.caste) >= upgrade.req.count;
+}
+
+export function upgradeCurrency(upgrade) {
+  return upgrade.currency || "food";
 }
 
 export function visibleUpgrades(game) {
@@ -180,6 +216,36 @@ export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game);
 }
 
+export function combatPerSoldier(game) {
+  return COMBAT.soldier * (1 + sumEffect(game, "soldierPower"));
+}
+
+export function combatPower(game) {
+  let power = 0;
+  for (const id in game.ants) {
+    const each = id === "soldier" ? combatPerSoldier(game) : COMBAT[id] || 0;
+    power += game.ants[id] * each;
+  }
+  return power;
+}
+
+export function monsterPower(game) {
+  const reach = Math.max(RAID_UNLOCK, game.peakPopulation || 0);
+  return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
+    (1 + 0.05 * (game.raidsWon || 0));
+}
+
+export function raidRewards(game, power) {
+  return {
+    protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER * (1 + sumEffect(game, "proteinYield")))),
+    food: power * FOOD_PER_POWER * globalFoodMultiplier(game)
+  };
+}
+
+export function raidsUnlocked(game) {
+  return Math.max(game.peakPopulation || 0, population(game)) >= RAID_UNLOCK;
+}
+
 export function bigForagerThreshold(game) {
   const found = game.bigForagers ? game.bigForagers.length : 0;
   return Math.round(BIG_FORAGER_FIRST * Math.pow(BIG_FORAGER_GROWTH, found));
@@ -218,7 +284,9 @@ export function slotsPerNurse(game) {
 }
 
 export function broodCapacity(game) {
-  return Math.max(1, Math.floor(BASE_BROOD_SLOTS + slotsPerNurse(game) * game.ants.nurse));
+  return Math.max(1, Math.floor(
+    BASE_BROOD_SLOTS + sumEffect(game, "broodSlots") + slotsPerNurse(game) * game.ants.nurse
+  ));
 }
 
 export function incubationTime(game) {

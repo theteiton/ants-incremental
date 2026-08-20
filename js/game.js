@@ -7,6 +7,17 @@ import {
   BASE_POPULATION_CAP,
   bigForagerThreshold,
   broodCapacity,
+  combatPower,
+  DEATH_ORDER,
+  EGG_PROTEIN_COST,
+  FED_EGG_SPEED,
+  LOSS_CAP,
+  monsterPower,
+  RAID_INTERVAL,
+  RAID_WARNING,
+  raidRewards,
+  raidsUnlocked,
+  upgradeCurrency,
   CASTE_COSTS,
   casteStock,
   NANITIC_LIFESPAN,
@@ -20,9 +31,9 @@ import {
   upgradeUnlocked
 } from "./ants.js";
 
-export const SAVE_KEY = "ants_save_v4";
-export const LEGACY_SAVE_KEYS = ["ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 4;
+export const SAVE_KEY = "ants_save_v5";
+export const LEGACY_SAVE_KEYS = ["ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 5;
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
 export const POINTS_PER_LEVEL = 5;
@@ -71,6 +82,11 @@ function blankGame() {
     ants: { nanitic: 0, forager: 0, bigforager: 0, excavator: 0, nurse: 0, soldier: 0 },
     bigForagers: [],
     foragersSinceBig: 0,
+    protein: 0,
+    raidTimer: RAID_INTERVAL,
+    raidsWon: 0,
+    raidsLost: 0,
+    lastRaid: null,
     emerged: 0,
     nextCaste: "forager",
     upgrades: [],
@@ -127,7 +143,9 @@ export function layEgg() {
   if (!canLay()) return false;
   const cost = eggCost(game);
   game[cost.resource] -= cost.amount;
-  game.eggs.push({ caste: game.nextCaste, progress: 0 });
+  const fed = game.protein >= EGG_PROTEIN_COST;
+  if (fed) game.protein -= EGG_PROTEIN_COST;
+  game.eggs.push({ caste: game.nextCaste, progress: 0, fed });
   return true;
 }
 
@@ -239,8 +257,9 @@ export function buyUpgrade(id) {
   const upgrade = UPGRADES.find(u => u.id === id);
   if (!upgrade) return false;
   if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) return false;
-  if (game.food < upgrade.cost) return false;
-  game.food -= upgrade.cost;
+  const currency = upgradeCurrency(upgrade);
+  if (game[currency] < upgrade.cost) return false;
+  game[currency] -= upgrade.cost;
   game.upgrades.push(upgrade.id);
   return true;
 }
@@ -271,6 +290,55 @@ function recountAchievements() {
   game.achievementLevel = Math.floor(points / POINTS_PER_LEVEL);
 }
 
+export function raidCountdown() {
+  return Math.max(0, game.raidTimer);
+}
+
+export function raidImminent() {
+  return raidsUnlocked(game) && game.raidTimer <= RAID_WARNING;
+}
+
+function killAnts(toll) {
+  const dead = {};
+  let remaining = toll;
+  for (const caste of DEATH_ORDER) {
+    if (remaining <= 0) break;
+    const held = game.ants[caste];
+    if (held <= 0) continue;
+    const taken = Math.min(held, remaining);
+    game.ants[caste] -= taken;
+    if (caste === "bigforager") game.bigForagers.splice(0, taken);
+    dead[caste] = taken;
+    remaining -= taken;
+  }
+  return dead;
+}
+
+export function resolveRaid() {
+  const power = monsterPower(game);
+  const defence = combatPower(game);
+  const won = defence >= power;
+  const reward = raidRewards(game, power);
+
+  if (won) {
+    game.protein += reward.protein;
+    game.food += reward.food;
+    game.stats.foodEarned += reward.food;
+    game.raidsWon++;
+    game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food, dead: {} };
+    return game.lastRaid;
+  }
+
+  const shortfall = Math.min(1, (power - defence) / power);
+  const toll = Math.max(1, Math.floor(population(game) * LOSS_CAP * shortfall));
+  const dead = killAnts(toll);
+  const salvage = Math.round(reward.protein * (defence / power));
+  game.protein += salvage;
+  game.raidsLost++;
+  game.lastRaid = { won: false, power, protein: salvage, food: 0, dead };
+  return game.lastRaid;
+}
+
 function rollBigForager() {
   const threshold = bigForagerThreshold(game);
   if (game.foragersSinceBig + 1 >= threshold) return true;
@@ -289,7 +357,7 @@ export function tick(dt) {
   for (let i = game.eggs.length - 1; i >= 0; i--) {
     const egg = game.eggs[i];
     if (i >= tended) continue;
-    egg.progress += rate * dt;
+    egg.progress += rate * dt * (egg.fed ? FED_EGG_SPEED : 1);
     if (egg.progress >= EGG_TIME) {
       const caste = emergingCaste(game, egg);
       if (caste === "forager" && rollBigForager()) {
@@ -312,6 +380,15 @@ export function tick(dt) {
   }
 
   game.peakPopulation = Math.max(game.peakPopulation, population(game));
+
+  if (raidsUnlocked(game)) {
+    game.raidTimer -= dt;
+    while (game.raidTimer <= 0) {
+      resolveRaid();
+      game.raidTimer += RAID_INTERVAL;
+    }
+  }
+
   if (!isUnlocked(game, game.nextCaste)) game.nextCaste = "forager";
   checkAchievements();
 }
@@ -358,6 +435,14 @@ function migrate(data) {
     if (data.ants) data.ants.bigforager = 0;
     data.version = 4;
   }
+  if (data.version === 4) {
+    data.protein = 0;
+    data.raidTimer = RAID_INTERVAL;
+    data.raidsWon = 0;
+    data.raidsLost = 0;
+    data.lastRaid = null;
+    data.version = 5;
+  }
   return data;
 }
 
@@ -391,6 +476,8 @@ export function load() {
   game.settings = Object.assign(fresh.settings, data.settings);
   game.seen = Object.assign(fresh.seen, data.seen);
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
+  game.protein = data.protein || 0;
+  game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];

@@ -4,6 +4,10 @@ import {
   EGG_TIME,
   emergingCaste,
   incubationTime,
+  combatPower,
+  monsterPower,
+  raidsUnlocked,
+  RAID_WARNING,
   NANITIC_GENERATION,
   eggCost,
   foodPerSecond,
@@ -27,6 +31,7 @@ import {
   OFFLINE_CAP,
   queenTitle,
   QUEEN_RESERVES,
+  raidCountdown,
   save,
   setNextCaste,
   shedWings,
@@ -201,6 +206,43 @@ function renderSlots(eggs, slots, tended) {
     ? "and " + (slots - SLOT_LIMIT) + " more slots working" : "";
 }
 
+function renderRaid() {
+  const active = raidsUnlocked(game);
+  el("raidPanel").hidden = !active;
+  if (!active) return;
+
+  const left = raidCountdown();
+  const defence = combatPower(game);
+  const threat = monsterPower(game);
+  el("raidDefence").textContent = fmt(defence);
+  el("raidThreat").textContent = fmt(threat);
+  el("raidDefence").classList.toggle("losing", defence < threat);
+
+  const soon = left <= RAID_WARNING;
+  el("raidPanel").classList.toggle("imminent", soon);
+  el("raidCountdown").textContent = soon
+    ? "Something is coming — " + Math.ceil(left) + "s"
+    : "Next attack in " + fmtTime(left) + ".";
+
+  const last = game.lastRaid;
+  if (!last) {
+    el("raidReport").textContent = defence >= threat
+      ? "Your soldiers can hold this one."
+      : "Your soldiers cannot hold this one. Lay more, or the colony will lose ants.";
+    return;
+  }
+  if (last.won) {
+    el("raidReport").textContent =
+      "The last attacker was killed and stripped: +" + fmt(last.protein) +
+      " protein, +" + fmt(last.food) + " food.";
+  } else {
+    const toll = Object.keys(last.dead).map(c => fmt(last.dead[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
+    el("raidReport").textContent =
+      "The last attacker broke through. Lost " + (toll || "nothing") +
+      ". Salvaged " + fmt(last.protein) + " protein.";
+  }
+}
+
 function render() {
   const reserves = el("readoutReserves");
   reserves.hidden = game.emerged > 0;
@@ -209,11 +251,15 @@ function render() {
   el("valRate").textContent = fmt(foodPerSecond(game)) + "/s";
   el("valPop").textContent = fmt(population(game)) + " / " + fmt(populationCap(game));
   el("valEggs").textContent = fmt(game.eggs.length);
+  const proteinRow = el("readoutProtein");
+  proteinRow.hidden = !raidsUnlocked(game) && game.protein <= 0;
+  el("valProtein").textContent = fmt(game.protein);
   el("valTime").textContent = fmtTime(game.stats.playtime);
 
   renderBadges();
   renderQueen();
   renderBrood();
+  renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
   else if (activeTab === "achievements") renderAchievements();

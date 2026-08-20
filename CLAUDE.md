@@ -59,7 +59,7 @@ Keep to this layout. If a file grows past roughly 400 lines, tell me and suggest
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v4`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v5`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
@@ -81,7 +81,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 - Big Foragers — a rare oversized forager variant, never laid on purpose
 - Nurses — increase the egg-to-worker conversion rate
 - Excavators — increase the colony population cap
-- Soldiers — reduce losses from raid events
+- Soldiers — fight raids, and bring back protein and food from what they kill
 
 **Unlocks are gated by colony population, not by purchasing upgrades.** 25 ants unlocks Excavators, 100 unlocks Nurses, 400 unlocks Soldiers.
 
@@ -91,7 +91,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 20 August 2026. Published and playable at the Pages URL below.
+Last updated 20 August 2026 (raids). Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first five workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
 
@@ -115,6 +115,8 @@ Last updated 20 August 2026. Published and playable at the Pages URL below.
 
 **Display rules.** `fmt()` keeps three significant figures — 1862 reads as 1.86K, not 1.9K — and rolls the suffix over when rounding carries (999999 is 1.00M, not 1000K). Costs read green when affordable and muted when not; red never means "you can afford this".
 
+**Protein** is the second resource, and only raids produce it. Laying an egg spends one protein when there is any, and that egg develops twice as fast; with no protein eggs still lay at normal speed, so a colony that loses its soldiers is slowed rather than blocked. Protein also buys its own five-upgrade branch, gated on soldier count, covering fighting strength, protein yield, and three extra brood slots.
+
 **Achievements.** 27 achievements worth 82 points total. Every 5 points is one achievement level; each level grants +3% food and +1% hatch speed, to a maximum of level 16.
 
 **Excavator dig-out rule.** At the population cap no egg could be laid at all, including the excavators that are the only way to raise the cap — a colony that filled its cap with foragers was permanently dead. Excavator eggs may now exceed the cap by up to 3 while they dig their own chambers. This rule was added to fix that softlock; change it and the softlock returns.
@@ -133,7 +135,11 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 **Not built.** Prestige (the nuptial flight) and raid events.
 
-**Soldiers are inert.** They gate at 400 and have an achievement, but with no raids they produce nothing. Their row in the Ants tab says so rather than letting anyone buy them blind.
+**Raids.** From 400 population a monster attacks every six minutes. Colony fighting strength is the sum of every caste — soldiers count 10 each, foragers and excavators 0.15, nurses and nanitics 0.05 — so ordinary ants help a little and soldiers decide it. Win and the corpse is stripped for protein and a burst of food that runs through the same multipliers as foraging, so it keeps pace. Lose and ants die in order: soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives. Losses are capped at 20% of the colony and a lost raid still salvages some protein.
+
+Monsters scale with peak population and grow 5% per raid won, so a fixed number of soldiers stops being enough. Around 6% of the colony is the measured optimum; 10% is worse than 6%.
+
+**Ignoring raids stalls a colony, but never kills it.** A run that never lays a soldier sits at about 400 ants losing every raid. Building soldiers breaks the stall — measured, a colony pinned at 386 reached 1,313 within an hour of reacting. Keep that recoverable if these numbers change.
 
 **Known issue.** Two tabs open at once clobber each other's saves — whichever unloads last wins.
 
