@@ -1,4 +1,4 @@
-# ants-incremental (Claude Instructions)
+# ants-incremental (Gemini / Antigravity Instructions)
 
 A browser-based ant colony incremental game. Hosted on GitHub Pages, played in a browser tab.
 
@@ -16,6 +16,7 @@ A browser-based ant colony incremental game. Hosted on GitHub Pages, played in a
 - Do not rewrite balance numbers, cost curves, or formulas unless I explicitly ask you to change balance.
 - Do not add comments explaining what obvious code does.
 - Do not write tests unless I ask.
+- Keep responses concise.
 
 **When a request is ambiguous, ask one short question instead of guessing and building something large.**
 
@@ -23,11 +24,12 @@ Prefer the smallest change that works. A twenty-line diff I can read beats a two
 
 ---
 
-## Claude-specific guidelines
+## Gemini & Antigravity specific guidelines
 
-- **CLI / Tools**: Keep bash/shell commands minimal and non-destructive. If running a static server, use `python -m http.server 8000`. Never install npm packages, bundlers, or toolchains.
-- **Diffs**: Generate small, isolated, and readable diffs.
-- **Focus**: Stay strictly within the scope of the user's prompt without introducing unsolicited boilerplate.
+- **Environment**: User is on Windows (PowerShell). When suggesting or running local static servers, use `python -m http.server 8000`. Never install npm packages, bundlers, or toolchains.
+- **Code modifications**: Use precise line-targeted replacements. Do not rewrite whole files when changing small parts.
+- **Links**: Use clickable file links with `file://` scheme when referencing project files or symbols.
+- **Planning**: For small, direct instructions, execute directly without unsolicited large plans. Always adhere strictly to the settled game design canon below.
 
 ---
 
@@ -58,8 +60,8 @@ js/upgrades.js      upgrade panel, effect previews, lock text
 js/achievements.js  achievement tracks, tiers, levels, achievement panel
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
-CLAUDE.md           this file (instructions for Claude)
-GEMINI.md           instructions for Gemini
+CLAUDE.md           instructions for Claude
+GEMINI.md           this file (instructions for Gemini)
 README.md
 ```
 
