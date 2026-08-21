@@ -1,8 +1,8 @@
 import { RAID_INTERVAL } from "./raids.js";
 
-export const SAVE_KEY = "ants_save_v5";
-export const LEGACY_SAVE_KEYS = ["ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 5;
+export const SAVE_KEY = "ants_save_v6";
+export const LEGACY_SAVE_KEYS = ["ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 6;
 export const LOCK_KEY = "ants_lock";
 
 // the tab the player most recently opened owns the save; older tabs go quiet
@@ -66,6 +66,10 @@ export function migrate(data) {
     data.raidsLost = 0;
     data.lastRaid = null;
     data.version = 5;
+  }
+  if (data.version === 5) {
+    data.prestige = { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] };
+    data.version = 6;
   }
   return data;
 }
@@ -148,6 +152,13 @@ export function applySave(game, fresh, data) {
   game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.peakCastes = Object.assign({}, data.peakCastes || {});
+  const savedPrestige = data.prestige || {};
+  game.prestige = {
+    royalJelly: savedPrestige.royalJelly || 0,
+    royalJellyTotal: savedPrestige.royalJellyTotal || 0,
+    flightsTaken: savedPrestige.flightsTaken || 0,
+    upgrades: Array.isArray(savedPrestige.upgrades) ? savedPrestige.upgrades : []
+  };
   game.version = SAVE_VERSION;
   return game;
 }

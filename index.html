@@ -15,6 +15,7 @@
     <div class="readout"><b id="valRate">0/s</b><i>food per second</i></div>
     <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
     <div class="readout" id="readoutProtein" hidden><b id="valProtein">0</b><i>protein</i></div>
+    <div class="readout" id="readoutRoyalJelly" hidden><b id="valRoyalJelly">0</b><i>royal jelly</i></div>
     <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
     <div class="readout"><b id="valTime">0s</b><i>colony age</i></div>
   </div>
@@ -78,6 +79,7 @@
     <button id="tabButton-ants">Ants</button>
     <button id="tabButton-upgrades">Upgrades<span class="badge" id="badge-upgrades" hidden></span></button>
     <button id="tabButton-achievements">Achievements<span class="badge" id="badge-achievements" hidden></span></button>
+    <button id="tabButton-prestige" hidden>Nuptial<span class="badge" id="badge-prestige" hidden></span></button>
     <button id="tabButton-settings">Settings</button>
   </nav>
 
@@ -104,6 +106,23 @@
     <span class="bar"><i id="achievementBar"></i></span>
     <p class="bonus" id="achievementBonus"></p>
     <ul id="achievementList"></ul>
+  </section>
+
+  <section class="panel tab" id="tab-prestige" hidden>
+    <div class="panel-head">
+      <span class="tally" id="prestigeJellyTally">0 Royal Jelly</span>
+      <span class="dim" id="prestigeFlightTally">0 flights taken</span>
+    </div>
+    <div class="prestige-flight-box">
+      <h2>The Nuptial Flight</h2>
+      <p id="prestigeDesc">
+        When the colony reaches 1,000 ants, winged alates take flight into the warm summer air to mate and found a new dynasty.
+      </p>
+      <p class="flight-yield" id="flightYield"></p>
+      <button id="btnFlight" class="danger">Take the Nuptial Flight</button>
+    </div>
+    <h2>Royal Lineage Adaptations</h2>
+    <div id="prestigeUpgradeList"></div>
   </section>
 
   <section class="panel tab" id="tab-settings" hidden>
@@ -133,6 +152,8 @@
       <div>Food gathered<span id="statFood">0</span></div>
       <div>Largest colony<span id="statPeak">0</span></div>
       <div>Raids<span id="statRaids">0 won / 0 lost</span></div>
+      <div>Nuptial flights<span id="statFlights">0</span></div>
+      <div>Royal Jelly gathered<span id="statJelly">0</span></div>
     </div>
 
     <h2>Save</h2>
@@ -155,6 +176,17 @@
     <div class="modal-actions">
       <button id="exileCancel">Cancel</button>
       <button id="exileConfirm" class="danger">Exile them</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="flightModal" hidden>
+  <div class="modal-box">
+    <h2>Take the Nuptial Flight?</h2>
+    <p id="flightModalDetail"></p>
+    <div class="modal-actions">
+      <button id="flightCancel">Cancel</button>
+      <button id="flightConfirm" class="danger">Take Flight</button>
     </div>
   </div>
 </div>

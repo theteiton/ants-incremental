@@ -33,6 +33,12 @@ import {
 } from "./raids.js";
 import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
 import {
+  PRESTIGE_UPGRADES,
+  prestigeStartingReserves,
+  prestigeUpgradeOwned,
+  royalJellyEarned
+} from "./prestige.js";
+import {
   applySave,
   claimSave,
   clearSaves,
@@ -46,6 +52,7 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
+export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, royalJellyEarned, prestigeUpgradeOwned } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
@@ -85,6 +92,7 @@ function blankGame() {
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
     seen: { upgrades: 0, tracks: null },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0 },
+    prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
 }
@@ -94,7 +102,7 @@ export const game = blankGame();
 export function shedWings() {
   if (game.wingsShed) return false;
   game.wingsShed = true;
-  game.reserves = QUEEN_RESERVES;
+  game.reserves = QUEEN_RESERVES + prestigeStartingReserves(game);
   return true;
 }
 
@@ -231,6 +239,42 @@ export function importSave(text) {
 export function hardReset() {
   clearSaves();
   Object.assign(game, blankGame());
+  return true;
+}
+
+export function doFlight() {
+  const earned = royalJellyEarned(game);
+  game.prestige.royalJelly += earned;
+  game.prestige.royalJellyTotal += earned;
+  game.prestige.flightsTaken += 1;
+
+  // Values that survive the flight
+  const surviving = {
+    prestige: game.prestige,
+    achievements: game.achievements,
+    achievementPoints: game.achievementPoints,
+    achievementLevel: game.achievementLevel,
+    peakPopulation: game.peakPopulation,
+    peakCastes: game.peakCastes,
+    peakStrength: game.peakStrength,
+    stats: game.stats,
+    settings: game.settings,
+    seen: game.seen,
+    queenName: game.queenName
+  };
+
+  Object.assign(game, blankGame());
+  Object.assign(game, surviving);
+  return earned;
+}
+
+export function buyPrestigeUpgrade(id) {
+  const upgrade = PRESTIGE_UPGRADES.find(u => u.id === id);
+  if (!upgrade) return false;
+  if (prestigeUpgradeOwned(game, upgrade)) return false;
+  if (game.prestige.royalJelly < upgrade.cost) return false;
+  game.prestige.royalJelly -= upgrade.cost;
+  game.prestige.upgrades.push(upgrade.id);
   return true;
 }
 

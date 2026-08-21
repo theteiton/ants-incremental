@@ -66,6 +66,7 @@ These are not preferences. Breaking them breaks the deployment.
 index.html          entry point, root, do not move
 style.css           all styling
 js/game.js          state object, tick loop, exiling
+js/prestige.js      prestige formulas, upgrades, flight reset
 js/save.js          save keys, migrations, the one-tab lock, import and export
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
@@ -88,11 +89,11 @@ Keep to this layout. Files are organized by feature domain. A file can comfortab
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v5`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v6`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
-- Names in code match names in the game fiction: `reserves`, `eggs`, `nanitics`, `foragers`, `nurses`, `excavators`.
+- Names in code match names in the game fiction: `reserves`, `eggs`, `nanitics`, `foragers`, `nurses`, `excavators`, `royalJelly`.
 
 ---
 
@@ -112,9 +113,9 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 - Excavators — increase the colony population cap
 - Soldiers — fight raids, and bring back protein and food from what they kill
 
-**Unlocks are gated by colony population, not by purchasing upgrades.** 25 ants unlocks Excavators, 100 unlocks Nurses, 400 unlocks Soldiers.
+**Unlocks are gated by colony population, not by purchasing upgrades.** 25 ants unlocks Excavators, 100 unlocks Nurses, 400 unlocks Soldiers, 1,000 unlocks the Nuptial Flight.
 
-**Prestige is the nuptial flight.** Not built yet. Do not build it until I ask.
+**Prestige is the nuptial flight (Layer 1).** Unlocks at 1,000 population. Yields Royal Jelly based on population and raids won. Colony resets (food, ants, brood, standard upgrades, queen wings) while achievements, peaks, royal jelly, and prestige upgrades persist.
 
 **No automation before prestige.** Nothing lays an egg, buys an upgrade, picks a caste or exiles an ant on the player's behalf. Every one of those stays a click. Automation is what prestige layer 1 upgrades will sell, so do not spend it early — passive production, hatching, raids and hunting are not automation, they are the game running.
 
@@ -122,9 +123,11 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 20 August 2026. Published and playable at the Pages URL below.
+Last updated 21 August 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first four workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 25 / 100 / 400 are in.
+
+**Prestige Layer 1 (Nuptial Flight)** is live. Gated at 1,000 population. The Nuptial tab sits between Achievements and Settings. Taking flight awards Royal Jelly based on `sqrt(peakPopulation / 1000) * (1 + raidsWon / 20)` and resets the colony into a new founding queen while keeping achievements, peak stats, Royal Jelly, and 8 Royal Lineage adaptations in `js/prestige.js`. Migration from save v5 to v6 is in. Two achievement tracks for flights and royal jelly are live.
 
 **Egg cost is per caste**, each with its own curve — forager `1.5 x n^1.75`, excavator `15 x n^1.8`, nurse `60 x n^1.7`, soldier `200 x n^1.6`. One caste's count never moves another's price. The price counts eggs already in the brood as well as hatched ants, so laying a batch at once costs exactly what laying them one at a time would. Before that, a batch of 100 cost 50.5% less than the same 100 bought singly.
 

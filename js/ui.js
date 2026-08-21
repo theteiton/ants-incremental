@@ -19,7 +19,9 @@ import {
   affordableEggs,
   broodSlots,
   broodSpace,
+  buyPrestigeUpgrade,
   canLay,
+  doFlight,
   exportSave,
   game,
   hardReset,
@@ -29,7 +31,11 @@ import {
   holdsSave,
   layEggs,
   load,
+  PRESTIGE_UNLOCK,
+  PRESTIGE_UPGRADES,
+  prestigeUpgradeOwned,
   proteinUnlocked,
+  royalJellyEarned,
   setSetting,
   markSeen,
   OFFLINE_CAP,
@@ -68,9 +74,10 @@ import {
 import { drawSprite } from "./sprites.js";
 
 const el = id => document.getElementById(id);
-const TABS = ["ants", "upgrades", "achievements", "settings"];
+const TABS = ["ants", "upgrades", "achievements", "prestige", "settings"];
 let activeTab = "ants";
 const casteButtons = {};
+
 
 function selectTab(name) {
   activeTab = name;
@@ -287,6 +294,105 @@ function renderRaid() {
   }
 }
 
+function prestigeUnlocked(game) {
+  const p = game.prestige || {};
+  return Math.max(game.peakPopulation || 0, population(game)) >= PRESTIGE_UNLOCK ||
+    (p.flightsTaken || 0) > 0 || (p.royalJellyTotal || 0) > 0;
+}
+
+function affordablePrestigeUpgrades() {
+  const p = game.prestige || { royalJelly: 0 };
+  let ready = 0;
+  for (const upgrade of PRESTIGE_UPGRADES) {
+    if (!prestigeUpgradeOwned(game, upgrade) && p.royalJelly >= upgrade.cost) ready++;
+  }
+  return ready;
+}
+
+function renderBadges() {
+  const upgrades = upgradeBadge();
+  const achievements = newTrackCount(game);
+  const prestige = affordablePrestigeUpgrades();
+  el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
+  el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
+  el("badge-prestige").hidden = activeTab === "prestige" || prestige <= 0;
+}
+
+const prestigeCards = {};
+
+function buildPrestige(onChange) {
+  const list = el("prestigeUpgradeList");
+  PRESTIGE_UPGRADES.forEach(upgrade => {
+    const card = document.createElement("button");
+    card.className = "upgrade prestige";
+    card.innerHTML =
+      '<span class="upgrade-head"><b></b><span class="upgrade-cost"></span></span>' +
+      '<span class="upgrade-desc"></span>';
+    card.querySelector("b").textContent = upgrade.name;
+    card.querySelector(".upgrade-desc").textContent = upgrade.desc;
+    card.onclick = () => {
+      if (buyPrestigeUpgrade(upgrade.id)) (onChange || render)();
+    };
+    watch(card, {
+      title: upgrade.name,
+      body: upgrade.desc,
+      note: () => {
+        if (prestigeUpgradeOwned(game, upgrade)) return "Already bought.";
+        return "Costs " + upgrade.cost + " Royal Jelly.";
+      }
+    });
+    prestigeCards[upgrade.id] = {
+      card,
+      cost: card.querySelector(".upgrade-cost")
+    };
+    list.appendChild(card);
+  });
+
+  el("btnFlight").onclick = () => {
+    if (population(game) < PRESTIGE_UNLOCK) return;
+    const earned = royalJellyEarned(game);
+    el("flightModalDetail").textContent =
+      "Disperse your colony of " + fmt(population(game)) + " ants to take flight into the summer air. " +
+      "You will earn +" + fmt(earned) + " Royal Jelly to enhance your future colonies. " +
+      "All achievements, peak records, and royal lineage adaptations remain forever.";
+    el("flightModal").hidden = false;
+  };
+  el("flightCancel").onclick = () => {
+    el("flightModal").hidden = true;
+  };
+  el("flightConfirm").onclick = () => {
+    el("flightModal").hidden = true;
+    doFlight();
+    selectTab("ants");
+    render();
+  };
+}
+
+function renderPrestige() {
+  const p = game.prestige || { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0 };
+  el("prestigeJellyTally").textContent = fmt(p.royalJelly) + " Royal Jelly";
+  el("prestigeFlightTally").textContent = (p.flightsTaken || 0) + " flights taken (" + fmt(p.royalJellyTotal || 0) + " total earned)";
+
+  const pop = population(game);
+  const ready = pop >= PRESTIGE_UNLOCK;
+  const projected = royalJellyEarned(game);
+  el("btnFlight").disabled = !ready;
+  el("flightYield").textContent = ready
+    ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — Taking flight now yields +" + fmt(projected) + " Royal Jelly."
+    : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
+
+  PRESTIGE_UPGRADES.forEach(upgrade => {
+    const ui = prestigeCards[upgrade.id];
+    if (!ui) return;
+    const isOwned = prestigeUpgradeOwned(game, upgrade);
+    ui.card.classList.toggle("owned", isOwned);
+    ui.card.disabled = isOwned || p.royalJelly < upgrade.cost;
+    ui.cost.textContent = isOwned ? "owned" : upgrade.cost + " Royal Jelly";
+    ui.cost.classList.toggle("affordable", !isOwned && p.royalJelly >= upgrade.cost);
+    ui.cost.classList.toggle("owned-tag", isOwned);
+  });
+}
+
 function render() {
   const reserves = el("readoutReserves");
   reserves.hidden = game.emerged > 0;
@@ -298,8 +404,15 @@ function render() {
   const proteinRow = el("readoutProtein");
   proteinRow.hidden = !raidsUnlocked(game) && game.protein <= 0;
   el("valProtein").textContent = fmt(game.protein);
+  
+  const p = game.prestige || {};
+  const jellyRow = el("readoutRoyalJelly");
+  jellyRow.hidden = !prestigeUnlocked(game) && !(p.royalJelly > 0);
+  el("valRoyalJelly").textContent = fmt(p.royalJelly || 0);
+
   el("valTime").textContent = fmtTime(game.stats.playtime);
 
+  el("tabButton-prestige").hidden = !prestigeUnlocked(game);
   el("takeover").hidden = holdsSave();
   renderBadges();
   renderInspector();
@@ -309,6 +422,7 @@ function render() {
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
   else if (activeTab === "achievements") renderAchievements(game);
+  else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "settings") renderSettings();
 }
 
@@ -346,6 +460,7 @@ buildAnts(render);
 buildExileDialog();
 buildUpgrades(render);
 buildAchievements(game);
+buildPrestige(render);
 buildSettings({
   refresh: render,
   applyTheme: () => {
@@ -390,3 +505,4 @@ requestAnimationFrame(frame);
 
 setInterval(save, 10000);
 window.addEventListener("beforeunload", save);
+

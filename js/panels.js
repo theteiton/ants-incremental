@@ -307,4 +307,8 @@ export function renderSettings() {
   el("statFood").textContent = fmt(game.stats.foodEarned);
   el("statPeak").textContent = fmt(Math.max(game.peakPopulation, population(game)));
   el("statRaids").textContent = game.raidsWon + " won / " + game.raidsLost + " lost";
+  const p = game.prestige || {};
+  el("statFlights").textContent = fmt(p.flightsTaken || 0);
+  el("statJelly").textContent = fmt(p.royalJellyTotal || 0);
 }
+

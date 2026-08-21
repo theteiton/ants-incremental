@@ -119,7 +119,17 @@ export const ACHIEVEMENT_TRACKS = [
   { id: "upgrades_combat", name: "Combat upgrades", unit: "combat upgrades",
     desc: "Adaptations from the Combat branch.",
     value: g => ownedIn(g, "combat"),
-    thresholds: upgradeSteps(BRANCH_TOTALS.combat) }
+    thresholds: upgradeSteps(BRANCH_TOTALS.combat) },
+
+  { id: "flights", name: "Nuptial flights", unit: "flights",
+    desc: "Times the queen has taken wing and founded a new colony.",
+    value: g => (g.prestige && g.prestige.flightsTaken) || 0,
+    thresholds: [1, 2, 3, 5, 10, 20, 35, 50] },
+
+  { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
+    desc: "Total royal jelly earned across all flights.",
+    value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
+    thresholds: [1, 2, 5, 10, 25, 50, 100, 250] }
 ];
 
 export function trackTier(game, track) {

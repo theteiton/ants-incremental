@@ -1,3 +1,11 @@
+import {
+  prestigeFoodMultiplier,
+  prestigeBaseCap,
+  prestigeExcavatorCap,
+  prestigeBroodSlots,
+  prestigeNaniticMult
+} from "./prestige.js";
+
 export const CASTES = {
   nanitic: {
     name: "Nanitic",
@@ -246,12 +254,13 @@ export function casteMultiplier(game, casteId) {
 export function casteFoodPerSecond(game, casteId) {
   const base = FOOD_PER_SECOND[casteId];
   if (!base) return 0;
+  const naniticMult = casteId === "nanitic" ? prestigeNaniticMult(game) : 1;
   return (base + casteFlatBonus(game, casteId)) *
-    casteMultiplier(game, casteId) * globalFoodMultiplier(game);
+    casteMultiplier(game, casteId) * naniticMult * globalFoodMultiplier(game);
 }
 
 export function globalFoodMultiplier(game) {
-  return productEffect(game, "globalFood") * achievementFoodBonus(game);
+  return productEffect(game, "globalFood") * achievementFoodBonus(game) * prestigeFoodMultiplier(game);
 }
 
 export function bigForagerThreshold(game) {
@@ -279,8 +288,8 @@ export function foodPerSecond(game) {
 }
 
 export function populationCap(game) {
-  const perExcavator = CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap");
-  return BASE_POPULATION_CAP + perExcavator * game.ants.excavator;
+  const perExcavator = CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
+  return BASE_POPULATION_CAP + prestigeBaseCap(game) + perExcavator * game.ants.excavator;
 }
 
 export function hatchRate(game) {
@@ -293,7 +302,7 @@ export function slotsPerNurse(game) {
 
 export function broodCapacity(game) {
   return Math.max(1, Math.floor(
-    BASE_BROOD_SLOTS + sumEffect(game, "broodSlots") + slotsPerNurse(game) * game.ants.nurse
+    BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") + slotsPerNurse(game) * game.ants.nurse
   ));
 }
 

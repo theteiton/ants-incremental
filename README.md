@@ -71,11 +71,18 @@ Measured under strong simulated play, so a human runs slower:
 
 ## Interface
 
-Four tabs — Ants, Upgrades, Achievements, Settings — with the brood above them so eggs can be laid from anywhere. On a wide screen it is two columns: the queen, the raid box and an inspector on the left; the brood and the tabs on the right.
+Five tabs — Ants, Upgrades, Achievements, Nuptial, Settings — with the brood above them so eggs can be laid from anywhere. On a wide screen it is two columns: the queen, the raid box and an inspector on the left; the brood and the tabs on the right.
 
 The **inspector** explains whatever the mouse is pointing at — an ant, an upgrade, an achievement track — including what it still needs, and it keeps showing the last thing you pointed at.
 
 Every caste has a pixel sprite drawn in JavaScript onto a canvas. Three themes (dark, light, soil) live in Settings, along with the queen's name, save export and import, and a hard reset.
+
+## Prestige: The Nuptial Flight
+
+At **1,000 ants**, the **Nuptial** tab unlocks. Taking flight releases winged alates to mate and start a new royal dynasty:
+- Earns **Royal Jelly** scaled by population and raids won.
+- Resets live food, ants, brood, queen wings, and colony upgrades.
+- Retains all achievements, peak records, Royal Jelly, and **Royal Lineage adaptations** (prestige upgrades).
 
 ## Running it locally
 
@@ -93,6 +100,7 @@ Then visit `http://localhost:8000`. Any static file server works.
 index.html          entry point
 style.css           all styling
 js/game.js          state object, tick loop, exiling
+js/prestige.js      prestige formulas, upgrades, flight reset
 js/save.js          save keys, migrations, the one-tab lock, import and export
 js/ants.js          castes, production, costs, upgrades
 js/raids.js         combat strength, monsters, raid resolution, hunting
@@ -105,10 +113,10 @@ js/ui.js            tab shell, header, brood controls, frame loop
 
 ## Saving
 
-Progress is saved to `localStorage` under `ants_save_v5`, automatically every 10 seconds and when the tab closes. Time away is credited when you return, capped at 8 hours, and time spent in a background tab is credited the same way. Every older save version migrates rather than being wiped.
+Progress is saved to `localStorage` under `ants_save_v6`, automatically every 10 seconds and when the tab closes. Time away is credited when you return, capped at 8 hours, and time spent in a background tab is credited the same way. Every older save version migrates rather than being wiped.
 
 Only one tab writes the save. The most recently opened tab owns it and older ones stop writing, so a forgotten background tab can no longer bury real progress when it closes; the stale tab offers a button to take over.
 
 ## Not built yet
 
-Prestige — the nuptial flight — and any automation, which is what prestige will sell. Nothing lays an egg, buys an upgrade or picks a caste for you.
+Automation (which belongs to subsequent prestige expansions). Nothing lays an egg, buys an upgrade or picks a caste for you.

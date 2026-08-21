@@ -1,4 +1,5 @@
 import { effectTotal, globalFoodMultiplier, population } from "./ants.js";
+import { prestigeSoldierMult } from "./prestige.js";
 
 export const RAID_UNLOCK = 400;
 export const RAID_INTERVAL = 360;
@@ -26,7 +27,7 @@ export const DEATH_ORDER = ["soldier", "forager", "bigforager", "nanitic", "nurs
 
 
 export function combatPerSoldier(game) {
-  return SOLDIER_COMBAT * (1 + effectTotal(game, "soldierPower"));
+  return SOLDIER_COMBAT * (1 + effectTotal(game, "soldierPower")) * prestigeSoldierMult(game);
 }
 
 export function combatPerCaste(game, caste) {
