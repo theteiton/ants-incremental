@@ -33,6 +33,22 @@ Prefer the smallest change that works. A twenty-line diff I can read beats a two
 
 ---
 
+## Two agents, one repo
+
+Claude Code and Gemini/Antigravity both work in here. Take the work you are better at and hand the rest over — the wrong one of you doing a job badly costs more than the handoff does.
+
+**Claude takes the maths.** Formulas, balance curves, cost exponents, anything multiplicative — the `(base + flat) × multipliers` model and the factor tag every new upgrade needs. Invariants that only surface when two files are read together: a gate that turns unreachable when a constant moves, a death order that compounds with a scaling term. Save shape, migrations, and the one-tab lock. Anything whose failure is silent, where the game keeps running and only the numbers are wrong.
+
+**Gemini takes what is judged by eye.** Claude cannot screenshot this game — its browser pane keeps the page hidden, so `requestAnimationFrame` never fires and nothing paints; it checks layout by reading `getBoundingClientRect()`, which proves two rows line up and says nothing about whether the screen looks right. So sprite art in `js/sprites.js`, spacing, colour, anything that needs looking at. Also the bulk mechanical work — renames, CSS, moving DOM nodes, README prose.
+
+**Either can take** a small self-contained mechanic. If it touches the brood array, the save, or a cost curve, it is Claude's.
+
+**Neither runs while the other is running.** One at a time in this repo — otherwise plain git conflicts, and the canon below is shared state.
+
+**Whoever ships updates Current state in the same commit, in both files.** `CLAUDE.md` and `GEMINI.md` differ only in the title, the agent-specific block above, and which of the two the layout listing marks as "this file". Everything else is byte-identical on purpose: edit one, edit the other.
+
+---
+
 ## Hard constraints
 
 These are not preferences. Breaking them breaks the deployment.
