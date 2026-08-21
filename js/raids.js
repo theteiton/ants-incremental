@@ -8,6 +8,7 @@ export const EGG_PROTEIN_COST = 1;
 export const FED_EGG_SPEED = 2;
 export const MONSTER_BASE = 1000;
 export const MONSTER_EXPONENT = 1.05;
+export const MONSTER_GROWTH = 0.05;
 export const PROTEIN_PER_POWER = 0.04;
 export const FOOD_PER_POWER = 60;
 export const LOSS_CAP = 0.2;
@@ -58,12 +59,17 @@ export function huntRate(game) {
   return game.ants.soldier * HUNT_PROTEIN_PER_SOLDIER * (1 + effectTotal(game, "proteinYield"));
 }
 
+export function monsterRamp(game) {
+  const seen = raidsSeen(game);
+  return seen < RAID_RAMP.length ? RAID_RAMP[seen] : 1;
+}
+
 export function monsterPower(game) {
   const reach = Math.max(RAID_UNLOCK, runPeakCount(game, "population"));
   const seen = raidsSeen(game);
   const ramp = seen < RAID_RAMP.length ? RAID_RAMP[seen] : 1;
   return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
-    (1 + 0.05 * (game.raidsWon || 0)) * ramp;
+    (1 + MONSTER_GROWTH * (game.raidsWon || 0)) * ramp;
 }
 
 export function raidRewards(game, power) {

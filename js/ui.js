@@ -63,6 +63,7 @@ import {
 import {
   affordableUpgrades,
   buildUpgrades,
+  formulaSummary,
   renderUpgrades,
   upgradeBadge
 } from "./upgrades.js";
@@ -303,6 +304,22 @@ function affordablePrestigeUpgrades() {
   return ready;
 }
 
+function renderFormulas() {
+  const box = el("formulaList");
+  const rows = formulaSummary(game);
+  while (box.children.length > rows.length) box.removeChild(box.lastChild);
+  while (box.children.length < rows.length) {
+    const row = document.createElement("div");
+    row.className = "formula-row";
+    row.innerHTML = "<b></b><span></span>";
+    box.appendChild(row);
+  }
+  rows.forEach((entry, i) => {
+    box.children[i].querySelector("b").textContent = entry.name;
+    box.children[i].querySelector("span").textContent = entry.text;
+  });
+}
+
 function renderBadges() {
   const upgrades = upgradeBadge();
   const achievements = newTrackCount(game);
@@ -417,7 +434,10 @@ function render() {
   else if (activeTab === "upgrades") renderUpgrades();
   else if (activeTab === "achievements") renderAchievements(game);
   else if (activeTab === "prestige") renderPrestige();
-  else if (activeTab === "settings") renderSettings();
+  else if (activeTab === "settings") {
+    renderSettings();
+    renderFormulas();
+  }
 }
 
 el("btnTakeOver").onclick = () => {

@@ -1,6 +1,7 @@
 import {
   achievementFoodBonus,
   BASE_BROOD_SLOTS,
+  bigForagerOutput,
   BASE_POPULATION_CAP,
   baseFood,
   broodCapacity,
@@ -27,8 +28,14 @@ import {
   combatPerSoldier,
   combatPower,
   HUNT_PROTEIN_PER_SOLDIER,
+  MONSTER_BASE,
+  MONSTER_EXPONENT,
+  MONSTER_GROWTH,
   monsterPower,
+  monsterRamp,
+  RAID_UNLOCK,
   raidRewards,
+  raidsUnlocked,
   SOLDIER_COMBAT
 } from "./raids.js";
 import {
@@ -124,6 +131,41 @@ function proteinFormula(game) {
     " × yield " + f(1 + effectTotal(game, "proteinYield")) +
     " = " + f(game.ants.soldier * HUNT_PROTEIN_PER_SOLDIER *
       (1 + effectTotal(game, "proteinYield"))) + "/s";
+}
+
+function monsterFormula(game) {
+  const reach = Math.max(RAID_UNLOCK, runPeakCount(game, "population"));
+  const ramp = monsterRamp(game);
+  return "next attacker = base " + MONSTER_BASE +
+    " × (this colony " + fmt(reach) + " / " + RAID_UNLOCK + ")^" + MONSTER_EXPONENT +
+    " × wins " + f(1 + MONSTER_GROWTH * (game.raidsWon || 0)) +
+    (ramp < 1 ? " × ramp " + f(ramp) : "") +
+    " = " + fmt(monsterPower(game));
+}
+
+function bigForagerFormula(game) {
+  return "each big forager = a forager " + fmt(casteFoodPerSecond(game, "forager")) +
+    "/s × 5 × her age, " + game.ants.bigforager + " of them = " +
+    fmt(bigForagerOutput(game)) + "/s";
+}
+
+// every layer at once, for the Formulas panel in Settings
+export function formulaSummary(game) {
+  const rows = [];
+  for (const caste of ["nanitic", "forager"]) {
+    if (game.ants[caste] > 0) {
+      rows.push({ name: CASTES[caste].name + " food", text: foodFormula(game, caste) });
+    }
+  }
+  if (game.ants.bigforager > 0) {
+    rows.push({ name: "Big Forager food", text: bigForagerFormula(game) });
+  }
+  rows.push({ name: "Population cap", text: capFormula(game) });
+  rows.push({ name: "Brood slots", text: broodFormula(game) });
+  if (game.ants.soldier > 0) rows.push({ name: "Soldier strength", text: soldierFormula(game) });
+  if (raidsUnlocked(game)) rows.push({ name: "Next attacker", text: monsterFormula(game) });
+  if (game.ants.soldier > 0) rows.push({ name: "Hunting", text: proteinFormula(game) });
+  return rows;
 }
 
 // returns [the formula as it stands, what this upgrade moves inside it]
