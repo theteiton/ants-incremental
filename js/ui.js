@@ -35,7 +35,8 @@ import {
   PRESTIGE_UPGRADES,
   prestigeUpgradeOwned,
   proteinUnlocked,
-  royalJellyEarned,
+  flightReady,
+  flightReward,
   setSetting,
   markSeen,
   OFFLINE_CAP,
@@ -116,13 +117,6 @@ function applyTheme() {
   document.documentElement.setAttribute("data-theme", game.settings.theme || "dark");
 }
 
-function renderBadges() {
-  const upgrades = upgradeBadge();
-  const achievements = newTrackCount(game);
-  el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
-  el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
-}
-
 function renderQueen() {
   if (!game.wingsShed) {
     el("queenTitle").textContent = queenTitle();
@@ -139,7 +133,7 @@ function renderQueen() {
       "Her wing muscles are being metabolised into eggs. The first " + NANITIC_GENERATION +
       " workers will emerge as undersized nanitics whatever caste is chosen — nothing else will feed this brood.";
   } else if (game.ants.nanitic > 0) {
-    const left = Math.max(0, NANITIC_LIFESPAN - game.stats.playtime);
+    const left = Math.max(0, NANITIC_LIFESPAN - (game.runTime || 0));
     el("queenText").textContent =
       "The first workers have emerged. Her reserves no longer matter; the colony feeds her now. " +
       "The founding nanitics die of old age in " + fmtTime(left) + ".";
@@ -349,8 +343,8 @@ function buildPrestige(onChange) {
   });
 
   el("btnFlight").onclick = () => {
-    if (population(game) < PRESTIGE_UNLOCK) return;
-    const earned = royalJellyEarned(game);
+    if (!flightReady()) return;
+    const earned = flightReward();
     el("flightModalDetail").textContent =
       "Disperse your colony of " + fmt(population(game)) + " ants to take flight into the summer air. " +
       "You will earn +" + fmt(earned) + " Royal Jelly to enhance your future colonies. " +
@@ -374,8 +368,8 @@ function renderPrestige() {
   el("prestigeFlightTally").textContent = (p.flightsTaken || 0) + " flights taken (" + fmt(p.royalJellyTotal || 0) + " total earned)";
 
   const pop = population(game);
-  const ready = pop >= PRESTIGE_UNLOCK;
-  const projected = royalJellyEarned(game);
+  const ready = flightReady();
+  const projected = flightReward();
   el("btnFlight").disabled = !ready;
   el("flightYield").textContent = ready
     ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — Taking flight now yields +" + fmt(projected) + " Royal Jelly."

@@ -57,7 +57,7 @@ adds 0.50 to forager yield → 1.25 → 1.75
 
 ### Achievements
 
-Fourteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level worth **+3% food and +1% hatch speed**, up to level 20. Tracks read your peak values, so a bad raid never takes a tier back.
+Sixteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level worth **+3% food and +1% hatch speed**, up to level 20. Tracks read your peak values, so a bad raid never takes a tier back.
 
 Each track carries a ladder of pips, one per tier and filled for the ones you have earned, so you can see how far up every ladder you are without clicking. A track that has gained a tier since you last looked at it shows a dot, and the dot clears when you point at that track — so the tab tells you *which* achievement you just earned, not merely that you earned one.
 
@@ -105,6 +105,7 @@ js/save.js          save keys, migrations, the one-tab lock, import and export
 js/ants.js          castes, production, costs, upgrades
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/achievements.js  achievement tracks, tiers, levels
+js/prestige.js      prestige formulas, upgrades, flight reset
 js/upgrades.js      upgrade panel and effect previews
 js/panels.js        shared formatting, the inspector, ants and settings panels
 js/sprites.js       pixel art drawn onto canvas

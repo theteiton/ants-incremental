@@ -17,6 +17,7 @@ import {
   population,
   populationCap,
   UPGRADES,
+  upgradeBranch,
   upgradeOwned,
   upgradeUnlocked
 } from "./ants.js";
@@ -33,6 +34,7 @@ import {
 } from "./raids.js";
 import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
 import {
+  PRESTIGE_UNLOCK,
   PRESTIGE_UPGRADES,
   prestigeStartingReserves,
   prestigeUpgradeOwned,
@@ -91,7 +93,9 @@ function blankGame() {
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
     seen: { upgrades: 0, tracks: null },
-    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0 },
+    runTime: 0,
+    peakUpgrades: { all: 0, colony: 0, combat: 0 },
+    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0, raidsWonTotal: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -242,8 +246,17 @@ export function hardReset() {
   return true;
 }
 
+export function flightReady() {
+  return population(game) >= PRESTIGE_UNLOCK;
+}
+
+export function flightReward() {
+  return royalJellyEarned(game, population(game));
+}
+
 export function doFlight() {
-  const earned = royalJellyEarned(game);
+  if (!flightReady()) return 0;
+  const earned = flightReward();
   game.prestige.royalJelly += earned;
   game.prestige.royalJellyTotal += earned;
   game.prestige.flightsTaken += 1;
@@ -257,6 +270,7 @@ export function doFlight() {
     peakPopulation: game.peakPopulation,
     peakCastes: game.peakCastes,
     peakStrength: game.peakStrength,
+    peakUpgrades: game.peakUpgrades,
     stats: game.stats,
     settings: game.settings,
     seen: game.seen,
@@ -276,6 +290,21 @@ export function buyPrestigeUpgrade(id) {
   game.prestige.royalJelly -= upgrade.cost;
   game.prestige.upgrades.push(upgrade.id);
   return true;
+}
+
+function recordUpgradePeaks(game) {
+  const peaks = game.peakUpgrades || (game.peakUpgrades = { all: 0, colony: 0, combat: 0 });
+  let colony = 0;
+  let combat = 0;
+  for (const id of game.upgrades) {
+    const upgrade = UPGRADES.find(u => u.id === id);
+    if (!upgrade) continue;
+    if (upgradeBranch(upgrade) === "combat") combat++;
+    else colony++;
+  }
+  peaks.all = Math.max(peaks.all || 0, colony + combat);
+  peaks.colony = Math.max(peaks.colony || 0, colony);
+  peaks.combat = Math.max(peaks.combat || 0, combat);
 }
 
 export function buyUpgrade(id) {
@@ -316,6 +345,7 @@ export function tick(dt) {
   game.food += earned;
   game.stats.foodEarned += earned;
   game.stats.playtime += dt;
+  game.runTime = (game.runTime || 0) + dt;
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);
@@ -339,7 +369,7 @@ export function tick(dt) {
     }
   }
 
-  if (!game.naniticsDied && game.stats.playtime >= NANITIC_LIFESPAN && game.ants.nanitic > 0) {
+  if (!game.naniticsDied && game.runTime >= NANITIC_LIFESPAN && game.ants.nanitic > 0) {
     game.ants.nanitic = 0;
     game.naniticsDied = true;
   }
@@ -350,6 +380,7 @@ export function tick(dt) {
   }
   const strength = combatPower(game);
   if (strength > (game.peakStrength || 0)) game.peakStrength = strength;
+  recordUpgradePeaks(game);
 
   if (raidsUnlocked(game)) {
     const hunted = huntRate(game) * dt;

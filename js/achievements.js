@@ -33,14 +33,18 @@ function peakOf(game, caste) {
   return Math.max(peaks[caste] || 0, game.ants[caste] || 0);
 }
 
+// reads the most upgrades ever held, not the live count — a nuptial flight
+// clears game.upgrades, and without this the tracks lose tiers and the
+// achievement level drops, which no other track can do
 function ownedIn(game, branch) {
-  if (!branch) return game.upgrades.length;
   let owned = 0;
   for (const id of game.upgrades) {
     const upgrade = UPGRADE_INDEX[id];
-    if (upgrade && (upgrade.branch || "colony") === branch) owned++;
+    if (!upgrade) continue;
+    if (!branch || (upgrade.branch || "colony") === branch) owned++;
   }
-  return owned;
+  const peaks = game.peakUpgrades || {};
+  return Math.max(owned, peaks[branch || "all"] || 0);
 }
 
 const UPGRADE_INDEX = {};
@@ -93,7 +97,7 @@ export const ACHIEVEMENT_TRACKS = [
 
   { id: "raids", name: "Raids won", unit: "raids",
     desc: "Attackers killed at the nest gate.",
-    value: g => g.raidsWon || 0,
+    value: g => Math.max(g.raidsWon || 0, (g.stats && g.stats.raidsWonTotal) || 0),
     thresholds: STEPS([1, 3, 5, 10, 25, 50], 2, 7) },
 
   { id: "strength", name: "Fighting strength", unit: "strength",

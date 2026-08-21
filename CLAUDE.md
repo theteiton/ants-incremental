@@ -71,6 +71,7 @@ js/save.js          save keys, migrations, the one-tab lock, import and export
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
 js/panels.js        shared fmt(), the inspector, ants and settings panels
+js/prestige.js      prestige formulas, upgrades, flight reset
 js/upgrades.js      upgrade panel, effect previews, lock text
 js/achievements.js  achievement tracks, tiers, levels, achievement panel
 js/sprites.js       pixel art drawn onto canvas
@@ -155,7 +156,13 @@ Monsters scale with peak population and grow 5% per raid won. Measured over a fu
 
 **Upgrades** are split into two branches shown as sub-tabs on the Upgrades tab, Colony and Combat, with a coloured edge per branch. 29 one-time purchases — 21 Colony bought with food, 8 Combat of which five cost protein — each unlocked by a caste count, a total population, or surviving a raid. All of them are listed at all times: locked entries show what they need and how close you are, and separate toggles hide locked and owned entries. Both toggles live on the Upgrades tab only — duplicating them in Settings was asked for and then asked against. Available ones show what they do to your *current* rates, because the raw percentages mislead — caste-food upgrades share one additive pool, so the "+150%" forager upgrade actually delivers about +44% overall.
 
-**Achievements are tracks that keep levelling**, not one-off badges. Fourteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (29 / 21 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. Measured over a full run, a 2,500-ant colony reaches 72 tiers and level 14.
+**Achievements are tracks that keep levelling**, not one-off badges. Sixteen tracks — colony size, food, eggs, each caste, raids won, fighting strength, protein, upgrades — each with a ladder of thresholds. Three of them count upgrades — all, Colony only and Combat only — and their ladders are generated from how many upgrades actually exist, so they always finish on the real maximum (29 / 21 / 8 today) and stay correct when upgrades are added. Every threshold passed is a tier, tiers are the points, and every 5 points is an achievement level worth +3% food and +1% hatch speed, capped at level 20. Tracks read peak values, so losing ants never takes a tier back, and the tab shows each track's next threshold. Measured over a full run, a 2,500-ant colony reaches 72 tiers and level 14.
+
+**Prestige Layer 1 (the Nuptial Flight)** unlocks at 1,000 *live* population and pays Royal Jelly on `sqrt(population / 1000) × (1 + raidsWon / 20)`, read from the colony standing at the moment of the flight. It must not read `peakPopulation`: that survives the reset, so paying on it let a player flight repeatedly with no ants and collect every time — measured at 25 jelly from 25 clicks on an empty colony, against a tree that costs 17. The flight clears food, protein, ants, brood, standard upgrades, raid counters and the queen's wings; Royal Jelly, the eight Royal Lineage adaptations, achievements, peak records, lifetime stats and settings all persist.
+
+**Two clocks, and they are not the same.** `stats.playtime` is a lifetime total that survives every flight; `runTime` resets with the colony. The nanitic lifespan reads `runTime`, because reading the lifetime clock meant every colony founded after the two-hour mark was born already too old — measured at 1 surviving nanitic and 1.90/s instead of 4 and 4.60/s, and worse with the prestige brood upgrades, since more eggs hatch into the same tick and die together.
+
+**A flight must never take an achievement tier back.** The three upgrade tracks read `peakUpgrades`, and the raids track reads `stats.raidsWonTotal`, because `game.upgrades` and `raidsWon` both reset — without those, a flight cost 14 tiers and three achievement levels, shrinking the food and hatch bonuses permanently.
 
 **Gates read high-water marks, everywhere.** Caste unlocks, upgrade requirements and achievement tiers all use the largest count the colony has ever held, not the live one. Without this a lost raid hides upgrades mid-run, and the nanitic upgrades become unbuyable forever the moment the founders die of old age.
 
@@ -189,7 +196,7 @@ The opening is slower than it was (20 ants in 2.9m against 1.6m) because brood s
 
 Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
 
-**Not built.** Prestige (the nuptial flight), and any automation, which belongs to prestige layer 1.
+**Not built.** Automation, which belongs to prestige layer 1's upgrade tree.
 
 ---
 

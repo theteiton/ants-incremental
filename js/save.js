@@ -69,6 +69,9 @@ export function migrate(data) {
   }
   if (data.version === 5) {
     data.prestige = { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] };
+    data.runTime = typeof data.stats === "object" && data.stats ? data.stats.playtime || 0 : 0;
+    data.peakUpgrades = { all: 0, colony: 0, combat: 0 };
+    if (data.stats) data.stats.raidsWonTotal = data.raidsWon || 0;
     data.version = 6;
   }
   return data;
@@ -152,6 +155,8 @@ export function applySave(game, fresh, data) {
   game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.peakCastes = Object.assign({}, data.peakCastes || {});
+  game.runTime = typeof data.runTime === "number" ? data.runTime : (data.stats && data.stats.playtime) || 0;
+  game.peakUpgrades = Object.assign({ all: 0, colony: 0, combat: 0 }, data.peakUpgrades || {});
   const savedPrestige = data.prestige || {};
   game.prestige = {
     royalJelly: savedPrestige.royalJelly || 0,

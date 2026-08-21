@@ -113,6 +113,7 @@ export function resolveRaid(game) {
     game.food += reward.food;
     game.stats.foodEarned += reward.food;
     game.raidsWon++;
+    game.stats.raidsWonTotal = (game.stats.raidsWonTotal || 0) + 1;
     game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food, dead: {} };
     return game.lastRaid;
   }

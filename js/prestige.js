@@ -53,10 +53,13 @@ function prestigeSumEffect(game, type) {
   return total;
 }
 
-export function royalJellyEarned(game) {
+// earned from the colony standing at the moment of the flight, not from
+// peakPopulation — that survives the reset, so paying out on it let a player
+// flight repeatedly with no ants and collect every time
+export function royalJellyEarned(game, population) {
+  if (population < PRESTIGE_UNLOCK) return 0;
   return Math.max(1, Math.floor(
-    Math.sqrt(Math.max(1000, game.peakPopulation || 0) / 1000) *
-    (1 + (game.raidsWon || 0) / 20)
+    Math.sqrt(population / PRESTIGE_UNLOCK) * (1 + (game.raidsWon || 0) / 20)
   ));
 }
 

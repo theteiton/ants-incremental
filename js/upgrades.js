@@ -31,6 +31,14 @@ import {
   raidRewards,
   SOLDIER_COMBAT
 } from "./raids.js";
+import {
+  prestigeBaseCap,
+  prestigeBroodSlots,
+  prestigeExcavatorCap,
+  prestigeFoodMultiplier,
+  prestigeNaniticMult,
+  prestigeSoldierMult
+} from "./prestige.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
 import { fmt, fmtFactor, watch } from "./panels.js";
 
@@ -65,30 +73,42 @@ function foodFormula(game, caste) {
   const vigour = casteHasMultiplier(caste)
     ? " × vigour " + f(casteMultiplier(game, caste))
     : "";
+  const nanitic = (caste === "nanitic" && prestigeNaniticMult(game) > 1)
+    ? " × lineage " + f(prestigeNaniticMult(game))
+    : "";
+  const lineage = prestigeFoodMultiplier(game) > 1
+    ? " × lineage " + f(prestigeFoodMultiplier(game))
+    : "";
   return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
-    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour +
+    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic +
     " × colony " + f(globalUpgradeMultiplier(game)) +
-    " × achievements " + f(achievementFoodBonus(game)) +
+    " × achievements " + f(achievementFoodBonus(game)) + lineage +
     " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
 }
 
 function capFormula(game) {
-  return "cap = base " + BASE_POPULATION_CAP +
-    " + per excavator " + f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) +
+  const base = BASE_POPULATION_CAP + prestigeBaseCap(game);
+  const per = CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap") + prestigeExcavatorCap(game);
+  return "cap = base " + base +
+    " + per excavator " + f(per) +
     " × excavators " + fmt(game.ants.excavator) +
     " = " + fmt(populationCap(game));
 }
 
 function broodFormula(game) {
-  return "brood = base " + (BASE_BROOD_SLOTS + effectTotal(game, "broodSlots")) +
+  const base = BASE_BROOD_SLOTS + effectTotal(game, "broodSlots") + prestigeBroodSlots(game);
+  return "brood = base " + base +
     " + per nurse " + f(slotsPerNurse(game)) +
     " × nurses " + fmt(game.ants.nurse) +
     " = " + broodCapacity(game) + " slots";
 }
 
 function soldierFormula(game) {
+  const lineage = prestigeSoldierMult(game) > 1
+    ? " × lineage " + f(prestigeSoldierMult(game))
+    : "";
   return "each soldier = base " + SOLDIER_COMBAT +
-    " × power " + f(1 + effectTotal(game, "soldierPower")) +
+    " × power " + f(1 + effectTotal(game, "soldierPower")) + lineage +
     " = " + fmt(combatPerSoldier(game)) + " strength";
 }
 
