@@ -1,4 +1,4 @@
-import { effectTotal, globalFoodMultiplier, population } from "./ants.js";
+import { effectTotal, globalFoodMultiplier, population, runPeakCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
 
 export const RAID_UNLOCK = 400;
@@ -59,7 +59,7 @@ export function huntRate(game) {
 }
 
 export function monsterPower(game) {
-  const reach = Math.max(RAID_UNLOCK, game.peakPopulation || 0);
+  const reach = Math.max(RAID_UNLOCK, runPeakCount(game, "population"));
   const seen = raidsSeen(game);
   const ramp = seen < RAID_RAMP.length ? RAID_RAMP[seen] : 1;
   return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
@@ -74,7 +74,7 @@ export function raidRewards(game, power) {
 }
 
 export function raidsUnlocked(game) {
-  return Math.max(game.peakPopulation || 0, population(game)) >= RAID_UNLOCK;
+  return runPeakCount(game, "population") >= RAID_UNLOCK;
 }
 
 export function raidCountdown(game) {

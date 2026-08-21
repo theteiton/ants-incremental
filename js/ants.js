@@ -166,6 +166,20 @@ export function upgradeBranch(upgrade) {
   return upgrade.branch || "colony";
 }
 
+// Two scopes, and they must not be confused. The run peak is the largest this
+// colony has ever been and resets with the nuptial flight; it gates what the
+// colony has earned — castes, upgrades, raids. The all-time peak never falls
+// and feeds achievements only. Gating on all-time meant a brand-new colony of
+// zero ants was already past every gate, facing a monster scaled to the best
+// colony the player ever had.
+export function runPeakCount(game, key) {
+  const live = casteCount(game, key);
+  const run = game.run || {};
+  if (key === "population") return Math.max(run.peakPopulation || 0, live);
+  const peaks = run.peakCastes || {};
+  return Math.max(peaks[key] || 0, live);
+}
+
 export function peakCasteCount(game, key) {
   const live = casteCount(game, key);
   if (key === "population") return Math.max(game.peakPopulation || 0, live);
@@ -179,7 +193,7 @@ export function upgradeNeedsRaid(game, upgrade) {
 
 export function upgradeUnlocked(game, upgrade) {
   if (upgradeNeedsRaid(game, upgrade)) return false;
-  return peakCasteCount(game, upgrade.req.caste) >= upgrade.req.count;
+  return runPeakCount(game, upgrade.req.caste) >= upgrade.req.count;
 }
 
 export function upgradeCurrency(upgrade) {
@@ -333,7 +347,7 @@ export function eggCost(game, casteId) {
 }
 
 export function isUnlocked(game, casteId) {
-  return Math.max(game.peakPopulation || 0, population(game)) >= CASTES[casteId].unlockAt;
+  return runPeakCount(game, "population") >= CASTES[casteId].unlockAt;
 }
 
 export function layableCastes() {

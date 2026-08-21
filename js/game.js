@@ -94,6 +94,7 @@ function blankGame() {
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
+    run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0, raidsWonTotal: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
@@ -374,12 +375,17 @@ export function tick(dt) {
     game.naniticsDied = true;
   }
 
-  game.peakPopulation = Math.max(game.peakPopulation, population(game));
+  const pop = population(game);
+  const run = game.run || (game.run = { peakPopulation: 0, peakCastes: {}, peakStrength: 0 });
+  game.peakPopulation = Math.max(game.peakPopulation, pop);
+  run.peakPopulation = Math.max(run.peakPopulation || 0, pop);
   for (const id in game.ants) {
     if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
+    if (game.ants[id] > (run.peakCastes[id] || 0)) run.peakCastes[id] = game.ants[id];
   }
   const strength = combatPower(game);
   if (strength > (game.peakStrength || 0)) game.peakStrength = strength;
+  if (strength > (run.peakStrength || 0)) run.peakStrength = strength;
   recordUpgradePeaks(game);
 
   if (raidsUnlocked(game)) {
@@ -404,6 +410,7 @@ export function load() {
 
   applySave(game, blankGame(), data);
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
+  game.run.peakPopulation = Math.max(game.run.peakPopulation || 0, population(game));
   for (const id in game.ants) {
     if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
   }

@@ -306,7 +306,8 @@ export function renderSettings() {
   el("statExiled").textContent = fmt(game.stats.exiled);
   el("statFood").textContent = fmt(game.stats.foodEarned);
   el("statPeak").textContent = fmt(Math.max(game.peakPopulation, population(game)));
-  el("statRaids").textContent = game.raidsWon + " won / " + game.raidsLost + " lost";
+  el("statRaids").textContent =
+    fmt((game.stats.raidsWonTotal || 0)) + " won all time (" + game.raidsWon + " this colony)";
   const p = game.prestige || {};
   el("statFlights").textContent = fmt(p.flightsTaken || 0);
   el("statJelly").textContent = fmt(p.royalJellyTotal || 0);

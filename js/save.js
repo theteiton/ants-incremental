@@ -72,6 +72,12 @@ export function migrate(data) {
     data.runTime = typeof data.stats === "object" && data.stats ? data.stats.playtime || 0 : 0;
     data.peakUpgrades = { all: 0, colony: 0, combat: 0 };
     if (data.stats) data.stats.raidsWonTotal = data.raidsWon || 0;
+    // an existing colony keeps the gates it has already earned
+    data.run = {
+      peakPopulation: data.peakPopulation || 0,
+      peakCastes: Object.assign({}, data.peakCastes || {}),
+      peakStrength: data.peakStrength || 0
+    };
     data.version = 6;
   }
   return data;
@@ -157,6 +163,15 @@ export function applySave(game, fresh, data) {
   game.peakCastes = Object.assign({}, data.peakCastes || {});
   game.runTime = typeof data.runTime === "number" ? data.runTime : (data.stats && data.stats.playtime) || 0;
   game.peakUpgrades = Object.assign({ all: 0, colony: 0, combat: 0 }, data.peakUpgrades || {});
+  const savedRun = data.run;
+  game.run = savedRun && typeof savedRun === "object"
+    ? { peakPopulation: savedRun.peakPopulation || 0,
+        peakCastes: Object.assign({}, savedRun.peakCastes || {}),
+        peakStrength: savedRun.peakStrength || 0 }
+    // a save written before the split earned its gates already; keep them
+    : { peakPopulation: data.peakPopulation || 0,
+        peakCastes: Object.assign({}, data.peakCastes || {}),
+        peakStrength: data.peakStrength || 0 };
   const savedPrestige = data.prestige || {};
   game.prestige = {
     royalJelly: savedPrestige.royalJelly || 0,

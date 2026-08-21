@@ -13,7 +13,7 @@ import {
   effectTotal,
   foodPerSecond,
   globalUpgradeMultiplier,
-  peakCasteCount,
+  runPeakCount,
   populationCap,
   slotsPerNurse,
   UPGRADES,
@@ -48,7 +48,7 @@ export function upgradeLockText(game, upgrade) {
   const parts = [];
   if (upgradeNeedsRaid(game, upgrade)) parts.push("survive your first raid");
   const req = upgrade.req;
-  const have = peakCasteCount(game, req.caste);
+  const have = runPeakCount(game, req.caste);
   if (req.count > 0 && have < req.count) {
     const label = req.caste === "population" ? "ants" : CASTES[req.caste].name.toLowerCase() + "s";
     parts.push("needs " + fmt(req.count) + " " + label + " (you have " + fmt(have) + ")");
