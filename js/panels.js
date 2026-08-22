@@ -13,6 +13,7 @@ import {
   foodPerSecond,
   incubationTime,
   isUnlocked,
+  layableCastes,
   population,
   populationCap,
   UPGRADES,
@@ -22,7 +23,9 @@ import {
 import { combatPerCaste, combatPerSoldier } from "./raids.js";
 import {
   buyUpgrade,
-  autoShedUnlocked,
+  automationOn,
+  automationUnlocked,
+  AUTOMATIONS,
   canExile,
   exile,
   exileUnlocked,
@@ -282,10 +285,7 @@ export function buildSettings(handlers) {
     setSetting("exileEnabled", event.target.checked);
     handlers.refresh();
   };
-  el("setAutoShed").onchange = event => {
-    setSetting("autoShed", event.target.checked);
-    handlers.refresh();
-  };
+
   el("setTheme").onchange = event => {
     setSetting("theme", event.target.value);
     handlers.applyTheme();
@@ -294,15 +294,77 @@ export function buildSettings(handlers) {
     setQueenName(event.target.value);
     handlers.refresh();
   };
+  buildAutomation(handlers);
   el("btnExport").onclick = handlers.exportSave;
   el("btnImport").onclick = handlers.importSave;
   el("btnReset").onclick = handlers.reset;
 }
 
+const automationRows = {};
+const ratioRows = {};
+
+function buildAutomation(handlers) {
+  AUTOMATIONS.forEach(entry => {
+    const row = document.createElement("label");
+    row.className = "toggle row-toggle";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.onchange = event => {
+      setSetting(entry.key, event.target.checked);
+      handlers.refresh();
+    };
+    const text = document.createElement("span");
+    row.append(box, text);
+    watch(row, { title: entry.name, body: entry.note,
+      note: () => automationOn(entry.key) ? "Running." : "Switched off — you are doing this by hand." });
+    automationRows[entry.key] = { row, box, text };
+    el("automationList").appendChild(row);
+  });
+
+  layableCastes().forEach(id => {
+    const field = document.createElement("label");
+    field.className = "ratio-field";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = "100";
+    input.oninput = () => {
+      const ratios = Object.assign({}, game.settings.ratios);
+      ratios[id] = Math.max(0, Math.min(100, Math.floor(Number(input.value) || 0)));
+      setSetting("ratios", ratios);
+      handlers.refresh();
+    };
+    const label = document.createElement("span");
+    label.textContent = CASTES[id].name + " %";
+    field.append(input, label);
+    ratioRows[id] = { field, input };
+    el("ratioList").appendChild(field);
+  });
+}
+
+function renderAutomation() {
+  let any = false;
+  AUTOMATIONS.forEach(entry => {
+    const ui = automationRows[entry.key];
+    const unlocked = automationUnlocked(game, entry.key);
+    ui.row.hidden = !unlocked;
+    if (unlocked) any = true;
+    ui.box.checked = game.settings[entry.key] !== false;
+    ui.text.textContent = entry.name + " — " + entry.note;
+  });
+  el("automationSection").hidden = !any;
+  el("ratioRow").hidden = !automationUnlocked(game, "autoRatio");
+  const ratios = game.settings.ratios || {};
+  layableCastes().forEach(id => {
+    const ui = ratioRows[id];
+    if (document.activeElement !== ui.input) ui.input.value = String(ratios[id] || 0);
+    ui.field.classList.toggle("locked", !isUnlocked(game, id));
+  });
+}
+
 export function renderSettings() {
+  renderAutomation();
   el("setExile").checked = !!game.settings.exileEnabled;
-  el("setAutoShedRow").hidden = !autoShedUnlocked();
-  el("setAutoShed").checked = game.settings.autoShed !== false;
   el("setTheme").value = game.settings.theme || "dark";
   if (document.activeElement !== el("setQueenName")) el("setQueenName").value = game.queenName || "";
   el("exileStatus").textContent = exileUnlocked()

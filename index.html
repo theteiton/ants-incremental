@@ -149,10 +149,18 @@
   <section class="panel tab" id="tab-settings" hidden>
     <h2>Colony rules</h2>
     <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
-    <label class="toggle row-toggle" id="setAutoShedRow" hidden>
-      <input type="checkbox" id="setAutoShed"> Shed her wings automatically
-    </label>
+
     <p class="dim" id="exileStatus"></p>
+
+    <section id="automationSection" hidden>
+      <h2>Automation</h2>
+      <p class="dim">Bought with Royal Jelly on the Nuptial tab. Each one can be switched off here.</p>
+      <div id="automationList"></div>
+      <div id="ratioRow" hidden>
+        <p class="dim">Share of the colony each caste should hold. Zero leaves a caste to you.</p>
+        <div class="ratios" id="ratioList"></div>
+      </div>
+    </section>
 
     <h2>Her majesty</h2>
     <label class="field">Queen's name

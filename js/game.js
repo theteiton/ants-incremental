@@ -14,6 +14,7 @@ import {
   foodPerSecond,
   hatchRate,
   isUnlocked,
+  layableCastes,
   population,
   populationCap,
   UPGRADES,
@@ -35,6 +36,7 @@ import {
 } from "./raids.js";
 import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
 import {
+  automationUnlocked,
   PRESTIGE_UNLOCK,
   PRESTIGE_UPGRADES,
   prestigeStartingReserves,
@@ -55,7 +57,7 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
-export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour } from "./prestige.js";
+export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, AUTOMATIONS, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour, automationUnlocked } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
@@ -97,7 +99,9 @@ function blankGame() {
     hiding: false,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
-      upgradeFilter: "all", upgradeSort: "default", feedBrood: true, autoShed: true },
+      upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
+      autoShed: true, autoBuy: true, autoLay: true, autoRatio: true,
+      ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
@@ -105,7 +109,7 @@ function blankGame() {
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0 },
-    prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
+    prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [], knownUpgrades: [] },
     lastSave: Date.now()
   };
 }
@@ -119,14 +123,55 @@ export function shedWings() {
   return true;
 }
 
-// the first automation, and it is what the nuptial flight buys: she has done
-// this before and no longer waits to be told
+// every automation is gated the same way: unlocked by prestige, then switchable
 export function autoShedUnlocked() {
-  return (game.prestige && game.prestige.flightsTaken || 0) > 0;
+  return automationUnlocked(game, "autoShed");
+}
+
+export function automationOn(key) {
+  return automationUnlocked(game, key) && game.settings[key] !== false;
 }
 
 export function autoShedOn() {
-  return autoShedUnlocked() && game.settings.autoShed !== false;
+  return automationOn("autoShed");
+}
+
+// Standing Orders picks the caste furthest below the share you asked for, and
+// digs first when the nest is running out of room -- a colony that cannot grow
+// is the one case where a ratio is the wrong answer.
+function pickManagedCaste() {
+  const cap = populationCap(game);
+  const pop = population(game);
+  if (cap - pop < Math.max(8, pop * 0.12) && isUnlocked(game, "excavator")) {
+    setNextCaste("excavator");
+    return;
+  }
+  const ratios = game.settings.ratios || {};
+  let want = null;
+  let worst = 0;
+  for (const id of layableCastes()) {
+    const target = (ratios[id] || 0) / 100;
+    if (target <= 0 || !isUnlocked(game, id)) continue;
+    const deficit = target - casteStock(game, id) / Math.max(1, pop);
+    if (deficit > worst) { worst = deficit; want = id; }
+  }
+  // with every share met, the surplus goes to food rather than to whatever
+  // caste happened to be selected last -- otherwise the ratios overshoot badly
+  setNextCaste(want || "forager");
+}
+
+function runAutomation() {
+  if (automationOn("autoBuy")) {
+    for (const id of game.prestige.knownUpgrades || []) buyUpgrade(id);
+  }
+  if (!automationOn("autoLay")) return;
+  if (automationOn("autoRatio")) pickManagedCaste();
+  // top up the tended slots only: filling the queue would bury whatever the
+  // player lays by hand, which is the problem destroying eggs exists to undo
+  let guard = 0;
+  while (game.eggs.length < broodCapacity(game) && guard++ < 64) {
+    if (!layEgg()) break;
+  }
 }
 
 export function setNextCaste(casteId) {
@@ -353,6 +398,8 @@ export function buyUpgrade(id) {
   if (game[currency] < upgrade.cost) return false;
   game[currency] -= upgrade.cost;
   game.upgrades.push(upgrade.id);
+  const known = game.prestige.knownUpgrades || (game.prestige.knownUpgrades = []);
+  if (known.indexOf(upgrade.id) < 0) known.push(upgrade.id);
   return true;
 }
 
@@ -386,6 +433,7 @@ export function tick(dt) {
   game.runTime = (game.runTime || 0) + dt;
 
   if (!game.wingsShed && autoShedOn()) shedWings();
+  runAutomation();
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);

@@ -237,7 +237,7 @@ const UNLOCK_BOXES = [
     unlocked: () => autoShedUnlocked(),
     value: () => autoShedUnlocked() ? (autoShedOn() ? "On" : "Off") : "Locked",
     note: () => autoShedUnlocked()
-      ? "Unlocked — shedding her wings is automatic. Turn it on or off in Settings."
+      ? "Unlocked — shedding her wings is automatic. Turn it on or off under Automation in Settings."
       : "Locked until your first nuptial flight." }
 ];
 

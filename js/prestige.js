@@ -25,6 +25,23 @@ export const PRESTIGE_UPGRADES = [
   { id: "prestige_8", name: "Queen Sovereignty", cost: 4,
     desc: "The queen's presence lifts the whole colony. All food ×2.",
     effect: { type: "prestigeGlobalFood", mult: 2 } },
+
+  { id: "prestige_9", name: "Nest Memory", cost: 3,
+    desc: "The colony remembers every adaptation it has ever paid for, and buys them back as food allows.",
+    effect: { type: "automation", key: "autoBuy" } },
+  { id: "prestige_10", name: "Brood Instinct", cost: 4,
+    desc: "The queen lays the chosen caste without being told, keeping the brood chambers full.",
+    effect: { type: "automation", key: "autoLay" } },
+  { id: "prestige_11", name: "Standing Orders", cost: 6,
+    desc: "The colony holds the caste balance you set, and digs when the nest runs out of room.",
+    effect: { type: "automation", key: "autoRatio" } },
+];
+
+export const AUTOMATIONS = [
+  { key: "autoShed", name: "Shed her wings", note: "She sheds the moment she lands." },
+  { key: "autoBuy", name: "Buy known adaptations", note: "Re-buys anything this colony has owned before." },
+  { key: "autoLay", name: "Keep the brood full", note: "Lays the chosen caste into every free slot." },
+  { key: "autoRatio", name: "Hold the caste balance", note: "Chooses the caste, and digs when the nest is full." }
 ];
 
 export function prestigeUpgradeOwned(game, upgrade) {
@@ -68,6 +85,14 @@ export function royalJellyEarned(game, population) {
 export function jellyPerHour(game, population, runTime) {
   if (!(runTime > 60)) return 0;
   return royalJellyEarned(game, population) / (runTime / 3600);
+}
+
+// automation is the thing the flight actually sells, so it is bought with
+// jelly rather than handed over by a flight count
+export function automationUnlocked(game, key) {
+  if (key === "autoShed") return (game.prestige && game.prestige.flightsTaken || 0) > 0;
+  return PRESTIGE_UPGRADES.some(u =>
+    u.effect.type === "automation" && u.effect.key === key && prestigeUpgradeOwned(game, u));
 }
 
 export function prestigeFoodMultiplier(game) {
