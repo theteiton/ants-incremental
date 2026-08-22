@@ -375,7 +375,9 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: 6px;
 }
 .track.maxed { border-color: var(--good); }
-.field.inline { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; }
+/* .field carries a 14px bottom margin; inside an align-items:center row that
+   margin is part of the box being centred, which lifts the control off the line */
+.field.inline { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 0; }
 .field.inline select { padding: 4px 6px; font-size: 12px; }
 #tab-achievements > .bar { margin-bottom: 16px; }
 #achievementTabs { margin-bottom: 4px; }
