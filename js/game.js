@@ -110,7 +110,7 @@ function blankGame() {
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0 },
-    prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [], knownUpgrades: [] },
+    prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
 }
@@ -176,7 +176,10 @@ export function autoCaste() {
 
 function runAutomation() {
   if (automationOn("autoBuy")) {
-    for (const id of game.prestige.knownUpgrades || []) buyUpgrade(id);
+    // every unlocked adaptation it can afford, not only ones owned before.
+    // This runs ahead of laying on purpose: upgrades get first claim on the
+    // food, or laying spends the colony down below their price every tick.
+    for (const upgrade of UPGRADES) buyUpgrade(upgrade.id);
   }
   if (!automationOn("autoLay")) return;
   const caste = autoCaste();
@@ -418,8 +421,6 @@ export function buyUpgrade(id) {
   if (game[currency] < upgrade.cost) return false;
   game[currency] -= upgrade.cost;
   game.upgrades.push(upgrade.id);
-  const known = game.prestige.knownUpgrades || (game.prestige.knownUpgrades = []);
-  if (known.indexOf(upgrade.id) < 0) known.push(upgrade.id);
   return true;
 }
 

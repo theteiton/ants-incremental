@@ -27,7 +27,7 @@ export const PRESTIGE_UPGRADES = [
     effect: { type: "prestigeGlobalFood", mult: 2 } },
 
   { id: "prestige_9", name: "Nest Memory", cost: 3,
-    desc: "The colony remembers every adaptation it has ever paid for, and buys them back as food allows.",
+    desc: "The colony buys any adaptation it can reach and afford, before it spends the food on eggs.",
     effect: { type: "automation", key: "autoBuy" } },
   { id: "prestige_10", name: "Brood Instinct", cost: 4,
     desc: "The queen lays the chosen caste without being told, keeping the brood chambers full.",
@@ -42,7 +42,7 @@ export const PRESTIGE_UPGRADES = [
 
 export const AUTOMATIONS = [
   { key: "autoShed", name: "Shed her wings", note: "She sheds the moment she lands." },
-  { key: "autoBuy", name: "Buy known adaptations", note: "Re-buys anything this colony has owned before." },
+  { key: "autoBuy", name: "Buy adaptations", note: "Buys any it can reach and afford, before laying." },
   { key: "autoLay", name: "Keep the brood full", note: "Lays into every free slot.", inBrood: true },
   { key: "autoRatio", name: "Hold the caste balance", note: "Chooses the caste, and digs when the nest is full." }
 ];

@@ -69,7 +69,7 @@ export function migrate(data) {
   }
   if (data.version === 5) {
     data.prestige = { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [],
-      knownUpgrades: Array.isArray(data.upgrades) ? data.upgrades.slice() : [] };
+    };
     data.runTime = typeof data.stats === "object" && data.stats ? data.stats.playtime || 0 : 0;
     data.peakUpgrades = { all: 0, colony: 0, combat: 0 };
     if (data.stats) data.stats.raidsWonTotal = data.raidsWon || 0;
@@ -180,10 +180,7 @@ export function applySave(game, fresh, data) {
     royalJelly: savedPrestige.royalJelly || 0,
     royalJellyTotal: savedPrestige.royalJellyTotal || 0,
     flightsTaken: savedPrestige.flightsTaken || 0,
-    upgrades: Array.isArray(savedPrestige.upgrades) ? savedPrestige.upgrades : [],
-    knownUpgrades: Array.isArray(savedPrestige.knownUpgrades)
-      ? savedPrestige.knownUpgrades
-      : (Array.isArray(data.upgrades) ? data.upgrades.slice() : [])
+    upgrades: Array.isArray(savedPrestige.upgrades) ? savedPrestige.upgrades : []
   };
   game.version = SAVE_VERSION;
   return game;
