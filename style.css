@@ -523,6 +523,14 @@ ul { list-style: none; margin: 0; padding: 0; }
   color: var(--dim);
 }
 
+.lineage-done {
+  border: 1px solid var(--good);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
 .prestige-flight-box {
   background: var(--panel2);
   border: 1px solid var(--accent);

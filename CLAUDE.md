@@ -228,7 +228,9 @@ The opening is slower than it was (20 ants in 2.9m against 1.6m) because brood s
 
 Upgrade unlocks are spaced against measured caste counts so a reward lands every few minutes; the worst gap is about 15 minutes, down from 65.
 
-**Not built.** Automation, which belongs to prestige layer 1's upgrade tree.
+**The tree ends, and the game says so.** With all twelve adaptations bought there is nothing left to spend Royal Jelly on, and a flight still pays around 25. Running out of content silently reads as a bug, so the Nuptial tab prints a line once the lineage is complete: what is banked, that jelly keeps gathering, and that deeper layers are being built for the beta. Keep it honest if more layers land — it is the last thing a finishing player reads.
+
+**Not built.** Prestige layers beyond the first. A competent player finishes the whole Royal Lineage in about five hours, so that is the current edge of the game.
 
 ---
 

@@ -452,6 +452,21 @@ function renderPrestige() {
       (perHour > 0 ? ", which is " + fmt(perHour) + " an hour for this colony so far." : ".")
     : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
 
+  // the tree is finite, and running out of it should read as the edge of what
+  // is built rather than as something broken
+  const owned = PRESTIGE_UPGRADES.filter(u => prestigeUpgradeOwned(game, u)).length;
+  const complete = owned === PRESTIGE_UPGRADES.length;
+  el("lineageDone").hidden = !complete;
+  if (complete) {
+    el("lineageDone").textContent =
+      "The lineage is complete — all " + PRESTIGE_UPGRADES.length +
+      " adaptations are hers, and there is nothing left here to buy. " +
+      "Royal Jelly still gathers with every flight" +
+      (p.royalJelly > 0 ? " (" + fmt(p.royalJelly) + " banked)" : "") +
+      ". Deeper prestige layers are being built, and the beta will carry more of them — " +
+      "this is as far down as the nest goes for now.";
+  }
+
   PRESTIGE_UPGRADES.forEach(upgrade => {
     const ui = prestigeCards[upgrade.id];
     if (!ui) return;
