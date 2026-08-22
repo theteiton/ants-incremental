@@ -48,9 +48,10 @@ export const CASTES = {
 export const NANITIC_GENERATION = 4;
 export const EGG_TIME = 24;
 export const BASE_POPULATION_CAP = 30;
-export const CAP_PER_EXCAVATOR = 6;
+export const CAP_PER_EXCAVATOR = 12;
 export const RESERVE_EGG_COST = 20;
 export const EXCAVATOR_OVERFLOW = 3;
+export const BIG_FORAGER_PRESTIGE_MULT = 25;
 export const NANITIC_LIFESPAN = 7200;
 export const BASE_BROOD_SLOTS = 3;
 export const SLOTS_PER_NURSE = 0.25;
@@ -77,7 +78,9 @@ const FOOD_PER_SECOND = {
 
 export const CASTE_COSTS = {
   forager: { base: 1.5, exponent: 1.75 },
-  excavator: { base: 15, exponent: 1.8 },
+  // dearer and rarer than they were, and steeper once a colony is past the
+  // prestige gate: at 58 cap each, #17 is where the nest first holds 1,000
+  excavator: { base: 100, exponent: 1.8, breakAt: 17, exponent2: 2.2 },
   nurse: { base: 60, exponent: 1.7 },
   soldier: { base: 200, exponent: 1.6 }
 };
@@ -107,13 +110,13 @@ export const UPGRADES = [
     desc: "The colony harvests the whole tree. Forager food +300%.", effect: { type: "casteFood", caste: "forager", add: 3 } },
 
   { id: "excavator_1", name: "Loose Soil", req: { caste: "excavator", count: 3 }, cost: 1200,
-    desc: "Easier digging. Each excavator holds 2 more ants.", effect: { type: "excavatorCap", add: 2 } },
+    desc: "Easier digging. Each excavator holds 4 more ants.", effect: { type: "excavatorCap", add: 4 } },
   { id: "excavator_2", name: "Vaulted Galleries", req: { caste: "excavator", count: 15 }, cost: 9000,
-    desc: "Arched roofs stop collapses. +3 cap per excavator.", effect: { type: "excavatorCap", add: 3 } },
+    desc: "Arched roofs stop collapses. +6 cap per excavator.", effect: { type: "excavatorCap", add: 6 } },
   { id: "excavator_3", name: "Deep Shafts", req: { caste: "excavator", count: 22 }, cost: 90000,
-    desc: "The nest reaches the water table. +6 cap per excavator.", effect: { type: "excavatorCap", add: 6 } },
+    desc: "The nest reaches the water table. +12 cap per excavator.", effect: { type: "excavatorCap", add: 12 } },
   { id: "excavator_4", name: "Cathedral Chambers", req: { caste: "excavator", count: 55 }, cost: 500000,
-    desc: "Halls big enough to lose a queen in. +12 cap per excavator.", effect: { type: "excavatorCap", add: 12 } },
+    desc: "Halls big enough to lose a queen in. +24 cap per excavator.", effect: { type: "excavatorCap", add: 24 } },
 
   { id: "nurse_1", name: "Warm Brood Pile", req: { caste: "nurse", count: 3 }, cost: 15000,
     desc: "Eggs are moved to follow the sun. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.05 } },
@@ -294,9 +297,15 @@ export function bigForagerMultiplier(game, bornAt) {
   return Math.min(BIG_FORAGER_AGE_CAP, 1 + BIG_FORAGER_AGE_GAIN * minutes);
 }
 
+// the flight teaches the colony to raise them properly; before it they are an
+// early-game curiosity that fades to a few percent of production
+export function bigForagerBonus(game) {
+  return (game.prestige && game.prestige.flightsTaken || 0) > 0 ? BIG_FORAGER_PRESTIGE_MULT : 1;
+}
+
 export function bigForagerOutput(game) {
   if (!game.bigForagers || game.bigForagers.length === 0) return 0;
-  const each = BIG_FORAGER_BASE * casteFoodPerSecond(game, "forager");
+  const each = BIG_FORAGER_BASE * bigForagerBonus(game) * casteFoodPerSecond(game, "forager");
   let total = 0;
   for (const bornAt of game.bigForagers) total += each * bigForagerMultiplier(game, bornAt);
   return total;
@@ -341,16 +350,18 @@ export function casteStock(game, casteId) {
   return game.ants[casteId] + broodCount(game, casteId);
 }
 
+export function eggPrice(casteId, n) {
+  const curve = CASTE_COSTS[casteId] || CASTE_COSTS.forager;
+  const exponent = curve.breakAt && n > curve.breakAt ? curve.exponent2 : curve.exponent;
+  return curve.base * Math.pow(n, exponent);
+}
+
 export function eggCost(game, casteId) {
   if (game.emerged === 0) {
     return { resource: "reserves", amount: RESERVE_EGG_COST };
   }
   const caste = casteId || game.nextCaste;
-  const curve = CASTE_COSTS[caste] || CASTE_COSTS.forager;
-  return {
-    resource: "food",
-    amount: curve.base * Math.pow(casteStock(game, caste) + 1, curve.exponent)
-  };
+  return { resource: "food", amount: eggPrice(caste, casteStock(game, caste) + 1) };
 }
 
 export function isUnlocked(game, casteId) {

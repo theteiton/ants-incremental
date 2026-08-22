@@ -27,6 +27,7 @@ import {
   hardReset,
   importSave,
   claimSave,
+  lastAway,
   feedableEggs,
   holdsSave,
   layEggs,
@@ -36,6 +37,7 @@ import {
   prestigeUpgradeOwned,
   proteinUnlocked,
   flightReady,
+  jellyPerHour,
   flightReward,
   setSetting,
   markSeen,
@@ -315,6 +317,19 @@ function affordablePrestigeUpgrades() {
   return ready;
 }
 
+function renderAway() {
+  const away = lastAway;
+  const box = el("awayNote");
+  box.hidden = !away;
+  if (!away) return;
+  const bits = ["+" + fmt(away.food) + " food"];
+  if (away.protein > 0.5) bits.push("+" + fmt(away.protein) + " protein");
+  if (away.hatched > 0) bits.push(fmt(away.hatched) + " hatched");
+  if (away.won > 0) bits.push(away.won + " raids won");
+  if (away.lost > 0) bits.push(away.lost + " lost");
+  box.textContent = "While you were away — " + fmtTime(away.seconds) + ": " + bits.join(", ") + ".";
+}
+
 function renderFormulas() {
   const box = el("formulaList");
   const rows = formulaSummary(game);
@@ -399,8 +414,11 @@ function renderPrestige() {
   const ready = flightReady();
   const projected = flightReward();
   el("btnFlight").disabled = !ready;
+  const perHour = jellyPerHour(game, pop, game.runTime || 0);
   el("flightYield").textContent = ready
-    ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — Taking flight now yields +" + fmt(projected) + " Royal Jelly."
+    ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — taking flight now yields +" +
+      fmt(projected) + " Royal Jelly" +
+      (perHour > 0 ? ", which is " + fmt(perHour) + " an hour for this colony so far." : ".")
     : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
 
   PRESTIGE_UPGRADES.forEach(upgrade => {
@@ -436,6 +454,7 @@ function render() {
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
   el("takeover").hidden = holdsSave();
+  renderAway();
   renderBadges();
   renderInspector();
   renderQueen();

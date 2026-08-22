@@ -313,6 +313,10 @@ export function renderSettings() {
   el("statExiled").textContent = fmt(game.stats.exiled);
   el("statFood").textContent = fmt(game.stats.foodEarned);
   el("statPeak").textContent = fmt(Math.max(game.peakPopulation, population(game)));
+  const best = game.best || {};
+  el("statBestRun").textContent = fmt(best.population || 0);
+  el("statBestJelly").textContent = fmt(best.jelly || 0) + " royal jelly";
+  el("statBest1000").textContent = best.timeTo1000 ? fmtTime(best.timeTo1000) : "not yet";
   el("statRaids").textContent =
     fmt((game.stats.raidsWonTotal || 0)) + " won all time (" + game.raidsWon + " this colony)";
   const p = game.prestige || {};

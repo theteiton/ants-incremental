@@ -8,7 +8,7 @@ import {
   bigForagerThreshold,
   broodCapacity,
   upgradeCurrency,
-  CASTE_COSTS,
+  eggPrice,
   casteStock,
   NANITIC_LIFESPAN,
   foodPerSecond,
@@ -55,10 +55,13 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
-export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, royalJellyEarned, prestigeUpgradeOwned } from "./prestige.js";
+export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
 export const OFFLINE_CAP = 8 * 3600;
+
+// what the last return from being away was worth, for the summary line
+export let lastAway = null;
 
 export function save() {
   return writeSave(game);
@@ -98,6 +101,7 @@ function blankGame() {
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
+    best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0, raidsWonTotal: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
@@ -141,7 +145,9 @@ export function broodSlots() {
   if (game.nextCaste !== "excavator") return 0;
   let digging = 0;
   for (const egg of game.eggs) if (egg.caste === "excavator") digging++;
-  return Math.max(0, EXCAVATOR_OVERFLOW - digging);
+  // a colony that tended three eggs could only ever dig three chambers out,
+  // however many nurses it had; the brood is the real limit
+  return Math.max(0, Math.max(EXCAVATOR_OVERFLOW, broodCapacity(game)) - digging);
 }
 
 export function canLay() {
@@ -174,12 +180,11 @@ export function affordableEggs() {
   if (first.resource === "reserves") {
     return Math.min(slots, Math.floor(game.reserves / first.amount));
   }
-  const curve = CASTE_COSTS[game.nextCaste];
   let budget = game.food;
   let stock = casteStock(game, game.nextCaste);
   let count = 0;
   while (count < slots) {
-    const price = curve.base * Math.pow(stock + 1, curve.exponent);
+    const price = eggPrice(game.nextCaste, stock + 1);
     if (price > budget) break;
     budget -= price;
     stock++;
@@ -274,6 +279,7 @@ export function doFlight() {
   game.prestige.royalJelly += earned;
   game.prestige.royalJellyTotal += earned;
   game.prestige.flightsTaken += 1;
+  game.best.jelly = Math.max(game.best.jelly || 0, earned);
 
   // Values that survive the flight
   const surviving = {
@@ -285,6 +291,7 @@ export function doFlight() {
     peakCastes: game.peakCastes,
     peakStrength: game.peakStrength,
     peakUpgrades: game.peakUpgrades,
+    best: game.best,
     stats: game.stats,
     settings: game.settings,
     seen: game.seen,
@@ -402,6 +409,9 @@ export function tick(dt) {
   if (strength > (game.peakStrength || 0)) game.peakStrength = strength;
   if (strength > (run.peakStrength || 0)) run.peakStrength = strength;
   recordUpgradePeaks(game);
+  const best = game.best || (game.best = { population: 0, jelly: 0, timeTo1000: 0 });
+  best.population = Math.max(best.population || 0, pop);
+  if (!best.timeTo1000 && pop >= 1000) best.timeTo1000 = game.runTime;
 
   game.hiding = inHiding(game);
   if (raidsUnlocked(game)) {
@@ -438,9 +448,18 @@ export function load() {
   recountAchievements();
 
   const elapsed = Math.min(Math.max(0, (Date.now() - game.lastSave) / 1000), OFFLINE_CAP);
+  const before = { food: game.stats.foodEarned, protein: game.stats.proteinEarned,
+    hatched: game.stats.eggsHatched, won: game.raidsWon, lost: game.raidsLost };
   const step = Math.max(1, elapsed / 600);
   for (let done = 0; done < elapsed; done += step) {
     tick(Math.min(step, elapsed - done));
+  }
+  if (elapsed >= 60) {
+    lastAway = { seconds: elapsed,
+      food: game.stats.foodEarned - before.food,
+      protein: game.stats.proteinEarned - before.protein,
+      hatched: game.stats.eggsHatched - before.hatched,
+      won: game.raidsWon - before.won, lost: game.raidsLost - before.lost };
   }
   return elapsed;
 }

@@ -63,6 +63,13 @@ export function royalJellyEarned(game, population) {
   ));
 }
 
+// what an hour of this colony is currently worth in jelly, so a player can see
+// whether to fly now or push on
+export function jellyPerHour(game, population, runTime) {
+  if (!(runTime > 60)) return 0;
+  return royalJellyEarned(game, population) / (runTime / 3600);
+}
+
 export function prestigeFoodMultiplier(game) {
   return prestigeProductEffect(game, "prestigeGlobalFood");
 }

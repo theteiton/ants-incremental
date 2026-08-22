@@ -193,6 +193,13 @@ button.danger { background: var(--danger); color: #fff; }
 .raid-scales b.losing { color: var(--danger); }
 .raid-report { font-size: 14px; margin: 0; line-height: 1.5; }
 
+.away {
+  margin: 12px 20px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--good);
+  border-radius: 8px;
+  font-size: 14px;
+}
 .takeover {
   margin: 0;
   padding: 12px 20px;

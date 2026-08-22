@@ -1,5 +1,6 @@
 import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
+import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch } from "./panels.js";
 
 const el = id => document.getElementById(id);
@@ -222,6 +223,15 @@ const BONUS_BOXES = [
 ];
 
 const UNLOCK_BOXES = [
+  { id: "bigforager", name: "Raised on royal jelly",
+    desc: "The colony finally knows how to feed an oversized forager.",
+    unlocked: game => bigForagerBonus(game) > 1,
+    value: game => bigForagerBonus(game) > 1
+      ? BIG_FORAGER_PRESTIGE_MULT + "× big forager food" : "Locked",
+    note: game => bigForagerBonus(game) > 1
+      ? "Every big forager gathers " + BIG_FORAGER_PRESTIGE_MULT +
+        " times what she did. They stop being a curiosity and carry the colony until the deep forager upgrades land."
+      : "Locked until your first nuptial flight." },
   { id: "autoshed", name: "Instinct to shed",
     desc: "She has landed before. She sheds her wings without being told.",
     unlocked: () => autoShedUnlocked(),
@@ -335,7 +345,7 @@ export function renderAchievements(game) {
     const ui = bonusBoxes[entry.id];
     if (!ui) return;
     ui.value.textContent = entry.value(game);
-    if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked());
+    if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked(game));
   });
 
   const points = totalTiers(game);
