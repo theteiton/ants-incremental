@@ -150,6 +150,10 @@ Last updated 21 August 2026. Published and playable at the Pages URL below.
 
 **Automation is bought with Royal Jelly, never handed over.** Three tier-one adaptations join the tree: **Nest Memory** (3) re-buys any adaptation this player has already owned, from `prestige.knownUpgrades` which persists across flights; **Brood Instinct** (4) lays the chosen caste into every free slot; **Standing Orders** (6) chooses the caste itself, holding the share you set per caste and digging first whenever the nest is running out of room. Shedding her wings stays free with the first flight. Every one has a switch under Automation in Settings, and `automationOn()` is the single gate — unlocked, then not switched off.
 
+**The laying switch lives in the brood panel, not in Settings**, because turning it off is a move you make during play rather than a preference you set once. With it on your food can never rise above the price of one egg — measured at a peak of 2,991 banked against a next egg of 3,071 — so any upgrade dearer than a single egg stays unbuyable until egg prices grow past it. Switching it off is how you bank for one, and the label says so.
+
+**Automation never touches `game.nextCaste`.** Standing Orders decides what it lays through `autoCaste()` and lays that caste directly, so the caste you pick by hand survives and the Lay buttons keep working while it runs. Before this it overwrote your selection every tick.
+
 Two rules keep them honest. **Brood Instinct tops up the tended slots only** and never builds a queue, because filling the queue would bury whatever the player lays by hand — the exact problem destroying eggs exists to undo. And **Standing Orders falls back to foragers once every share is met**; without that it kept laying whatever caste it last chose and overshot badly, measured at 29.5% nurses against a 10% target. With the fallback it holds 10.1% and 15.0% against targets of 10 and 15.
 
 This is the rule in *No automation before prestige* being spent, as intended. Nothing exiles an ant or destroys an egg on the player's behalf, and nothing should: both are irreversible, and an automated mistake there is the silent kind.

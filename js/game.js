@@ -139,13 +139,10 @@ export function autoShedOn() {
 // Standing Orders picks the caste furthest below the share you asked for, and
 // digs first when the nest is running out of room -- a colony that cannot grow
 // is the one case where a ratio is the wrong answer.
-function pickManagedCaste() {
+export function managedCaste() {
   const cap = populationCap(game);
   const pop = population(game);
-  if (cap - pop < Math.max(8, pop * 0.12) && isUnlocked(game, "excavator")) {
-    setNextCaste("excavator");
-    return;
-  }
+  if (cap - pop < Math.max(8, pop * 0.12) && isUnlocked(game, "excavator")) return "excavator";
   const ratios = game.settings.ratios || {};
   let want = null;
   let worst = 0;
@@ -155,9 +152,17 @@ function pickManagedCaste() {
     const deficit = target - casteStock(game, id) / Math.max(1, pop);
     if (deficit > worst) { worst = deficit; want = id; }
   }
-  // with every share met, the surplus goes to food rather than to whatever
-  // caste happened to be selected last -- otherwise the ratios overshoot badly
-  setNextCaste(want || "forager");
+  // with every share met the surplus goes to food, not to whatever caste
+  // happened to be chosen last -- otherwise the ratios overshoot badly
+  return want || "forager";
+}
+
+// what the automation will lay next, which is not necessarily what the player
+// has selected: Standing Orders decides for itself and leaves game.nextCaste
+// alone, so laying by hand still works while it runs
+export function autoCaste() {
+  const caste = automationOn("autoRatio") ? managedCaste() : game.nextCaste;
+  return isUnlocked(game, caste) ? caste : "forager";
 }
 
 function runAutomation() {
@@ -165,12 +170,12 @@ function runAutomation() {
     for (const id of game.prestige.knownUpgrades || []) buyUpgrade(id);
   }
   if (!automationOn("autoLay")) return;
-  if (automationOn("autoRatio")) pickManagedCaste();
+  const caste = autoCaste();
   // top up the tended slots only: filling the queue would bury whatever the
   // player lays by hand, which is the problem destroying eggs exists to undo
   let guard = 0;
   while (game.eggs.length < broodCapacity(game) && guard++ < 64) {
-    if (!layEgg()) break;
+    if (!layEgg(caste)) break;
   }
 }
 
@@ -185,10 +190,10 @@ export function broodSpace() {
   return populationCap(game) - population(game) - game.eggs.length;
 }
 
-export function broodSlots() {
+export function broodSlots(casteId) {
   const space = broodSpace();
   if (space > 0) return space;
-  if (game.nextCaste !== "excavator") return 0;
+  if ((casteId || game.nextCaste) !== "excavator") return 0;
   let digging = 0;
   for (const egg of game.eggs) if (egg.caste === "excavator") digging++;
   // a colony that tended three eggs could only ever dig three chambers out,
@@ -196,26 +201,28 @@ export function broodSlots() {
   return Math.max(0, Math.max(EXCAVATOR_OVERFLOW, broodCapacity(game)) - digging);
 }
 
-export function canLay() {
+export function canLay(casteId) {
+  const caste = casteId || game.nextCaste;
   if (!game.wingsShed) return false;
-  if (broodSlots() <= 0) return false;
-  const cost = eggCost(game);
+  if (broodSlots(caste) <= 0) return false;
+  const cost = eggCost(game, caste);
   return game[cost.resource] >= cost.amount;
 }
 
-export function layEgg() {
-  if (!canLay()) return false;
-  const cost = eggCost(game);
+export function layEgg(casteId) {
+  const caste = casteId || game.nextCaste;
+  if (!canLay(caste)) return false;
+  const cost = eggCost(game, caste);
   game[cost.resource] -= cost.amount;
   const fed = game.settings.feedBrood !== false && game.protein >= EGG_PROTEIN_COST;
   if (fed) game.protein -= EGG_PROTEIN_COST;
-  game.eggs.push({ caste: game.nextCaste, progress: 0, fed });
+  game.eggs.push({ caste, progress: 0, fed });
   return true;
 }
 
-export function layEggs(count) {
+export function layEggs(count, casteId) {
   let laid = 0;
-  while (laid < count && layEgg()) laid++;
+  while (laid < count && layEgg(casteId)) laid++;
   return laid;
 }
 

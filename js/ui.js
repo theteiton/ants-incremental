@@ -17,6 +17,9 @@ import {
 import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
   affordableEggs,
+  autoCaste,
+  automationOn,
+  automationUnlocked,
   broodSlots,
   cancelEggs,
   maxCancellable,
@@ -181,6 +184,18 @@ function renderBrood() {
       ? CASTES[id].name
       : CASTES[id].name + " — " + CASTES[id].unlockAt + " ants";
   });
+
+  const autoRow = el("autoLayRow");
+  autoRow.hidden = !automationUnlocked(game, "autoLay");
+  if (!autoRow.hidden) {
+    const on = automationOn("autoLay");
+    el("autoLay").checked = on;
+    el("autoLayLabel").textContent = on
+      ? "Laying automatically — " + CASTES[autoCaste()].name.toLowerCase() +
+        " eggs into every free slot" +
+        (automationOn("autoRatio") ? ", chosen by your caste balance" : "")
+      : "Lay eggs automatically — off, so food banks for upgrades";
+  }
 
   const feedRow = el("feedBroodRow");
   feedRow.hidden = !proteinUnlocked();
@@ -535,6 +550,11 @@ el("btnTakeOver").onclick = () => {
   // claim without saving: this tab is the stale one, the other holds the real progress
   claimSave();
   window.location.reload();
+};
+
+el("autoLay").onchange = event => {
+  setSetting("autoLay", event.target.checked);
+  render();
 };
 
 el("feedBrood").onchange = event => {

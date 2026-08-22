@@ -304,7 +304,7 @@ const automationRows = {};
 const ratioRows = {};
 
 function buildAutomation(handlers) {
-  AUTOMATIONS.forEach(entry => {
+  AUTOMATIONS.filter(entry => !entry.inBrood).forEach(entry => {
     const row = document.createElement("label");
     row.className = "toggle row-toggle";
     const box = document.createElement("input");
@@ -344,7 +344,7 @@ function buildAutomation(handlers) {
 
 function renderAutomation() {
   let any = false;
-  AUTOMATIONS.forEach(entry => {
+  AUTOMATIONS.filter(entry => !entry.inBrood).forEach(entry => {
     const ui = automationRows[entry.key];
     const unlocked = automationUnlocked(game, entry.key);
     ui.row.hidden = !unlocked;

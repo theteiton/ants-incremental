@@ -40,7 +40,7 @@ export const PRESTIGE_UPGRADES = [
 export const AUTOMATIONS = [
   { key: "autoShed", name: "Shed her wings", note: "She sheds the moment she lands." },
   { key: "autoBuy", name: "Buy known adaptations", note: "Re-buys anything this colony has owned before." },
-  { key: "autoLay", name: "Keep the brood full", note: "Lays the chosen caste into every free slot." },
+  { key: "autoLay", name: "Keep the brood full", note: "Lays into every free slot.", inBrood: true },
   { key: "autoRatio", name: "Hold the caste balance", note: "Chooses the caste, and digs when the nest is full." }
 ];
 
