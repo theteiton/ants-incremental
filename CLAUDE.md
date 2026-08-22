@@ -234,6 +234,8 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 **Not built.** Prestige layers beyond the first. A competent player finishes the whole Royal Lineage in about five hours, so that is the current edge of the game.
 
+**When layer 2 lands, the lifetime clock is the Matriline.** Not the bloodline: ants have hemolymph rather than blood, in an open system with no hemoglobin, so nothing about them is red or vessel-borne. Colonies genuinely are matrilineal — every worker descends from the queen, and each new nest is founded by her daughter — so the Matriline is the accurate word for the line of queens, and the right home for the total-time figure the header stopped showing when colony age began resetting. Layer 1 keeps *Lineage*; the two read as related without colliding.
+
 ---
 
 ## Playtest feedback — 19 August 2026
