@@ -456,6 +456,9 @@ function renderPrestige() {
   // is built rather than as something broken
   const owned = PRESTIGE_UPGRADES.filter(u => prestigeUpgradeOwned(game, u)).length;
   const complete = owned === PRESTIGE_UPGRADES.length;
+  el("prestigeOwnedTally").textContent =
+    owned + " / " + PRESTIGE_UPGRADES.length + " adaptations" +
+    (complete ? "" : " (" + (PRESTIGE_UPGRADES.length - owned) + " left)");
   el("lineageDone").hidden = !complete;
   if (complete) {
     el("lineageDone").textContent =
