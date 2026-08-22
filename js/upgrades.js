@@ -14,6 +14,7 @@ import {
   effectTotal,
   foodPerSecond,
   globalUpgradeMultiplier,
+  hidingPenalty,
   runPeakCount,
   populationCap,
   slotsPerNurse,
@@ -87,10 +88,13 @@ function foodFormula(game, caste) {
   const lineage = prestigeFoodMultiplier(game) > 1
     ? " × lineage " + f(prestigeFoodMultiplier(game))
     : "";
+  const hidden = hidingPenalty(game) < 1
+    ? " × hiding " + f(hidingPenalty(game))
+    : "";
   return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
     " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic +
     " × colony " + f(globalUpgradeMultiplier(game)) +
-    " × achievements " + f(achievementFoodBonus(game)) + lineage +
+    " × achievements " + f(achievementFoodBonus(game)) + lineage + hidden +
     " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
 }
 

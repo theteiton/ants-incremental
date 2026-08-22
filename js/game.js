@@ -28,6 +28,7 @@ import {
   raidCountdown as countdownFor,
   raidImminent as imminentFor,
   raidsUnlocked,
+  inHiding,
   combatPower,
   huntRate,
   resolveRaid as resolveRaidFor
@@ -90,6 +91,7 @@ function blankGame() {
     peakCastes: {},
     peakStrength: 0,
     naniticsDied: false,
+    hiding: false,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true, autoShed: true },
@@ -401,14 +403,20 @@ export function tick(dt) {
   if (strength > (run.peakStrength || 0)) run.peakStrength = strength;
   recordUpgradePeaks(game);
 
+  game.hiding = inHiding(game);
   if (raidsUnlocked(game)) {
     const hunted = huntRate(game) * dt;
     game.protein += hunted;
     game.stats.proteinEarned += hunted;
-    game.raidTimer -= dt;
-    while (game.raidTimer <= 0) {
-      resolveRaidFor(game);
-      game.raidTimer += RAID_INTERVAL;
+    if (game.hiding) {
+      // nothing finds the nest while it is shut; the next attack waits for an army
+      game.raidTimer = RAID_INTERVAL;
+    } else {
+      game.raidTimer -= dt;
+      while (game.raidTimer <= 0) {
+        resolveRaidFor(game);
+        game.raidTimer += RAID_INTERVAL;
+      }
     }
   }
 

@@ -14,7 +14,7 @@ import {
   population,
   populationCap
 } from "./ants.js";
-import { combatPower, hunting, huntRate, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
+import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
   affordableEggs,
   broodSlots,
@@ -241,6 +241,7 @@ function renderRaid() {
   el("raidPanel").hidden = !active;
   if (!active) return;
 
+  const hidden = inHiding(game);
   const left = raidCountdown(game);
   const defence = combatPower(game);
   const threat = monsterPower(game);
@@ -248,11 +249,14 @@ function renderRaid() {
   el("raidThreat").textContent = fmt(threat);
   el("raidDefence").classList.toggle("losing", defence < threat);
 
-  const soon = left <= RAID_WARNING;
+  const soon = !hidden && left <= RAID_WARNING;
   el("raidPanel").classList.toggle("imminent", soon);
-  el("raidCountdown").textContent = soon
-    ? "Something is coming — " + Math.ceil(left) + "s"
-    : "Next attack in " + fmtTime(left) + ".";
+  el("raidPanel").classList.toggle("hiding", hidden);
+  el("raidCountdown").textContent = hidden
+    ? "The nest is shut. With no soldiers left the colony has gone to ground — nothing is coming while it stays that way."
+    : soon
+      ? "Something is coming — " + Math.ceil(left) + "s"
+      : "Next attack in " + fmtTime(left) + ".";
 
   const out = hunting(game);
   el("raidHunt").hidden = game.ants.soldier === 0;
@@ -268,6 +272,13 @@ function renderRaid() {
       "The colony has been attacked. Workers cannot fight until you teach them how — " +
       "the Combat upgrades on the Upgrades tab arm your foragers, diggers and nurses. " +
       "Soldiers hunt between attacks and come home when one is close.";
+  }
+
+  if (hidden) {
+    el("raidReport").textContent =
+      "Foraging is half what it was — the workers keep to cover and will not range far. " +
+      "Lay a soldier and the colony opens up again; the next attack is a full six minutes away.";
+    return;
   }
 
   const last = game.lastRaid;

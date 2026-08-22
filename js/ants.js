@@ -61,6 +61,8 @@ export const BIG_FORAGER_AGE_GAIN = 0.05;
 export const BIG_FORAGER_AGE_CAP = 3;
 
 
+export const HIDING_FOOD_PENALTY = 0.5;
+
 export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
 export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
 
@@ -273,8 +275,13 @@ export function casteFoodPerSecond(game, casteId) {
     casteMultiplier(game, casteId) * naniticMult * globalFoodMultiplier(game);
 }
 
+export function hidingPenalty(game) {
+  return game.hiding ? HIDING_FOOD_PENALTY : 1;
+}
+
 export function globalFoodMultiplier(game) {
-  return productEffect(game, "globalFood") * achievementFoodBonus(game) * prestigeFoodMultiplier(game);
+  return productEffect(game, "globalFood") * achievementFoodBonus(game) *
+    prestigeFoodMultiplier(game) * hidingPenalty(game);
 }
 
 export function bigForagerThreshold(game) {

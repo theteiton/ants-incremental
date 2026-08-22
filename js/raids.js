@@ -12,6 +12,11 @@ export const MONSTER_GROWTH = 0.05;
 export const PROTEIN_PER_POWER = 0.04;
 export const FOOD_PER_POWER = 60;
 export const LOSS_CAP = 0.2;
+// Losing the last soldier used to be the start of a death spiral: the monster
+// kept coming on the same timer, killed foragers next, and salvage scaled with
+// a defence that no longer existed. Now the colony goes to ground instead --
+// the attacks stop, and the ants forage warily until an army stands again.
+export const HIDING_FOOD_PENALTY = 0.5;
 
 export const SOLDIER_COMBAT = 25;
 export const BIG_FORAGER_COMBAT_MULT = 3;
@@ -48,6 +53,10 @@ export function combatPower(game) {
 
 export function raidsSeen(game) {
   return (game.raidsWon || 0) + (game.raidsLost || 0);
+}
+
+export function inHiding(game) {
+  return raidsUnlocked(game) && game.ants.soldier <= 0;
 }
 
 export function hunting(game) {
