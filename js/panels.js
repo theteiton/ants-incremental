@@ -370,6 +370,7 @@ export function renderSettings() {
   el("exileStatus").textContent = exileUnlocked()
     ? "Unlocked — exile controls appear on the Ants tab."
     : "Locked until your first forager emerges.";
+  el("statRunTime").textContent = fmtTime(game.runTime || 0);
   el("statPlaytime").textContent = fmtTime(game.stats.playtime);
   el("statHatched").textContent = fmt(game.stats.eggsHatched);
   el("statExiled").textContent = fmt(game.stats.exiled);

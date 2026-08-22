@@ -510,7 +510,7 @@ function render() {
   jellyRow.hidden = !prestigeUnlocked(game) && !(p.royalJelly > 0);
   el("valRoyalJelly").textContent = fmt(p.royalJelly || 0);
 
-  el("valTime").textContent = fmtTime(game.stats.playtime);
+  el("valTime").textContent = fmtTime(game.runTime || 0);
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
   el("takeover").hidden = holdsSave();
