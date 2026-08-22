@@ -511,6 +511,11 @@ function render() {
   el("valRoyalJelly").textContent = fmt(p.royalJelly || 0);
 
   el("valTime").textContent = fmtTime(game.runTime || 0);
+  // the line of queens, shown only once there is more than one of them --
+  // before the first flight it would just repeat the colony age
+  const flown = (game.prestige && game.prestige.flightsTaken || 0) > 0;
+  el("readoutMatriline").hidden = !flown;
+  if (flown) el("valMatriline").textContent = fmtTime(game.stats.playtime);
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
   el("takeover").hidden = holdsSave();
