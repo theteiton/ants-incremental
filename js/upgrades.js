@@ -418,6 +418,28 @@ export function renderUpgrades() {
     ui.lock.textContent = isOwned ? "" : upgradeLockText(game, upgrade);
     ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
   });
+  // An empty grid with nothing said reads as a broken tab. It is usually
+  // "Hide owned" doing exactly what it promises, and at 29 of 29 it hides
+  // every card there is.
+  const showing = UPGRADES.filter(u => !upgradeCards[u.id].card.hidden).length;
+  const note = el("upgradeEmpty");
+  note.hidden = showing > 0;
+  if (showing === 0) {
+    const filter = game.settings.upgradeFilter || "all";
+    const reasons = [];
+    if (game.settings.hideOwned && owned > 0) reasons.push("Hide owned");
+    if (game.settings.hideLocked && locked > 0) reasons.push("Hide locked");
+    if (owned === UPGRADES.length) {
+      note.textContent = "Every adaptation is bought — all " + UPGRADES.length +
+        " of them. Untick Hide owned to look back over what the colony has.";
+    } else if (reasons.length) {
+      note.textContent = "Nothing to show here: " + reasons.join(" and ") +
+        (filter === "all" ? "" : " and the " + filter + " filter") +
+        " account for all " + UPGRADES.length + ".";
+    } else {
+      note.textContent = "No " + filter + " adaptations to show.";
+    }
+  }
   el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
   el("upgradeSort").value = game.settings.upgradeSort || "default";
