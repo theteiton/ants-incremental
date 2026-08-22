@@ -1,4 +1,5 @@
 import {
+  achievementJellyBonus,
   CASTES,
   EGG_TIME,
   eggCost,
@@ -350,14 +351,15 @@ export function flightReady() {
 }
 
 export function flightReward() {
-  return royalJellyEarned(game, population(game));
+  return royalJellyEarned(game, population(game), achievementJellyBonus(game));
 }
 
 export function doFlight() {
   if (!flightReady()) return 0;
   const earned = flightReward();
-  game.prestige.royalJelly += earned;
-  game.prestige.royalJellyTotal += earned;
+  // keep the running totals clean: the payout carries one decimal now
+  game.prestige.royalJelly = Math.round((game.prestige.royalJelly + earned) * 100) / 100;
+  game.prestige.royalJellyTotal = Math.round((game.prestige.royalJellyTotal + earned) * 100) / 100;
   game.prestige.flightsTaken += 1;
   game.best.jelly = Math.max(game.best.jelly || 0, earned);
 

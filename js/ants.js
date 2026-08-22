@@ -66,6 +66,7 @@ export const HIDING_FOOD_PENALTY = 0.5;
 
 export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
 export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
+export const ACHIEVEMENT_JELLY_PER_LEVEL = 0.05;
 
 const FOOD_PER_SECOND = {
   nanitic: 0.9,
@@ -257,6 +258,10 @@ export function achievementFoodBonus(game) {
 
 export function achievementHatchBonus(game) {
   return 1 + ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel;
+}
+
+export function achievementJellyBonus(game) {
+  return 1 + ACHIEVEMENT_JELLY_PER_LEVEL * game.achievementLevel;
 }
 
 // flat food added to a caste's base: casteFood upgrades are stored as a share of

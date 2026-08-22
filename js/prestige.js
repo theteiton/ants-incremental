@@ -73,21 +73,31 @@ function prestigeSumEffect(game, type) {
   return total;
 }
 
-// earned from the colony standing at the moment of the flight, not from
-// peakPopulation — that survives the reset, so paying out on it let a player
-// flight repeatedly with no ants and collect every time
-export function royalJellyEarned(game, population) {
+export const JELLY_SCALE = 3;
+export const JELLY_EXPONENT = 0.8;
+
+// Earned from the colony standing at the moment of the flight, not from
+// peakPopulation -- that survives the reset, so paying out on it let a player
+// flight repeatedly with no ants and collect every time.
+//
+// The payout is deliberately not floored. Under sqrt-and-floor every flight
+// paid exactly 1 whatever the colony did: tripling a run from 1,000 to 3,000
+// ants moved the raw value from 1.00 to 1.73 and still rounded to 1, so
+// pushing a run was punished and the whole tree took 35 identical flights.
+export function royalJellyEarned(game, population, jellyBonus) {
   if (population < PRESTIGE_UNLOCK) return 0;
-  return Math.max(1, Math.floor(
-    Math.sqrt(population / PRESTIGE_UNLOCK) * (1 + (game.raidsWon || 0) / 20)
-  ));
+  const raw = JELLY_SCALE *
+    Math.pow(population / PRESTIGE_UNLOCK, JELLY_EXPONENT) *
+    (1 + (game.raidsWon || 0) / 20) *
+    (jellyBonus || 1);
+  return Math.max(1, Math.round(raw * 10) / 10);
 }
 
 // what an hour of this colony is currently worth in jelly, so a player can see
 // whether to fly now or push on
-export function jellyPerHour(game, population, runTime) {
+export function jellyPerHour(reward, runTime) {
   if (!(runTime > 60)) return 0;
-  return royalJellyEarned(game, population) / (runTime / 3600);
+  return reward / (runTime / 3600);
 }
 
 // automation is the thing the flight actually sells, so it is bought with

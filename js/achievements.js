@@ -1,4 +1,4 @@
-import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
+import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, ACHIEVEMENT_JELLY_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch } from "./panels.js";
@@ -215,6 +215,13 @@ const BONUS_BOXES = [
     value: game => "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * game.achievementLevel * 100) + "% food",
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
       ", worth " + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * 100) + "% each. It multiplies every caste at once." },
+  { id: "jelly", name: "Richer jelly",
+    desc: "A colony with a long record behind it sends off a better queen.",
+    value: game => "+" + Math.round(ACHIEVEMENT_JELLY_PER_LEVEL * game.achievementLevel * 100) +
+      "% Royal Jelly",
+    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+      ", worth " + Math.round(ACHIEVEMENT_JELLY_PER_LEVEL * 100) +
+      "% each. It multiplies what every nuptial flight pays." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "+" + Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel * 100) + "% hatch speed",

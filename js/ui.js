@@ -445,7 +445,7 @@ function renderPrestige() {
   const ready = flightReady();
   const projected = flightReward();
   el("btnFlight").disabled = !ready;
-  const perHour = jellyPerHour(game, pop, game.runTime || 0);
+  const perHour = jellyPerHour(projected, game.runTime || 0);
   el("flightYield").textContent = ready
     ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — taking flight now yields +" +
       fmt(projected) + " Royal Jelly" +
