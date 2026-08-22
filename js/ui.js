@@ -18,6 +18,8 @@ import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raid
 import {
   affordableEggs,
   broodSlots,
+  cancelEggs,
+  maxCancellable,
   broodSpace,
   buyPrestigeUpgrade,
   canLay,
@@ -207,6 +209,13 @@ function renderBrood() {
       Math.max(0, (EGG_TIME - soonest) / (EGG_TIME / period)).toFixed(1) + "s" +
       (waiting > 0 ? ", " + fmt(waiting) + " waiting for a slot" : "");
   }
+  const cancelButton = el("btnCancelEggs");
+  cancelButton.hidden = eggs.length === 0;
+  cancelButton.textContent = waiting > 0
+    ? "Destroy waiting eggs (" + fmt(waiting) + ")"
+    : "Destroy eggs (" + fmt(eggs.length) + ")";
+  if (!el("cancelModal").hidden) updateCancelDialog();
+
   renderSlots(eggs, slots, tended);
 }
 
@@ -469,6 +478,58 @@ function render() {
     renderFormulas();
   }
 }
+
+function updateCancelDialog() {
+  const allowed = maxCancellable();
+  const input = el("cancelAmount");
+  let amount = Math.max(0, Math.min(allowed, Math.floor(Number(input.value) || 0)));
+  input.value = String(amount);
+  input.max = String(allowed);
+  const slots = broodCapacity(game);
+  const waiting = Math.max(0, game.eggs.length - slots);
+  el("cancelDetail").textContent =
+    "Destroy " + fmt(amount) + " of " + fmt(game.eggs.length) + " eggs. " +
+    "They go from the back of the queue, so the eggs closest to hatching are the last to be taken. " +
+    "Nothing is refunded." +
+    (waiting > 0 ? " " + fmt(waiting) + " are waiting for a slot." : "");
+  el("cancelConfirm").disabled = amount <= 0;
+}
+
+function openCancelDialog() {
+  if (maxCancellable() <= 0) return;
+  const slots = broodCapacity(game);
+  const waiting = Math.max(0, game.eggs.length - slots);
+  el("cancelAmount").value = String(waiting > 0 ? waiting : game.eggs.length);
+  updateCancelDialog();
+  el("cancelModal").hidden = false;
+}
+
+el("btnCancelEggs").onclick = openCancelDialog;
+el("cancelAmount").oninput = updateCancelDialog;
+el("cancelKeep").onclick = () => { el("cancelModal").hidden = true; };
+el("cancelConfirm").onclick = () => {
+  cancelEggs(Number(el("cancelAmount").value));
+  el("cancelModal").hidden = true;
+  render();
+};
+[1, 10, 100].forEach(n => {
+  const chip = document.createElement("button");
+  chip.className = "chip";
+  chip.textContent = "+" + n;
+  chip.onclick = () => {
+    el("cancelAmount").value = String(Math.min(maxCancellable(), Number(el("cancelAmount").value) + n));
+    updateCancelDialog();
+  };
+  el("cancelQuick").appendChild(chip);
+});
+const cancelAll = document.createElement("button");
+cancelAll.className = "chip";
+cancelAll.textContent = "All";
+cancelAll.onclick = () => {
+  el("cancelAmount").value = String(maxCancellable());
+  updateCancelDialog();
+};
+el("cancelQuick").appendChild(cancelAll);
 
 el("btnTakeOver").onclick = () => {
   // claim without saving: this tab is the stale one, the other holds the real progress

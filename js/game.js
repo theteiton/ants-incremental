@@ -103,7 +103,8 @@ function blankGame() {
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
     best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
-    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0, raidsWonTotal: 0 },
+    stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
+      raidsWonTotal: 0, eggsCancelled: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -191,6 +192,22 @@ export function affordableEggs() {
     count++;
   }
   return count;
+}
+
+// The brood is strict FIFO, so a misclick of "lay max" can bury a caste you
+// actually wanted behind hundreds of eggs. Destroying takes from the back of
+// the queue -- the newest and least developed -- so the egg about to hatch is
+// never the one that dies. Nothing is refunded, the same as exiling.
+export function maxCancellable() {
+  return game.eggs.length;
+}
+
+export function cancelEggs(count) {
+  const taken = Math.min(Math.floor(count), maxCancellable());
+  if (!(taken > 0)) return 0;
+  game.eggs.splice(game.eggs.length - taken, taken);
+  game.stats.eggsCancelled = (game.stats.eggsCancelled || 0) + taken;
+  return taken;
 }
 
 export function proteinUnlocked() {

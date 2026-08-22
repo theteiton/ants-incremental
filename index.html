@@ -71,6 +71,7 @@
     </div>
     <div id="casteChoice"></div>
     <p class="egg-summary" id="eggSummary"></p>
+    <button id="btnCancelEggs" class="cancel-eggs" hidden>Destroy waiting eggs</button>
     <label class="toggle row-toggle" id="feedBroodRow" hidden>
       <input type="checkbox" id="feedBrood"> <span id="feedBroodLabel">Feed the brood protein</span>
     </label>
@@ -172,6 +173,7 @@
       <div>Colony age<span id="statPlaytime">0s</span></div>
       <div>Eggs hatched<span id="statHatched">0</span></div>
       <div>Ants exiled<span id="statExiled">0</span></div>
+      <div>Eggs destroyed<span id="statCancelled">0</span></div>
       <div>Food gathered<span id="statFood">0</span></div>
       <div>Largest colony<span id="statPeak">0</span></div>
       <div>Best colony in one run<span id="statBestRun">0</span></div>
@@ -196,6 +198,19 @@
   </div>
   </div>
 </main>
+
+<div class="modal" id="cancelModal" hidden>
+  <div class="modal-box">
+    <h2>Destroy eggs</h2>
+    <p id="cancelDetail"></p>
+    <input type="number" id="cancelAmount" min="0" value="1">
+    <div class="quick" id="cancelQuick"></div>
+    <div class="modal-actions">
+      <button id="cancelKeep">Keep them</button>
+      <button id="cancelConfirm" class="danger">Destroy them</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal" id="exileModal" hidden>
   <div class="modal-box">

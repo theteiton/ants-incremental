@@ -311,6 +311,7 @@ export function renderSettings() {
   el("statPlaytime").textContent = fmtTime(game.stats.playtime);
   el("statHatched").textContent = fmt(game.stats.eggsHatched);
   el("statExiled").textContent = fmt(game.stats.exiled);
+  el("statCancelled").textContent = fmt(game.stats.eggsCancelled || 0);
   el("statFood").textContent = fmt(game.stats.foodEarned);
   el("statPeak").textContent = fmt(Math.max(game.peakPopulation, population(game)));
   const best = game.best || {};
