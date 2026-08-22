@@ -1,4 +1,5 @@
 import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
+import { autoShedOn, autoShedUnlocked } from "./game.js";
 import { fmt, watch } from "./panels.js";
 
 const el = id => document.getElementById(id);
@@ -200,7 +201,73 @@ export function levelPoints(level) {
 
 const trackRows = {};
 
+const ACH_TABS = [
+  { id: "tracks", name: "Tracks" },
+  { id: "bonuses", name: "Bonuses" }
+];
+let achTab = "tracks";
+
+// the standing bonuses every achievement level pays, and what a flight unlocks
+const BONUS_BOXES = [
+  { id: "food", name: "Colony appetite",
+    desc: "Every achievement level feeds the whole colony better.",
+    value: game => "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * game.achievementLevel * 100) + "% food",
+    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+      ", worth " + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * 100) + "% each. It multiplies every caste at once." },
+  { id: "hatch", name: "Warm brood",
+    desc: "Levels also shorten how long an egg takes to develop.",
+    value: game => "+" + Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel * 100) + "% hatch speed",
+    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+      ", worth " + Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * 100) + "% each. Incubation is 24s divided by this." }
+];
+
+const UNLOCK_BOXES = [
+  { id: "autoshed", name: "Instinct to shed",
+    desc: "She has landed before. She sheds her wings without being told.",
+    unlocked: () => autoShedUnlocked(),
+    value: () => autoShedUnlocked() ? (autoShedOn() ? "On" : "Off") : "Locked",
+    note: () => autoShedUnlocked()
+      ? "Unlocked — shedding her wings is automatic. Turn it on or off in Settings."
+      : "Locked until your first nuptial flight." }
+];
+
+const bonusBoxes = {};
+
+function buildBox(list, entry, game) {
+  const box = document.createElement("div");
+  box.className = "bonus-box";
+  box.innerHTML = '<b></b><span class="bonus-value"></span><span class="bonus-note"></span>';
+  box.querySelector("b").textContent = entry.name;
+  box.querySelector(".bonus-note").textContent = entry.desc;
+  watch(box, { title: entry.name, body: entry.desc, note: () => entry.note(game) });
+  bonusBoxes[entry.id] = { box, value: box.querySelector(".bonus-value") };
+  list.appendChild(box);
+}
+
+export function selectAchievementTab(name) {
+  achTab = name;
+  el("achievementPanel-tracks").hidden = name !== "tracks";
+  el("achievementPanel-bonuses").hidden = name !== "bonuses";
+  for (const button of el("achievementTabs").children) {
+    button.classList.toggle("active", button.dataset.tab === name);
+  }
+}
+
 export function buildAchievements(game) {
+  ACH_TABS.forEach(tab => {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.dataset.tab = tab.id;
+    button.onclick = () => selectAchievementTab(tab.id);
+    el("achievementTabs").appendChild(button);
+  });
+  BONUS_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
+  UNLOCK_BOXES.forEach(entry => buildBox(el("unlockList"), entry, game));
+  selectAchievementTab("tracks");
+  buildTracks(game);
+}
+
+function buildTracks(game) {
   const list = el("achievementList");
   ACHIEVEMENT_TRACKS.forEach(track => {
     const row = document.createElement("li");
@@ -264,6 +331,13 @@ export function renderAchievements(game) {
       : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
   });
 
+  BONUS_BOXES.concat(UNLOCK_BOXES).forEach(entry => {
+    const ui = bonusBoxes[entry.id];
+    if (!ui) return;
+    ui.value.textContent = entry.value(game);
+    if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked());
+  });
+
   const points = totalTiers(game);
   const level = Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
   const capped = level >= MAX_ACHIEVEMENT_LEVEL;
@@ -271,9 +345,6 @@ export function renderAchievements(game) {
   el("achievementPoints").textContent = capped
     ? points + " tiers earned across " + ACHIEVEMENT_TRACKS.length + " tracks"
     : points + " tiers earned — " + Math.max(0, levelPoints(level + 1) - points) + " to the next level";
-  el("achievementBonus").textContent =
-    "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * level * 100) + "% food, +" +
-    Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * level * 100) + "% hatch speed";
   const progress = capped ? 1 : (points - levelPoints(level)) / POINTS_PER_LEVEL;
   el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
 }

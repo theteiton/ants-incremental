@@ -31,6 +31,7 @@ import {
   MONSTER_BASE,
   MONSTER_EXPONENT,
   MONSTER_GROWTH,
+  foodPerProtein,
   monsterPower,
   monsterRamp,
   RAID_UNLOCK,
@@ -279,6 +280,35 @@ function previewUpgrade(upgrade) {
   return fmt(before) + "/s to " + fmt(after) + "/s (+" + gain + "% overall)";
 }
 
+// a protein cost only compares to a food cost through what the colony earns,
+// so sorting by price converts protein into its food equivalent first
+export function comparableCost(game, upgrade) {
+  if (upgradeCurrency(upgrade) !== "protein") return upgrade.cost;
+  const rate = foodPerProtein(game);
+  return rate > 0 ? upgrade.cost * rate : upgrade.cost * 10000;
+}
+
+export function proteinInFood(game, upgrade) {
+  if (upgradeCurrency(upgrade) !== "protein") return 0;
+  const rate = foodPerProtein(game);
+  return rate > 0 ? upgrade.cost * rate : 0;
+}
+
+const SORTS = {
+  "default": null,
+  "name": (a, b) => a.name.localeCompare(b.name),
+  "name-desc": (a, b) => b.name.localeCompare(a.name),
+  "cost": (a, b) => comparableCost(game, a) - comparableCost(game, b),
+  "cost-desc": (a, b) => comparableCost(game, b) - comparableCost(game, a),
+  "req": (a, b) => a.req.count - b.req.count || a.name.localeCompare(b.name),
+  "req-desc": (a, b) => b.req.count - a.req.count || a.name.localeCompare(b.name)
+};
+
+function sortedUpgrades() {
+  const compare = SORTS[game.settings.upgradeSort || "default"];
+  return compare ? UPGRADES.slice().sort(compare) : UPGRADES;
+}
+
 const BRANCHES = [
   { id: "all", name: "All" },
   { id: "colony", name: "Colony" },
@@ -319,7 +349,9 @@ export function buildUpgrades(onChange) {
         const locked = upgradeLockText(game, upgrade);
         if (locked) return locked;
         const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
-        return ["Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) + "."]
+        const worth = proteinInFood(game, upgrade);
+        return ["Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) +
+          (worth > 0 ? " — about " + fmt(worth) + " food at what the colony earns now." : ".")]
           .concat(formulaLines(upgrade, probe), previewUpgrade(upgrade)).join("\n");
       },
       warn: false
@@ -332,6 +364,10 @@ export function buildUpgrades(onChange) {
     };
     list.appendChild(card);
   });
+  el("upgradeSort").onchange = event => {
+    setSetting("upgradeSort", event.target.value);
+    renderUpgrades();
+  };
   el("hideLocked").onchange = event => {
     setSetting("hideLocked", event.target.checked);
     renderUpgrades();
@@ -345,6 +381,10 @@ export function buildUpgrades(onChange) {
 export function renderUpgrades() {
   let owned = 0;
   let locked = 0;
+  const list = el("upgradeList");
+  sortedUpgrades().forEach(upgrade => {
+    list.appendChild(upgradeCards[upgrade.id].card);
+  });
   UPGRADES.forEach(upgrade => {
     const ui = upgradeCards[upgrade.id];
     const isOwned = upgradeOwned(game, upgrade);
@@ -363,7 +403,11 @@ export function renderUpgrades() {
     ui.card.classList.toggle("locked", !isOpen);
     const currency = upgradeCurrency(upgrade);
     ui.card.disabled = isOwned || !isOpen || game[currency] < upgrade.cost;
-    ui.cost.textContent = isOwned ? "owned" : fmt(upgrade.cost) + " " + currency;
+    const worth = proteinInFood(game, upgrade);
+    ui.cost.textContent = isOwned
+      ? "owned"
+      : fmt(upgrade.cost) + " " + currency +
+        (worth > 0 ? " (≈ " + fmt(worth) + " food)" : "");
     ui.cost.classList.toggle("affordable", !isOwned && isOpen && game[currency] >= upgrade.cost);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
@@ -372,6 +416,7 @@ export function renderUpgrades() {
   });
   el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
+  el("upgradeSort").value = game.settings.upgradeSort || "default";
   el("hideLocked").checked = !!game.settings.hideLocked;
   el("hideOwned").checked = !!game.settings.hideOwned;
   const filter = game.settings.upgradeFilter || "all";

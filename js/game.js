@@ -91,7 +91,8 @@ function blankGame() {
     peakStrength: 0,
     naniticsDied: false,
     queenName: "",
-    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark", upgradeFilter: "all", feedBrood: true },
+    settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
+      upgradeFilter: "all", upgradeSort: "default", feedBrood: true, autoShed: true },
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
@@ -109,6 +110,16 @@ export function shedWings() {
   game.wingsShed = true;
   game.reserves = QUEEN_RESERVES + prestigeStartingReserves(game);
   return true;
+}
+
+// the first automation, and it is what the nuptial flight buys: she has done
+// this before and no longer waits to be told
+export function autoShedUnlocked() {
+  return (game.prestige && game.prestige.flightsTaken || 0) > 0;
+}
+
+export function autoShedOn() {
+  return autoShedUnlocked() && game.settings.autoShed !== false;
 }
 
 export function setNextCaste(casteId) {
@@ -347,6 +358,8 @@ export function tick(dt) {
   game.stats.foodEarned += earned;
   game.stats.playtime += dt;
   game.runTime = (game.runTime || 0) + dt;
+
+  if (!game.wingsShed && autoShedOn()) shedWings();
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);

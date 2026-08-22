@@ -118,7 +118,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 **Prestige is the nuptial flight (Layer 1).** Unlocks at 1,000 population. Yields Royal Jelly based on population and raids won. Colony resets (food, ants, brood, standard upgrades, queen wings) while achievements, peaks, royal jelly, and prestige upgrades persist.
 
-**No automation before prestige.** Nothing lays an egg, buys an upgrade, picks a caste or exiles an ant on the player's behalf. Every one of those stays a click. Automation is what prestige layer 1 upgrades will sell, so do not spend it early — passive production, hatching, raids and hunting are not automation, they are the game running.
+**No automation before prestige.** (Shedding her wings is automatic after the first flight; that is what prestige sells.) Nothing lays an egg, buys an upgrade, picks a caste or exiles an ant on the player's behalf. Every one of those stays a click. Automation is what prestige layer 1 upgrades will sell, so do not spend it early — passive production, hatching, raids and hunting are not automation, they are the game running.
 
 ---
 
@@ -171,6 +171,14 @@ Monsters scale with peak population and grow 5% per raid won. Measured over a fu
 **Every rate is `(base + flat) × multipliers`.** Hovering an upgrade shows its layer's formula with live numbers, the one factor that upgrade moves, and the before and after — `each forager = (base 1 + yield 1.25) × colony 1.25 × achievements 1.48 = 4.2/s`. Effects come in four kinds: `casteFlat` adds food to a caste's base, `casteFood` does the same but is stored as a share of that base, `casteMult` multiplies one caste, `globalFood` multiplies everything. A new upgrade must be tagged with the factor it moves or the formula stops matching the game. `fmtFactor()` prints those factors, because `fmt()` keeps three significant figures and would read a 1.25 multiplier as 1.3.
 
 **Achievement tracks carry a dot and a pip ladder.** A track that gained a tier since you last pointed at *that track* shows a dot, cleared by hovering the row rather than by opening the tab — so the tab says which tracks moved, not merely that something did. Under each track is one pip per tier, filled for earned, so completed tiers read at a glance. `seen.tracks` records the per-track tier last looked at; a save written before it existed is seeded from current tiers, or every track lights at once.
+
+**Protein and food are not comparable by their raw numbers.** Measured across a full run, one protein is worth between 5,700 and 18,400 food, and the ratio triples as foragers outscale the soldier count, so no fixed rate is honest. `foodPerProtein()` reads what the colony earns right now — hunting plus the raid's share against food plus the raid's food — and every protein cost is shown with its live equivalent, `2.00K protein (≈ 2.92M food)`. Sorting by price converts protein the same way, or the two currencies cannot share one order.
+
+**The Upgrades tab sorts** by name either way, by price, and by the ants a gate needs, chosen from a control beside the hide toggles and saved with the colony. Sorting reorders the existing cards rather than rebuilding them.
+
+**Achievements are two sub-tabs**, with the level and its bar above both. Tracks holds the sixteen ladders. Bonuses holds what the levels actually pay, one box each for food and hatch speed, and below them what a nuptial flight has unlocked.
+
+**The queen sheds her wings by herself once she has flown.** This is the first automation in the game and the flight is what buys it — `autoShedUnlocked()` reads `flightsTaken`, and a Settings toggle turns it off. It does not lay an egg, buy an upgrade, pick a caste or exile an ant, so the rule that those stay clicks is intact.
 
 **A Formulas panel sits in Settings**, not in a tab of its own — it is system information rather than something you act on. It lists every layer the colony runs on with live numbers: each producing caste's food, the population cap, brood slots, soldier strength, the next attacker and the hunting rate. Rows appear only when they mean something, so a colony with no soldiers is not told about hunting. `monsterPower` is printed there too, which is the only place the raid scaling is visible — `next attacker = base 1000 × (this colony 700 / 400)^1.05 × wins 1.35 = 2.43K`. Its growth per win reads `MONSTER_GROWTH` so the panel and the raid cannot drift apart.
 

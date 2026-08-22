@@ -22,6 +22,7 @@ import {
 import { combatPerCaste, combatPerSoldier } from "./raids.js";
 import {
   buyUpgrade,
+  autoShedUnlocked,
   canExile,
   exile,
   exileUnlocked,
@@ -281,6 +282,10 @@ export function buildSettings(handlers) {
     setSetting("exileEnabled", event.target.checked);
     handlers.refresh();
   };
+  el("setAutoShed").onchange = event => {
+    setSetting("autoShed", event.target.checked);
+    handlers.refresh();
+  };
   el("setTheme").onchange = event => {
     setSetting("theme", event.target.value);
     handlers.applyTheme();
@@ -296,6 +301,8 @@ export function buildSettings(handlers) {
 
 export function renderSettings() {
   el("setExile").checked = !!game.settings.exileEnabled;
+  el("setAutoShedRow").hidden = !autoShedUnlocked();
+  el("setAutoShed").checked = game.settings.autoShed !== false;
   el("setTheme").value = game.settings.theme || "dark";
   if (document.activeElement !== el("setQueenName")) el("setQueenName").value = game.queenName || "";
   el("exileStatus").textContent = exileUnlocked()

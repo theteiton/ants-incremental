@@ -1,4 +1,4 @@
-import { effectTotal, globalFoodMultiplier, population, runPeakCount } from "./ants.js";
+import { effectTotal, foodPerSecond, globalFoodMultiplier, population, runPeakCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
 
 export const RAID_UNLOCK = 400;
@@ -70,6 +70,24 @@ export function monsterPower(game) {
   const ramp = seen < RAID_RAMP.length ? RAID_RAMP[seen] : 1;
   return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
     (1 + MONSTER_GROWTH * (game.raidsWon || 0)) * ramp;
+}
+
+// Protein and food are not comparable by their raw numbers: measured across a
+// full run one protein is worth between 5,700 and 18,400 food, and the ratio
+// triples as foragers outscale the soldier count. So the exchange is read from
+// what the colony actually earns right now rather than fixed to a constant.
+export function proteinPerSecond(game) {
+  if (!raidsUnlocked(game)) return 0;
+  const power = monsterPower(game);
+  return huntRate(game) + raidRewards(game, power).protein / RAID_INTERVAL;
+}
+
+export function foodPerProtein(game) {
+  const perProtein = proteinPerSecond(game);
+  if (!(perProtein > 0)) return 0;
+  const power = monsterPower(game);
+  const food = foodPerSecond(game) + raidRewards(game, power).food / RAID_INTERVAL;
+  return food / perProtein;
 }
 
 export function raidRewards(game, power) {
