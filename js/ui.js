@@ -571,6 +571,59 @@ cancelAll.onclick = () => {
 };
 el("cancelQuick").appendChild(cancelAll);
 
+// A finished colony's save code runs to tens of thousands of characters -- a
+// 2,400-ant nest with a full brood queue measured over 12,000, and past 60,000
+// with a long queue. window.prompt() cannot carry that: browsers truncate the
+// default value, a single-line box cannot be selected reliably, it is hopeless
+// on a phone, and a sandboxed iframe without allow-modals returns null outright,
+// which is what breaks it inside an itch.io embed.
+function setSaveStatus(text, bad) {
+  el("saveStatus").textContent = text || "";
+  el("saveStatus").classList.toggle("bad", !!bad);
+}
+
+function openSaveDialog(mode) {
+  const box = el("saveCode");
+  const exporting = mode === "export";
+  el("saveTitle").textContent = exporting ? "Your save code" : "Load a save code";
+  el("saveHelp").textContent = exporting
+    ? "Select all of it and copy. Keep it somewhere safe — it is the whole colony."
+    : "Paste a save code here. It replaces the colony you have now, which cannot be undone.";
+  el("saveCopy").hidden = !exporting;
+  el("saveLoad").hidden = exporting;
+  box.value = exporting ? exportSave() : "";
+  box.readOnly = exporting;
+  setSaveStatus(exporting ? box.value.length.toLocaleString() + " characters" : "");
+  el("saveModal").hidden = false;
+  box.focus();
+  if (exporting) box.select();
+}
+
+el("saveClose").onclick = () => { el("saveModal").hidden = true; };
+el("saveCopy").onclick = () => {
+  const box = el("saveCode");
+  box.select();
+  const done = () => setSaveStatus("Copied — " + box.value.length.toLocaleString() + " characters.");
+  // clipboard access needs a secure context and is not granted in every embed
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(box.value).then(done, () => {
+      setSaveStatus("Could not copy for you — it is selected, press Ctrl+C.", true);
+    });
+  } else {
+    setSaveStatus("It is selected — press Ctrl+C to copy.", true);
+  }
+};
+el("saveLoad").onclick = () => {
+  const text = el("saveCode").value.trim();
+  if (!text) return setSaveStatus("Paste a save code first.", true);
+  if (importSave(text)) {
+    el("saveModal").hidden = true;
+    render();
+  } else {
+    setSaveStatus("That is not a valid save code. Check nothing was cut off when you copied it.", true);
+  }
+};
+
 el("btnTakeOver").onclick = () => {
   // claim without saving: this tab is the stale one, the other holds the real progress
   claimSave();
@@ -622,15 +675,23 @@ buildSettings({
     applyTheme();
     render();
   },
-  exportSave: () => window.prompt("Copy your save code:", exportSave()),
-  importSave: () => {
-    const text = window.prompt("Paste a save code:");
-    if (!text) return;
-    window.alert(importSave(text) ? "Save imported." : "That save code is not valid.");
-    render();
-  },
+  exportSave: () => openSaveDialog("export"),
+  importSave: () => openSaveDialog("import"),
   reset: () => {
-    if (!window.confirm("Erase this colony and start over? This cannot be undone.")) return;
+    // confirm() is blocked in a sandboxed embed and returns false there, which
+    // makes the button look dead. Two deliberate clicks work everywhere.
+    const button = el("btnReset");
+    if (button.dataset.armed !== "yes") {
+      button.dataset.armed = "yes";
+      button.textContent = "Really erase it? This cannot be undone";
+      setTimeout(() => {
+        button.dataset.armed = "";
+        button.textContent = "Erase colony";
+      }, 5000);
+      return;
+    }
+    button.dataset.armed = "";
+    button.textContent = "Erase colony";
     hardReset();
     render();
   }

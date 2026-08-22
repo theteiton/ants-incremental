@@ -298,6 +298,21 @@ ul { list-style: none; margin: 0; padding: 0; }
 .ratio-field input { width: 58px; padding: 4px 6px; font-size: 13px; }
 .ratio-field.locked { opacity: 0.45; }
 
+.save-box { max-width: 560px; width: 92vw; }
+#saveCode {
+  width: 100%;
+  font: 12px/1.45 ui-monospace, Consolas, monospace;
+  color: var(--text);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+  word-break: break-all;
+}
+.save-status { font-size: 13px; min-height: 18px; margin: 8px 0 0; color: var(--good); }
+.save-status.bad { color: var(--danger); }
+
 .cancel-eggs {
   background: transparent;
   border: 1px solid var(--line);

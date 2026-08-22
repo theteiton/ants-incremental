@@ -215,6 +215,20 @@
   </div>
 </main>
 
+<div class="modal" id="saveModal" hidden>
+  <div class="modal-box save-box">
+    <h2 id="saveTitle">Save code</h2>
+    <p class="dim" id="saveHelp"></p>
+    <textarea id="saveCode" spellcheck="false" rows="6"></textarea>
+    <p class="save-status" id="saveStatus"></p>
+    <div class="modal-actions">
+      <button id="saveClose">Close</button>
+      <button id="saveCopy">Copy</button>
+      <button id="saveLoad" class="danger">Load this save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="cancelModal" hidden>
   <div class="modal-box">
     <h2>Destroy eggs</h2>
