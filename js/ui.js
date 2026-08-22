@@ -159,14 +159,25 @@ function renderBrood() {
   el("broodPanel").hidden = !game.wingsShed;
   if (!game.wingsShed) return;
 
-  const cost = eggCost(game);
   const space = broodSpace();
   const emerging = pendingCaste();
-  el("eggCost").textContent = space > 0
-    ? "A " + CASTES[emerging].name.toLowerCase() + " egg costs " +
-      fmt(cost.amount) + " " + cost.resource + ". Chamber space: " + fmt(space) + "."
-    : "The nest is full at " + fmt(populationCap(game)) +
-      ". Only excavators can be laid now — they dig their own chambers.";
+  if (space > 0) {
+    const cost = eggCost(game);
+    el("eggCost").textContent = "A " + CASTES[emerging].name.toLowerCase() + " egg costs " +
+      fmt(cost.amount) + " " + cost.resource + ". Chamber space: " + fmt(space) + ".";
+  } else if (isUnlocked(game, "excavator")) {
+    // at the cap an excavator is the only egg that can be laid, so it is the
+    // excavator's price that matters -- saying only that they are the option
+    // left the player with no idea what it costs or how many would fit
+    const dig = eggCost(game, "excavator");
+    el("eggCost").textContent = "The nest is full at " + fmt(populationCap(game)) +
+      ". Only excavators can be laid now — they dig their own chambers. One costs " +
+      fmt(dig.amount) + " " + dig.resource + ", and " + fmt(broodSlots("excavator")) +
+      " can be dug out at once.";
+  } else {
+    el("eggCost").textContent = "The nest is full at " + fmt(populationCap(game)) +
+      ". Nothing more can be laid until there is room.";
+  }
 
   const ready = canLay();
   el("btnLay").disabled = !ready;
