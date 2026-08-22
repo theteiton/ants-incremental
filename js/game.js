@@ -100,7 +100,7 @@ function blankGame() {
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
-      autoShed: true, autoBuy: true, autoLay: true, autoRatio: true,
+      autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
@@ -160,6 +160,14 @@ export function managedCaste() {
 // what the automation will lay next, which is not necessarily what the player
 // has selected: Standing Orders decides for itself and leaves game.nextCaste
 // alone, so laying by hand still works while it runs
+// how much food laying will not touch. Without it the automation spends down
+// to the next egg price every tick, which caps banked food at one egg and puts
+// every dearer upgrade out of reach.
+export function foodReserve() {
+  if (!automationUnlocked(game, "foodReserve")) return 0;
+  return Math.max(0, game.settings.foodReserve || 0);
+}
+
 export function autoCaste() {
   const caste = automationOn("autoRatio") ? managedCaste() : game.nextCaste;
   return isUnlocked(game, caste) ? caste : "forager";
@@ -171,10 +179,13 @@ function runAutomation() {
   }
   if (!automationOn("autoLay")) return;
   const caste = autoCaste();
+  const reserve = foodReserve();
   // top up the tended slots only: filling the queue would bury whatever the
   // player lays by hand, which is the problem destroying eggs exists to undo
   let guard = 0;
   while (game.eggs.length < broodCapacity(game) && guard++ < 64) {
+    const cost = eggCost(game, caste);
+    if (cost.resource === "food" && game.food - cost.amount < reserve) break;
     if (!layEgg(caste)) break;
   }
 }

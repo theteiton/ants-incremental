@@ -291,6 +291,8 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .caste-row:first-child { border-top: none; }
 #automationList { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.brood-field { margin-bottom: 10px; color: var(--dim); }
+.brood-field input { width: 96px; }
 .ratios { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 14px; }
 .ratio-field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ratio-field input { width: 58px; padding: 4px 6px; font-size: 13px; }

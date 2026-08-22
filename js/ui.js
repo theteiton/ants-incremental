@@ -18,6 +18,7 @@ import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raid
 import {
   affordableEggs,
   autoCaste,
+  foodReserve,
   automationOn,
   automationUnlocked,
   broodSlots,
@@ -195,6 +196,12 @@ function renderBrood() {
         " eggs into every free slot" +
         (automationOn("autoRatio") ? ", chosen by your caste balance" : "")
       : "Lay eggs automatically — off, so food banks for upgrades";
+  }
+
+  const reserveRow = el("foodReserveRow");
+  reserveRow.hidden = !automationUnlocked(game, "foodReserve");
+  if (!reserveRow.hidden && document.activeElement !== el("foodReserve")) {
+    el("foodReserve").value = String(foodReserve());
   }
 
   const feedRow = el("feedBroodRow");
@@ -554,6 +561,11 @@ el("btnTakeOver").onclick = () => {
 
 el("autoLay").onchange = event => {
   setSetting("autoLay", event.target.checked);
+  render();
+};
+
+el("foodReserve").oninput = event => {
+  setSetting("foodReserve", Math.max(0, Math.floor(Number(event.target.value) || 0)));
   render();
 };
 

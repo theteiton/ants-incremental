@@ -35,6 +35,9 @@ export const PRESTIGE_UPGRADES = [
   { id: "prestige_11", name: "Standing Orders", cost: 6,
     desc: "The colony holds the caste balance you set, and digs when the nest runs out of room.",
     effect: { type: "automation", key: "autoRatio" } },
+  { id: "prestige_12", name: "Granary Instinct", cost: 5,
+    desc: "The colony learns to keep a store back. Laying stops before it spends the food you are saving.",
+    effect: { type: "automation", key: "foodReserve" } },
 ];
 
 export const AUTOMATIONS = [
