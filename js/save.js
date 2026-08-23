@@ -162,6 +162,8 @@ export function applySave(game, fresh, data) {
   game.protein = data.protein || 0;
   game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
   game.foragersSinceBig = data.foragersSinceBig || 0;
+  game.rallyTime = data.rallyTime || 0;
+  game.rallyCooldown = data.rallyCooldown || 0;
   game.peakCastes = Object.assign({}, data.peakCastes || {});
   game.runTime = typeof data.runTime === "number" ? data.runTime : (data.stats && data.stats.playtime) || 0;
   game.peakUpgrades = Object.assign({ all: 0, colony: 0, combat: 0 }, data.peakUpgrades || {});

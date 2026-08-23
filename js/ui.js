@@ -12,7 +12,12 @@ import {
   isUnlocked,
   layableCastes,
   population,
-  populationCap
+  populationCap,
+  rallyActive,
+  RALLY_COOLDOWN,
+  RALLY_DURATION,
+  RALLY_MULT,
+  runPeakCount
 } from "./ants.js";
 import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
@@ -22,8 +27,7 @@ import {
   automationOn,
   automationUnlocked,
   broodSlots,
-  cancelEggs,
-  maxCancellable,
+  destroyEggRange,
   broodSpace,
   buyPrestigeUpgrade,
   canLay,
@@ -51,9 +55,11 @@ import {
   queenTitle,
   QUEEN_RESERVES,
   raidCountdown,
+  rallyReady,
   save,
   setNextCaste,
   shedWings,
+  startRally,
   tick
 } from "./game.js";
 import {
@@ -155,6 +161,51 @@ function renderQueen() {
   }
 }
 
+// The gates are the shape of the early game, and the flight was the only one
+// that never announced itself: its whole explanation lived inside a tab that
+// stayed hidden until you had already met it.
+const MILESTONES = [
+  { at: CASTES.excavator.unlockAt,
+    text: "Excavators, who dig new chambers and raise the population cap." },
+  { at: CASTES.nurse.unlockAt,
+    text: "Nurses, who tend the brood so more eggs develop at once." },
+  { at: CASTES.soldier.unlockAt,
+    text: "Soldiers — and the first monster at the gate." },
+  { at: PRESTIGE_UNLOCK,
+    text: "the Nuptial Flight: she takes wing, and the colony begins again on Royal Jelly." }
+];
+
+function renderMilestone() {
+  const box = el("queenMilestone");
+  box.hidden = !game.wingsShed;
+  if (box.hidden) return;
+  // reads the run high-water mark, the same figure the gates themselves read,
+  // so a lost raid never walks the milestone backwards
+  const reach = runPeakCount(game, "population");
+  const next = MILESTONES.find(milestone => reach < milestone.at);
+  box.textContent = next
+    ? "Next milestone at " + fmt(next.at) + " ants — " + next.text +
+      " " + fmt(reach) + " so far, " + fmt(next.at - reach) + " to go."
+    : "Every milestone this colony has is behind her, the last being the Nuptial Flight at " +
+      fmt(PRESTIGE_UNLOCK) + " ants. Deeper ones are being built for the beta.";
+}
+
+function renderRally() {
+  const state = el("rallyState");
+  el("btnRally").disabled = !rallyReady();
+  state.classList.toggle("live", rallyActive(game));
+  if (rallyActive(game)) {
+    state.textContent = "Out in force — ×" + RALLY_MULT + " forager food for another " +
+      Math.ceil(game.rallyTime) + "s, the colony on " + fmt(foodPerSecond(game)) + "/s.";
+  } else if (game.rallyCooldown > 0) {
+    state.textContent = "The foragers are resting. Ready again in " +
+      Math.ceil(game.rallyCooldown) + "s.";
+  } else {
+    state.textContent = "Work the trails hard: ×" + RALLY_MULT + " forager food for " +
+      RALLY_DURATION + "s, then " + RALLY_COOLDOWN + "s to recover.";
+  }
+}
+
 function renderBrood() {
   el("broodPanel").hidden = !game.wingsShed;
   if (!game.wingsShed) return;
@@ -242,14 +293,14 @@ function renderBrood() {
       Math.max(0, (EGG_TIME - soonest) / (EGG_TIME / period)).toFixed(1) + "s" +
       (waiting > 0 ? ", " + fmt(waiting) + " waiting for a slot" : "");
   }
-  const cancelButton = el("btnCancelEggs");
-  cancelButton.hidden = eggs.length === 0;
-  cancelButton.textContent = waiting > 0
-    ? "Destroy waiting eggs (" + fmt(waiting) + ")"
-    : "Destroy eggs (" + fmt(eggs.length) + ")";
-  if (!el("cancelModal").hidden) updateCancelDialog();
+  const detailsButton = el("btnBroodDetails");
+  detailsButton.hidden = eggs.length === 0;
+  detailsButton.textContent = "See details (" + fmt(eggs.length) + " eggs" +
+    (waiting > 0 ? ", " + fmt(waiting) + " waiting)" : ")");
+  if (!el("broodModal").hidden) updateBroodDialog();
 
   renderSlots(eggs, slots, tended);
+  renderRally();
 }
 
 const SLOT_LIMIT = 5;
@@ -523,6 +574,7 @@ function render() {
   renderBadges();
   renderInspector();
   renderQueen();
+  renderMilestone();
   renderBrood();
   renderRaid();
   if (activeTab === "ants") renderAnts();
@@ -535,57 +587,199 @@ function render() {
   }
 }
 
-function updateCancelDialog() {
-  const allowed = maxCancellable();
-  const input = el("cancelAmount");
-  let amount = Math.max(0, Math.min(allowed, Math.floor(Number(input.value) || 0)));
-  input.value = String(amount);
-  input.max = String(allowed);
-  const slots = broodCapacity(game);
-  const waiting = Math.max(0, game.eggs.length - slots);
-  el("cancelDetail").textContent =
-    "Destroy " + fmt(amount) + " of " + fmt(game.eggs.length) + " eggs. " +
-    "They go from the back of the queue, so the eggs closest to hatching are the last to be taken. " +
-    "Nothing is refunded." +
-    (waiting > 0 ? " " + fmt(waiting) + " are waiting for a slot." : "");
-  el("cancelConfirm").disabled = amount <= 0;
+// --------------------------------------------------- the brood chamber window
+
+// The queue is strict FIFO and it is laid in batches, so a 600-egg queue is a
+// handful of runs rather than 600 rows. Selecting a run selects the whole
+// batch: its first egg when taking everything behind it, its last when taking
+// everything ahead, so either direction destroys the batch you pointed at.
+//
+// The selection is held as "which run", not as an index, because eggs hatch
+// while the window is open and raw indices would slide onto different eggs
+// underneath the player.
+let broodPick = null;   // { list: "tended" | "waiting", index }
+
+function broodScope() {
+  return game.settings.broodScope === "all" ? "all" : "waiting";
 }
 
-function openCancelDialog() {
-  if (maxCancellable() <= 0) return;
-  const slots = broodCapacity(game);
-  const waiting = Math.max(0, game.eggs.length - slots);
-  el("cancelAmount").value = String(waiting > 0 ? waiting : game.eggs.length);
-  updateCancelDialog();
-  el("cancelModal").hidden = false;
+function broodDirection() {
+  return game.settings.broodDirection === "forward" ? "forward" : "back";
 }
 
-el("btnCancelEggs").onclick = openCancelDialog;
-el("cancelAmount").oninput = updateCancelDialog;
-el("cancelKeep").onclick = () => { el("cancelModal").hidden = true; };
-el("cancelConfirm").onclick = () => {
-  cancelEggs(Number(el("cancelAmount").value));
-  el("cancelModal").hidden = true;
+function tendedCount() {
+  return Math.min(game.eggs.length, broodCapacity(game));
+}
+
+function waitingRuns() {
+  const runs = [];
+  for (let i = tendedCount(); i < game.eggs.length; i++) {
+    const caste = emergingCaste(game, game.eggs[i], i);
+    const last = runs[runs.length - 1];
+    if (last && last.caste === caste) last.to = i;
+    else runs.push({ caste, from: i, to: i });
+  }
+  return runs;
+}
+
+// the stretch of the queue the current scope allows to be taken
+function broodRegion() {
+  return { first: broodScope() === "all" ? 0 : tendedCount(), last: game.eggs.length - 1 };
+}
+
+function resolvePick() {
+  if (!broodPick) return null;
+  if (broodPick.list === "tended") {
+    return broodPick.index < tendedCount() ? { from: broodPick.index, to: broodPick.index } : null;
+  }
+  const run = waitingRuns()[broodPick.index];
+  return run ? { from: run.from, to: run.to } : null;
+}
+
+function broodRange() {
+  const pick = resolvePick();
+  const region = broodRegion();
+  if (!pick || region.last < region.first) return null;
+  if (pick.to < region.first) return null;   // a tended egg while the scope protects them
+  const from = broodDirection() === "back" ? Math.max(pick.from, region.first) : region.first;
+  const to = broodDirection() === "back" ? region.last : Math.min(pick.to, region.last);
+  return to >= from ? { from, to } : null;
+}
+
+function casteTally(from, to) {
+  const counts = {};
+  for (let i = from; i <= to; i++) {
+    const caste = emergingCaste(game, game.eggs[i], i);
+    counts[caste] = (counts[caste] || 0) + 1;
+  }
+  return Object.keys(counts)
+    .map(id => fmt(counts[id]) + " " + CASTES[id].name.toLowerCase())
+    .join(", ");
+}
+
+// Rows are pooled and updated in place rather than rebuilt. A node detached
+// between mousedown and mouseup never receives its click -- the bug the upgrade
+// cards had -- and this list redraws every frame while the window is open.
+// Selection binds on mousedown for the same reason.
+function fillRows(box, rows) {
+  while (box.children.length < rows.length) {
+    const row = document.createElement("button");
+    row.className = "brood-row";
+    row.innerHTML = '<span class="brood-pos"></span><span class="brood-what"></span>' +
+      '<span class="bar"><i></i></span><span class="brood-note"></span>';
+    row.addEventListener("mousedown", () => {
+      broodPick = { list: row.dataset.list, index: Number(row.dataset.index) };
+      updateBroodDialog();
+    });
+    box.appendChild(row);
+  }
+  while (box.children.length > rows.length) box.removeChild(box.lastChild);
+  rows.forEach((data, i) => {
+    const row = box.children[i];
+    row.dataset.list = data.list;
+    row.dataset.index = String(data.index);
+    row.disabled = !!data.locked;
+    row.classList.toggle("picked", !!data.picked);
+    row.classList.toggle("doomed", !!data.doomed);
+    row.querySelector(".brood-pos").textContent = data.pos;
+    row.querySelector(".brood-what").textContent = data.what;
+    row.querySelector(".bar").hidden = data.progress === null;
+    if (data.progress !== null) row.querySelector(".bar i").style.width = data.progress + "%";
+    row.querySelector(".brood-note").textContent = data.note;
+  });
+}
+
+function updateBroodDialog() {
+  const eggs = game.eggs;
+  const tended = tendedCount();
+  const waiting = eggs.length - tended;
+  const range = broodRange();
+  const doomed = i => !!range && i >= range.from && i <= range.to;
+  const period = incubationTime(game);
+
+  el("broodSummary").textContent = eggs.length === 0
+    ? "The brood chamber is empty."
+    : fmt(eggs.length) + " eggs — " + fmt(tended) + " tended in " + broodCapacity(game) +
+      " slots" + (waiting > 0 ? ", " + fmt(waiting) + " waiting behind them." : ".");
+
+  const lockTended = broodScope() !== "all";
+  el("broodTendedHead").textContent = "Tended — " + fmt(tended) + " developing" +
+    (lockTended ? ", protected" : "");
+  fillRows(el("broodTendedList"), eggs.slice(0, tended).map((egg, i) => ({
+    list: "tended", index: i, locked: lockTended,
+    picked: !!broodPick && broodPick.list === "tended" && broodPick.index === i,
+    doomed: doomed(i),
+    pos: "#" + (i + 1),
+    what: CASTES[emergingCaste(game, egg, i)].name + (egg.fed ? " ·fed" : ""),
+    progress: Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1),
+    note: Math.max(0, (EGG_TIME - egg.progress) / (EGG_TIME / period)).toFixed(0) + "s"
+  })));
+
+  const runs = waitingRuns();
+  el("broodWaitingHead").textContent = "Waiting — " + fmt(waiting) +
+    (runs.length > 1 ? " in " + runs.length + " batches" : "");
+  el("broodWaitingEmpty").hidden = runs.length > 0;
+  fillRows(el("broodWaitingList"), runs.map((run, i) => ({
+    list: "waiting", index: i, locked: false,
+    picked: !!broodPick && broodPick.list === "waiting" && broodPick.index === i,
+    doomed: doomed(run.from),
+    pos: run.from === run.to ? "#" + (run.from + 1) : "#" + (run.from + 1) + "–#" + (run.to + 1),
+    what: fmt(run.to - run.from + 1) + " × " + CASTES[run.caste].name,
+    progress: null,
+    note: ""
+  })));
+
+  el("broodScope").value = broodScope();
+  el("broodDirection").value = broodDirection();
+
+  const count = range ? range.to - range.from + 1 : 0;
+  el("broodPlan").textContent = range
+    ? "Destroy " + fmt(count) + " of " + fmt(eggs.length) + " eggs — " +
+      casteTally(range.from, range.to) + ". Nothing is refunded."
+    : "Pick an egg or a batch above to choose what goes.";
+
+  // a part-grown egg is incubation already paid for, so say so plainly
+  const hit = range ? Math.max(0, Math.min(range.to, tended - 1) - range.from + 1) : 0;
+  const warn = el("broodWarn");
+  warn.hidden = hit <= 0;
+  if (hit > 0) {
+    let best = 0;
+    for (let i = range.from; i <= Math.min(range.to, tended - 1); i++) {
+      best = Math.max(best, eggs[i].progress / EGG_TIME);
+    }
+    warn.textContent = fmt(hit) + (hit === 1 ? " of them is tended" : " of them are tended") +
+      ", the furthest " + Math.round(best * 100) + "% grown. That incubation is lost.";
+  }
+  el("broodConfirm").disabled = !range;
+}
+
+function openBroodDialog() {
+  if (game.eggs.length === 0) return;
+  // opens on the eggs waiting for a slot, which is what the old button did
+  const runs = waitingRuns();
+  broodPick = runs.length ? { list: "waiting", index: 0 } : { list: "tended", index: 0 };
+  updateBroodDialog();
+  el("broodModal").hidden = false;
+}
+
+el("btnBroodDetails").onclick = openBroodDialog;
+el("broodClose").onclick = () => { el("broodModal").hidden = true; };
+el("broodScope").onchange = event => {
+  setSetting("broodScope", event.target.value);
+  if (event.target.value !== "all" && broodPick && broodPick.list === "tended") broodPick = null;
+  updateBroodDialog();
+};
+el("broodDirection").onchange = event => {
+  setSetting("broodDirection", event.target.value);
+  updateBroodDialog();
+};
+el("broodConfirm").onclick = () => {
+  const range = broodRange();
+  if (range) destroyEggRange(range.from, range.to);
+  broodPick = null;
+  el("broodModal").hidden = true;
   render();
 };
-[1, 10, 100].forEach(n => {
-  const chip = document.createElement("button");
-  chip.className = "chip";
-  chip.textContent = "+" + n;
-  chip.onclick = () => {
-    el("cancelAmount").value = String(Math.min(maxCancellable(), Number(el("cancelAmount").value) + n));
-    updateCancelDialog();
-  };
-  el("cancelQuick").appendChild(chip);
-});
-const cancelAll = document.createElement("button");
-cancelAll.className = "chip";
-cancelAll.textContent = "All";
-cancelAll.onclick = () => {
-  el("cancelAmount").value = String(maxCancellable());
-  updateCancelDialog();
-};
-el("cancelQuick").appendChild(cancelAll);
 
 // A finished colony's save code runs to tens of thousands of characters -- a
 // 2,400-ant nest with a full brood queue measured over 12,000, and past 60,000
@@ -663,6 +857,10 @@ el("feedBrood").onchange = event => {
 
 el("btnShed").onclick = () => {
   shedWings();
+  render();
+};
+el("btnRally").onclick = () => {
+  startRally();
   render();
 };
 el("btnLay").onclick = () => {

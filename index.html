@@ -39,6 +39,7 @@
       <h2 id="queenTitle">The queen</h2>
       <p id="queenText"></p>
       <button id="btnShed">Shed her wings</button>
+      <p class="milestone" id="queenMilestone" hidden></p>
     </div>
   </section>
 
@@ -71,8 +72,12 @@
       <button id="btnLayMax">Lay max</button>
     </div>
     <div id="casteChoice"></div>
+    <div class="rally-row">
+      <button id="btnRally">Rally the foragers</button>
+      <span class="rally-state" id="rallyState"></span>
+    </div>
     <p class="egg-summary" id="eggSummary"></p>
-    <button id="btnCancelEggs" class="cancel-eggs" hidden>Destroy waiting eggs</button>
+    <button id="btnBroodDetails" class="cancel-eggs" hidden>See details</button>
     <label class="toggle row-toggle" id="autoLayRow" hidden>
       <input type="checkbox" id="autoLay"> <span id="autoLayLabel">Lay eggs automatically</span>
     </label>
@@ -232,15 +237,38 @@
   </div>
 </div>
 
-<div class="modal" id="cancelModal" hidden>
-  <div class="modal-box">
-    <h2>Destroy eggs</h2>
-    <p id="cancelDetail"></p>
-    <input type="number" id="cancelAmount" min="0" value="1">
-    <div class="quick" id="cancelQuick"></div>
+<div class="modal" id="broodModal" hidden>
+  <div class="modal-box brood-box">
+    <h2>The brood chamber</h2>
+    <p id="broodSummary"></p>
+
+    <h3 class="brood-head" id="broodTendedHead">Tended</h3>
+    <div class="brood-list" id="broodTendedList"></div>
+
+    <h3 class="brood-head" id="broodWaitingHead">Waiting</h3>
+    <div class="brood-list" id="broodWaitingList"></div>
+    <p class="dim brood-empty" id="broodWaitingEmpty" hidden>Nothing is queued behind the tended slots.</p>
+
+    <div class="brood-settings">
+      <label class="field inline">Destroy
+        <select id="broodScope">
+          <option value="waiting">waiting eggs only</option>
+          <option value="all">any egg, tended included</option>
+        </select>
+      </label>
+      <label class="field inline">taking
+        <select id="broodDirection">
+          <option value="back">this one and everything behind it</option>
+          <option value="forward">this one and everything ahead of it</option>
+        </select>
+      </label>
+    </div>
+
+    <p class="brood-plan" id="broodPlan"></p>
+    <p class="brood-warn" id="broodWarn" hidden></p>
     <div class="modal-actions">
-      <button id="cancelKeep">Keep them</button>
-      <button id="cancelConfirm" class="danger">Destroy them</button>
+      <button id="broodClose">Keep them</button>
+      <button id="broodConfirm" class="danger">Destroy them</button>
     </div>
   </div>
 </div>

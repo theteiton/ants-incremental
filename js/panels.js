@@ -32,6 +32,7 @@ import {
   game,
   markSeen,
   maxExilable,
+  pendingByCaste,
   setQueenName,
   setSetting
 } from "./game.js";
@@ -139,6 +140,7 @@ export function buildAnts(onChange) {
 
     const count = document.createElement("div");
     count.className = "caste-count";
+    count.innerHTML = '<b class="caste-held"></b><span class="caste-pending"></span>';
 
     row.append(art, body, count, exileCell);
     list.appendChild(row);
@@ -155,7 +157,8 @@ export function buildAnts(onChange) {
       name: body.querySelector(".caste-name"),
       role: body.querySelector(".caste-role"),
       effect: body.querySelector(".caste-effect"),
-      count
+      held: count.querySelector(".caste-held"),
+      pending: count.querySelector(".caste-pending")
     };
   });
 }
@@ -189,14 +192,17 @@ function casteEffectText(id) {
 }
 
 export function renderAnts() {
+  const pending = pendingByCaste();
   Object.keys(CASTES).forEach(id => {
     const ui = casteRows[id];
     const held = game.ants[id];
-    ui.row.hidden = held === 0 && (!CASTES[id].layable || !isUnlocked(game, id));
+    const coming = pending[id] || 0;
+    ui.row.hidden = held === 0 && coming === 0 && (!CASTES[id].layable || !isUnlocked(game, id));
     ui.name.textContent = CASTES[id].name;
     ui.role.textContent = CASTES[id].role;
     ui.effect.textContent = casteEffectText(id);
-    ui.count.textContent = fmt(held);
+    ui.held.textContent = fmt(held);
+    ui.pending.textContent = coming > 0 ? "+" + fmt(coming) + " pending" : "";
 
     const allowed = maxExilable(id);
     // the cell stays on every row so the sprites and counts line up; only the

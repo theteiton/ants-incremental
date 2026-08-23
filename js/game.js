@@ -12,6 +12,8 @@ import {
   eggPrice,
   casteStock,
   NANITIC_LIFESPAN,
+  RALLY_COOLDOWN,
+  RALLY_DURATION,
   foodPerSecond,
   hatchRate,
   isUnlocked,
@@ -98,10 +100,13 @@ function blankGame() {
     peakStrength: 0,
     naniticsDied: false,
     hiding: false,
+    rallyTime: 0,
+    rallyCooldown: 0,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
       autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
+      broodScope: "waiting", broodDirection: "back",
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
     seen: { upgrades: 0, tracks: null },
     runTime: 0,
@@ -121,6 +126,16 @@ export function shedWings() {
   if (game.wingsShed) return false;
   game.wingsShed = true;
   game.reserves = QUEEN_RESERVES + prestigeStartingReserves(game);
+  return true;
+}
+
+export function rallyReady() {
+  return game.wingsShed && (game.rallyTime || 0) <= 0 && (game.rallyCooldown || 0) <= 0;
+}
+
+export function startRally() {
+  if (!rallyReady()) return false;
+  game.rallyTime = RALLY_DURATION;
   return true;
 }
 
@@ -265,16 +280,28 @@ export function affordableEggs() {
 // actually wanted behind hundreds of eggs. Destroying takes from the back of
 // the queue -- the newest and least developed -- so the egg about to hatch is
 // never the one that dies. Nothing is refunded, the same as exiling.
-export function maxCancellable() {
-  return game.eggs.length;
-}
-
-export function cancelEggs(count) {
-  const taken = Math.min(Math.floor(count), maxCancellable());
+// One function mutates the brood. "Destroy the last n" is a range like any
+// other, so the details window and every other caller go through here rather
+// than splicing game.eggs themselves.
+export function destroyEggRange(from, to) {
+  const start = Math.max(0, Math.floor(from));
+  const end = Math.min(game.eggs.length - 1, Math.floor(to));
+  const taken = end - start + 1;
   if (!(taken > 0)) return 0;
-  game.eggs.splice(game.eggs.length - taken, taken);
+  game.eggs.splice(start, taken);
   game.stats.eggsCancelled = (game.stats.eggsCancelled || 0) + taken;
   return taken;
+}
+
+// what each caste has coming, read off the queue rather than stored -- the
+// emerging caste depends on queue position while the founders are still nanitic
+export function pendingByCaste() {
+  const out = {};
+  for (let i = 0; i < game.eggs.length; i++) {
+    const caste = emergingCaste(game, game.eggs[i], i);
+    out[caste] = (out[caste] || 0) + 1;
+  }
+  return out;
 }
 
 export function proteinUnlocked() {
@@ -452,6 +479,15 @@ export function tick(dt) {
   game.stats.foodEarned += earned;
   game.stats.playtime += dt;
   game.runTime = (game.runTime || 0) + dt;
+
+  // the cooldown only starts once the rally is over, so the cycle is
+  // RALLY_DURATION boosted then RALLY_COOLDOWN waiting
+  if (game.rallyTime > 0) {
+    game.rallyTime = Math.max(0, game.rallyTime - dt);
+    if (game.rallyTime === 0) game.rallyCooldown = RALLY_COOLDOWN;
+  } else if (game.rallyCooldown > 0) {
+    game.rallyCooldown = Math.max(0, game.rallyCooldown - dt);
+  }
 
   if (!game.wingsShed && autoShedOn()) shedWings();
   runAutomation();
