@@ -12,6 +12,7 @@
   --glow: #24120f;
   --btn-text: #1c0f0d;
   --hover: #2c1c19;
+  --header: rgba(16, 11, 10, 0.92);
 }
 
 :root[data-theme="light"] {
@@ -28,6 +29,7 @@
   --glow: #fffdfb;
   --btn-text: #fff7f5;
   --hover: #fdf1e9;
+  --header: rgba(244, 236, 231, 0.92);
 }
 
 :root[data-theme="soil"] {
@@ -44,6 +46,7 @@
   --glow: #33220f;
   --btn-text: #1c0f0d;
   --hover: #3b2e1f;
+  --header: rgba(23, 19, 16, 0.92);
 }
 
 * { box-sizing: border-box; }
@@ -59,10 +62,15 @@ body {
 header {
   border-bottom: 1px solid var(--line);
   padding: 14px 20px;
-  background: rgba(16, 11, 10, 0.92);
+  background: var(--header);
   position: sticky;
   top: 0;
   z-index: 5;
+  /* A stuck header overlays whatever scrolls under it, and at 101px tall it
+     covered the top of any card, button or row in that band -- elementFromPoint
+     returned HEADER, so the click never reached them. Nothing in here is
+     interactive, so let every pointer through. */
+  pointer-events: none;
 }
 
 h1 {
