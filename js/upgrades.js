@@ -17,6 +17,8 @@ import {
   hidingPenalty,
   runPeakCount,
   populationCap,
+  rallyActive,
+  RALLY_MULT,
   slotsPerNurse,
   UPGRADES,
   upgradeBranch,
@@ -32,10 +34,10 @@ import {
   MONSTER_BASE,
   MONSTER_EXPONENT,
   MONSTER_GROWTH,
+  MONSTER_REFERENCE,
   foodPerProtein,
   monsterPower,
   monsterRamp,
-  RAID_UNLOCK,
   raidRewards,
   raidsUnlocked,
   SOLDIER_COMBAT
@@ -91,8 +93,11 @@ function foodFormula(game, caste) {
   const hidden = hidingPenalty(game) < 1
     ? " × hiding " + f(hidingPenalty(game))
     : "";
+  const rally = (caste === "forager" && rallyActive(game))
+    ? " × rally " + f(RALLY_MULT)
+    : "";
   return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
-    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic +
+    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic + rally +
     " × colony " + f(globalUpgradeMultiplier(game)) +
     " × achievements " + f(achievementFoodBonus(game)) + lineage + hidden +
     " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
@@ -139,10 +144,10 @@ function proteinFormula(game) {
 }
 
 function monsterFormula(game) {
-  const reach = Math.max(RAID_UNLOCK, runPeakCount(game, "population"));
+  const reach = Math.max(MONSTER_REFERENCE, runPeakCount(game, "population"));
   const ramp = monsterRamp(game);
   return "next attacker = base " + MONSTER_BASE +
-    " × (this colony " + fmt(reach) + " / " + RAID_UNLOCK + ")^" + MONSTER_EXPONENT +
+    " × (this colony " + fmt(reach) + " / " + MONSTER_REFERENCE + ")^" + MONSTER_EXPONENT +
     " × wins " + f(1 + MONSTER_GROWTH * (game.raidsWon || 0)) +
     (ramp < 1 ? " × ramp " + f(ramp) : "") +
     " = " + fmt(monsterPower(game));
@@ -385,9 +390,12 @@ export function buildUpgrades(onChange) {
 export function renderUpgrades() {
   let owned = 0;
   let locked = 0;
-  const list = el("upgradeList");
-  sortedUpgrades().forEach(upgrade => {
-    list.appendChild(upgradeCards[upgrade.id].card);
+  // Ordered by CSS, not by moving the nodes. appendChild on a card already in
+  // the list detaches it first, and a button detached between mousedown and
+  // mouseup never receives the click -- buying an upgrade needed an
+  // autoclicker to land both inside one frame.
+  sortedUpgrades().forEach((upgrade, i) => {
+    upgradeCards[upgrade.id].card.style.order = i;
   });
   UPGRADES.forEach(upgrade => {
     const ui = upgradeCards[upgrade.id];

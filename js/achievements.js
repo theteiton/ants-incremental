@@ -14,8 +14,6 @@ const DECADES = (from, to) => {
   return out;
 };
 
-const STEPS = (list, from, to) => list.concat(DECADES(from, to));
-
 // widening steps that finish exactly on the number of upgrades that exist
 export function upgradeSteps(total) {
   const steps = [];
@@ -56,61 +54,70 @@ for (const upgrade of UPGRADES) {
   BRANCH_TOTALS[upgradeBranch(upgrade)]++;
 }
 
+// Every ladder ends on a number a colony actually reaches. They used to run to
+// 1e12 ants and 1e24 food, so eleven of the sixteen tracks could never be
+// finished and the level cap of 20 was unreachable -- measured at 92 tiers and
+// level 18 after fourteen hours and six flights. The tops are now set against a
+// colony of roughly 10,000 ants, and the rungs are dense where players actually
+// stand rather than spread across decades nobody sees.
 export const ACHIEVEMENT_TRACKS = [
   { id: "population", name: "Colony size", unit: "ants",
     desc: "The largest colony you have raised.",
     value: g => Math.max(g.peakPopulation || 0, population(g)),
-    thresholds: STEPS([1, 5, 10, 25, 50, 100, 250, 500], 3, 12) },
+    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000] },
 
   { id: "food", name: "Food gathered", unit: "food",
     desc: "Every crumb the colony has ever brought home.",
     value: g => g.stats.foodEarned,
-    thresholds: DECADES(2, 24) },
+    thresholds: DECADES(2, 12) },
 
   { id: "eggs", name: "Eggs hatched", unit: "eggs",
     desc: "Workers raised from egg to adult.",
     value: g => g.stats.eggsHatched,
-    thresholds: STEPS([10, 50], 2, 12) },
+    thresholds: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000] },
 
   { id: "forager", name: "Foragers", unit: "foragers",
     desc: "The most foragers the colony has held at once.",
     value: g => peakOf(g, "forager"),
-    thresholds: STEPS([5, 25, 50, 100, 250, 500], 3, 10) },
+    thresholds: [5, 25, 50, 100, 250, 500, 1000, 2000, 4000, 6000, 8000] },
 
   { id: "excavator", name: "Excavators", unit: "excavators",
     desc: "The most diggers the colony has held at once.",
     value: g => peakOf(g, "excavator"),
-    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+    thresholds: [3, 10, 25, 50, 75, 100, 150, 200] },
 
   { id: "nurse", name: "Nurses", unit: "nurses",
     desc: "The most nurses the colony has held at once.",
     value: g => peakOf(g, "nurse"),
-    thresholds: STEPS([3, 10, 25, 50], 2, 8) },
+    thresholds: [3, 10, 25, 50, 100, 200, 350, 500] },
 
+  // the k-th big forager needs round(3 x 3.5^k) forager hatches since the last,
+  // so twelve is about 4,600 hatches and twenty is about 690,000. The old ladder
+  // ran to eighty, which read as "you are playing this wrong" to anyone counting.
   { id: "bigforager", name: "Big Foragers", unit: "big foragers",
     desc: "Oversized foragers that hatched by chance.",
     value: g => peakOf(g, "bigforager"),
-    thresholds: [1, 2, 3, 5, 8, 12, 20, 30, 50, 80] },
+    thresholds: [1, 2, 3, 5, 8, 12] },
 
   { id: "soldier", name: "Soldiers", unit: "soldiers",
     desc: "The standing army at its largest.",
     value: g => peakOf(g, "soldier"),
-    thresholds: STEPS([1, 5, 10, 25, 50], 2, 8) },
+    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 750, 1000] },
 
   { id: "raids", name: "Raids won", unit: "raids",
     desc: "Attackers killed at the nest gate.",
     value: g => Math.max(g.raidsWon || 0, (g.stats && g.stats.raidsWonTotal) || 0),
-    thresholds: STEPS([1, 3, 5, 10, 25, 50], 2, 7) },
+    thresholds: [1, 3, 5, 10, 20, 35, 50, 75, 100] },
 
   { id: "strength", name: "Fighting strength", unit: "strength",
     desc: "The most fighting strength the colony has fielded.",
     value: g => g.peakStrength || 0,
-    thresholds: STEPS([25, 100, 500], 3, 12) },
+    thresholds: [25, 100, 500, 1000, 2500, 10000, 25000, 50000, 100000] },
 
   { id: "protein", name: "Protein gathered", unit: "protein",
     desc: "Everything the soldiers have dragged home.",
     value: g => g.stats.proteinEarned || 0,
-    thresholds: STEPS([10, 50], 2, 12) },
+    thresholds: [10, 50, 100, 250, 1000, 5000, 25000, 100000, 250000] },
 
   { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
     desc: "Every adaptation the colony has paid for.",
@@ -127,10 +134,13 @@ export const ACHIEVEMENT_TRACKS = [
     value: g => ownedIn(g, "combat"),
     thresholds: upgradeSteps(BRANCH_TOTALS.combat) },
 
+  // flights and royal jelly keep their old tops. They are prestige-grind tracks
+  // rather than colony-size ones, and shortening them would have taken a tier
+  // back from anyone who had already gone past.
   { id: "flights", name: "Nuptial flights", unit: "flights",
     desc: "Times the queen has taken wing and founded a new colony.",
     value: g => (g.prestige && g.prestige.flightsTaken) || 0,
-    thresholds: [1, 2, 3, 5, 10, 20, 35, 50] },
+    thresholds: [1, 2, 3, 5, 8, 12, 20, 35, 50] },
 
   { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
     desc: "Total royal jelly earned across all flights.",

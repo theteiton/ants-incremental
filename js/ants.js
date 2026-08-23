@@ -21,13 +21,13 @@ export const CASTES = {
   },
   excavator: {
     name: "Excavator",
-    unlockAt: 25,
+    unlockAt: 16,
     layable: true,
     role: "Digs new chambers, raising the population cap."
   },
   nurse: {
     name: "Nurse",
-    unlockAt: 100,
+    unlockAt: 64,
     layable: true,
     role: "Tends the brood, so more eggs develop at once."
   },
@@ -39,7 +39,7 @@ export const CASTES = {
   },
   soldier: {
     name: "Soldier",
-    unlockAt: 400,
+    unlockAt: 256,
     layable: true,
     role: "Fights raids, and hunts between them for protein."
   }
@@ -60,6 +60,13 @@ export const BIG_FORAGER_FIRST = 3;
 export const BIG_FORAGER_GROWTH = 3.5;
 export const BIG_FORAGER_AGE_GAIN = 0.05;
 export const BIG_FORAGER_AGE_CAP = 3;
+
+// Rallying is the one thing a player can do to the food rate by hand. It is a
+// forager multiplier, so big foragers ride on it too and the founding
+// nanitics do not -- they are not out there to be called back.
+export const RALLY_MULT = 3;
+export const RALLY_DURATION = 30;
+export const RALLY_COOLDOWN = 90;
 
 
 export const HIDING_FOOD_PENALTY = 0.5;
@@ -275,12 +282,21 @@ export function casteMultiplier(game, casteId) {
   return productEffect(game, "casteMult", casteId);
 }
 
+export function rallyActive(game) {
+  return (game.rallyTime || 0) > 0;
+}
+
+export function rallyMultiplier(game, casteId) {
+  return casteId === "forager" && rallyActive(game) ? RALLY_MULT : 1;
+}
+
 export function casteFoodPerSecond(game, casteId) {
   const base = FOOD_PER_SECOND[casteId];
   if (!base) return 0;
   const naniticMult = casteId === "nanitic" ? prestigeNaniticMult(game) : 1;
   return (base + casteFlatBonus(game, casteId)) *
-    casteMultiplier(game, casteId) * naniticMult * globalFoodMultiplier(game);
+    casteMultiplier(game, casteId) * naniticMult * rallyMultiplier(game, casteId) *
+    globalFoodMultiplier(game);
 }
 
 export function hidingPenalty(game) {

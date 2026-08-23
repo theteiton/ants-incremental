@@ -1,7 +1,11 @@
 import { effectTotal, foodPerSecond, globalFoodMultiplier, population, runPeakCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
 
-export const RAID_UNLOCK = 400;
+export const RAID_UNLOCK = 256;
+// The gate moved from 400 to 256; the threat curve deliberately did not. Monster
+// power is still measured against a 400-ant nest, so a colony of any given size
+// meets exactly the attacker it met before -- only the first one arrives sooner.
+export const MONSTER_REFERENCE = 400;
 export const RAID_INTERVAL = 360;
 export const RAID_WARNING = 30;
 export const EGG_PROTEIN_COST = 1;
@@ -74,10 +78,10 @@ export function monsterRamp(game) {
 }
 
 export function monsterPower(game) {
-  const reach = Math.max(RAID_UNLOCK, runPeakCount(game, "population"));
+  const reach = Math.max(MONSTER_REFERENCE, runPeakCount(game, "population"));
   const seen = raidsSeen(game);
   const ramp = seen < RAID_RAMP.length ? RAID_RAMP[seen] : 1;
-  return MONSTER_BASE * Math.pow(reach / RAID_UNLOCK, MONSTER_EXPONENT) *
+  return MONSTER_BASE * Math.pow(reach / MONSTER_REFERENCE, MONSTER_EXPONENT) *
     (1 + MONSTER_GROWTH * (game.raidsWon || 0)) * ramp;
 }
 
