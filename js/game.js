@@ -11,11 +11,15 @@ import {
   upgradeCurrency,
   eggPrice,
   casteStock,
-  NANITIC_LIFESPAN,
+  NANITIC_HATCH_SPEED,
+  naniticLifespan,
   RALLY_COOLDOWN,
   RALLY_DURATION,
   foodPerSecond,
   hatchRate,
+  wingYield,
+  WING_COUNT,
+  WING_STRIP_TIME,
   isUnlocked,
   layableCastes,
   population,
@@ -102,6 +106,8 @@ function blankGame() {
     hiding: false,
     rallyTime: 0,
     rallyCooldown: 0,
+    wings: 0,
+    wingStrip: 0,
     queenName: "",
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
@@ -126,6 +132,28 @@ export function shedWings() {
   if (game.wingsShed) return false;
   game.wingsShed = true;
   game.reserves = QUEEN_RESERVES + prestigeStartingReserves(game);
+  game.wings = WING_COUNT;
+  return true;
+}
+
+// one source of truth for how long an egg still needs, because the founding
+// four develop at double speed and a fed egg at double again -- the summary
+// line and the brood window both read this rather than recomputing it
+export function eggSecondsLeft(egg, queuePosition) {
+  const founding = emergingCaste(game, egg, queuePosition) === "nanitic";
+  const rate = hatchRate(game) * (egg.fed ? FED_EGG_SPEED : 1) *
+    (founding ? NANITIC_HATCH_SPEED : 1);
+  return Math.max(0, (EGG_TIME - egg.progress) / rate);
+}
+
+export function stripReady() {
+  return game.wingsShed && (game.wings || 0) > 0 && (game.wingStrip || 0) <= 0;
+}
+
+export function stripWing() {
+  if (!stripReady()) return false;
+  game.wings -= 1;
+  game.wingStrip = WING_STRIP_TIME;
   return true;
 }
 
@@ -474,11 +502,18 @@ function rollBigForager() {
 
 export function tick(dt) {
   if (!isFinite(dt) || dt <= 0) return;
-  const earned = foodPerSecond(game) * dt;
+  // A wing pays only for as long as it lasts. An offline chunk can be far
+  // longer than the strip -- at an eight hour absence the step is 48s against
+  // a 10s strip -- and would otherwise pay out several times over.
+  const wingRate = wingYield(game);
+  const wingSeconds = Math.min(dt, game.wingStrip || 0);
+  const earned = (foodPerSecond(game) - wingRate) * dt + wingRate * wingSeconds;
   game.food += earned;
   game.stats.foodEarned += earned;
   game.stats.playtime += dt;
   game.runTime = (game.runTime || 0) + dt;
+
+  if (game.wingStrip > 0) game.wingStrip = Math.max(0, game.wingStrip - dt);
 
   // the cooldown only starts once the rally is over, so the cycle is
   // RALLY_DURATION boosted then RALLY_COOLDOWN waiting
@@ -497,7 +532,9 @@ export function tick(dt) {
   for (let i = game.eggs.length - 1; i >= 0; i--) {
     const egg = game.eggs[i];
     if (i >= tended) continue;
-    egg.progress += rate * dt * (egg.fed ? FED_EGG_SPEED : 1);
+    const founding = emergingCaste(game, egg, i) === "nanitic";
+    egg.progress += rate * dt * (egg.fed ? FED_EGG_SPEED : 1) *
+      (founding ? NANITIC_HATCH_SPEED : 1);
     if (egg.progress >= EGG_TIME) {
       const caste = emergingCaste(game, egg);
       if (caste === "forager" && rollBigForager()) {
@@ -514,7 +551,7 @@ export function tick(dt) {
     }
   }
 
-  if (!game.naniticsDied && game.runTime >= NANITIC_LIFESPAN && game.ants.nanitic > 0) {
+  if (!game.naniticsDied && game.runTime >= naniticLifespan(game) && game.ants.nanitic > 0) {
     game.ants.nanitic = 0;
     game.naniticsDied = true;
   }
