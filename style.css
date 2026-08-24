@@ -329,7 +329,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .caste-row:first-child { border-top: none; }
 #automationList { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
 .brood-field { margin-bottom: 10px; color: var(--dim); }
-.brood-field input { width: 96px; }
+.brood-field input { width: 130px; }
 .ratios { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 14px; }
 .ratio-field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ratio-field input { width: 58px; padding: 4px 6px; font-size: 13px; }
@@ -401,6 +401,45 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .caste-held { font-size: 20px; font-weight: 700; }
 .caste-pending { font-size: 11px; font-weight: 500; color: var(--accent-soft); }
+
+#challengeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.challenge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 12px;
+}
+.challenge.locked { opacity: 0.5; border-left-color: var(--line); }
+.challenge.running { border-color: var(--good); border-left-color: var(--good); }
+.challenge-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.challenge-head b { font-size: 14px; }
+.challenge-level { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.challenge-flavour { font-size: 12px; color: var(--dim); font-style: italic; }
+.challenge-rule { font-size: 12px; color: var(--text); }
+.challenge-target { font-size: 12px; color: var(--good); }
+.challenge-enter { align-self: flex-start; margin-top: 4px; }
+.modal-box .challenge-running,
+.challenge-running {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  font-size: 13px;
+  color: var(--dim);
+}
+.ratio-guide {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  font-size: 12px;
+}
+.ratio-guide b { color: var(--text); }
+.challenge-running.met { border-left-color: var(--good); color: var(--good); }
 
 #upgradeList {
   display: grid;

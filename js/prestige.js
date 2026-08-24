@@ -38,6 +38,12 @@ export const PRESTIGE_UPGRADES = [
   { id: "prestige_12", name: "Granary Instinct", cost: 5,
     desc: "The colony learns to keep a store back. Laying stops before it spends the food you are saving.",
     effect: { type: "automation", key: "foodReserve" } },
+
+  // the end of the lineage is where the trials begin, so the tab that used to
+  // say "there is nothing left to buy" has one more thing to buy
+  { id: "prestige_13", name: "The Trials", cost: 8,
+    desc: "The queen remembers hardship. Her daughters can found a colony under conditions that should kill it.",
+    effect: { type: "challenges" } },
 ];
 
 export const AUTOMATIONS = [
@@ -108,30 +114,37 @@ export function automationUnlocked(game, key) {
     u.effect.type === "automation" && u.effect.key === key && prestigeUpgradeOwned(game, u));
 }
 
+// A trial suppresses everything the lineage bought that makes the colony
+// stronger, and nothing it bought that makes the colony run itself. Tedium is
+// not difficulty, and six trials of manual laying is not a challenge.
+function suppressed(game) {
+  return !!game.challenge;
+}
+
 export function prestigeFoodMultiplier(game) {
-  return prestigeProductEffect(game, "prestigeGlobalFood");
+  return suppressed(game) ? 1 : prestigeProductEffect(game, "prestigeGlobalFood");
 }
 
 export function prestigeStartingReserves(game) {
-  return prestigeSumEffect(game, "startingReserves");
+  return suppressed(game) ? 0 : prestigeSumEffect(game, "startingReserves");
 }
 
 export function prestigeBaseCap(game) {
-  return prestigeSumEffect(game, "prestigeBaseCap");
+  return suppressed(game) ? 0 : prestigeSumEffect(game, "prestigeBaseCap");
 }
 
 export function prestigeExcavatorCap(game) {
-  return prestigeSumEffect(game, "prestigeExcavatorCap");
+  return suppressed(game) ? 0 : prestigeSumEffect(game, "prestigeExcavatorCap");
 }
 
 export function prestigeBroodSlots(game) {
-  return prestigeSumEffect(game, "prestigeBroodSlots");
+  return suppressed(game) ? 0 : prestigeSumEffect(game, "prestigeBroodSlots");
 }
 
 export function prestigeSoldierMult(game) {
-  return prestigeProductEffect(game, "prestigeSoldierMult");
+  return suppressed(game) ? 1 : prestigeProductEffect(game, "prestigeSoldierMult");
 }
 
 export function prestigeNaniticMult(game) {
-  return prestigeProductEffect(game, "prestigeNaniticMult");
+  return suppressed(game) ? 1 : prestigeProductEffect(game, "prestigeNaniticMult");
 }

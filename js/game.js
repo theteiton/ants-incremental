@@ -43,6 +43,13 @@ import {
 } from "./raids.js";
 import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
 import {
+  activeChallenge,
+  challengeActive,
+  challengeById,
+  challengesUnlocked,
+  CHALLENGE_TARGET
+} from "./challenges.js";
+import {
   automationUnlocked,
   PRESTIGE_UNLOCK,
   PRESTIGE_UPGRADES,
@@ -64,6 +71,9 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
+export { CHALLENGES, CHALLENGE_TARGET, activeChallenge, challengeActive, challengeById,
+  challengeDebuff, challengeDebuffAt, challengeLevel, challengeLevelsTotal,
+  challengeReward, challengesUnlocked } from "./challenges.js";
 export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, AUTOMATIONS, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour, automationUnlocked } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
@@ -106,6 +116,8 @@ function blankGame() {
     hiding: false,
     rallyTime: 0,
     rallyCooldown: 0,
+    challenge: null,
+    challenges: {},
     wings: 0,
     wingStrip: 0,
     queenName: "",
@@ -404,8 +416,11 @@ export function hardReset() {
   return true;
 }
 
+// No flying out of a trial. doFlight() refounds the colony, which would clear
+// game.challenge as a side effect -- so a colony that pushed past 1,000 inside
+// a trial could leave it through the Nuptial tab and be paid jelly for it.
 export function flightReady() {
-  return population(game) >= PRESTIGE_UNLOCK;
+  return !challengeActive(game) && population(game) >= PRESTIGE_UNLOCK;
 }
 
 export function flightReward() {
@@ -421,7 +436,13 @@ export function doFlight() {
   game.prestige.flightsTaken += 1;
   game.best.jelly = Math.max(game.best.jelly || 0, earned);
 
-  // Values that survive the flight
+  refoundColony();
+  return earned;
+}
+
+// Everything that outlives a colony. A nuptial flight, entering a trial and
+// leaving one all found a new colony and keep exactly this much.
+function refoundColony(extra) {
   const surviving = {
     prestige: game.prestige,
     achievements: game.achievements,
@@ -435,12 +456,43 @@ export function doFlight() {
     stats: game.stats,
     settings: game.settings,
     seen: game.seen,
-    queenName: game.queenName
+    queenName: game.queenName,
+    challenges: game.challenges
   };
-
   Object.assign(game, blankGame());
-  Object.assign(game, surviving);
-  return earned;
+  Object.assign(game, surviving, extra || {});
+}
+
+export function enterChallenge(id) {
+  if (!challengesUnlocked(game) || game.challenge) return false;
+  const challenge = challengeById(id);
+  if (!challenge || !challenge.open) return false;
+  refoundColony({ challenge: id });
+  return true;
+}
+
+export function abandonChallenge() {
+  if (!game.challenge) return false;
+  refoundColony({ challenge: null });
+  return true;
+}
+
+// the target is met but the level is not banked until the player says so --
+// a colony that dissolved itself the moment it hit 600 would be a nasty
+// surprise in the middle of a run
+export function challengeMet() {
+  return challengeActive(game) && population(game) >= CHALLENGE_TARGET;
+}
+
+export function completeChallenge() {
+  if (!challengeMet()) return false;
+  const id = activeChallenge(game).id;
+  const cleared = Object.assign({}, game.challenges);
+  cleared[id] = (cleared[id] || 0) + 1;
+  game.challenges = cleared;
+  game.stats.challengeLevels = (game.stats.challengeLevels || 0) + 1;
+  refoundColony({ challenge: null });
+  return true;
 }
 
 export function buyPrestigeUpgrade(id) {

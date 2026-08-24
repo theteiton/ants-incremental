@@ -1,3 +1,4 @@
+import { challengeDebuff, challengeReward } from "./challenges.js";
 import {
   prestigeFoodMultiplier,
   prestigeBaseCap,
@@ -340,16 +341,25 @@ export function casteFoodPerSecond(game, casteId) {
     : 1;
   return (base + casteFlatBonus(game, casteId)) *
     casteMultiplier(game, casteId) * naniticMult * rallyMultiplier(game, casteId) *
-    globalFoodMultiplier(game);
+    globalFoodMultiplier(game) * foodPenalty(game);
 }
 
 export function hidingPenalty(game) {
   return game.hiding ? HIDING_FOOD_PENALTY : 1;
 }
 
+// Everything that raises food above its base. Penalties are not in here --
+// they live in foodPenalty(), so a debuff is one term in one place rather than
+// something hidden inside a factor called "colony".
 export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game) *
-    prestigeFoodMultiplier(game) * hidingPenalty(game);
+    prestigeFoodMultiplier(game) * challengeReward(game);
+}
+
+// Everything that takes food away, multiplied together. Trials plug in here,
+// and so does whatever comes after them.
+export function foodPenalty(game) {
+  return hidingPenalty(game) * challengeDebuff(game);
 }
 
 export function bigForagerThreshold(game) {
@@ -365,6 +375,7 @@ export function bigForagerMultiplier(game, bornAt) {
 // the flight teaches the colony to raise them properly; before it they are an
 // early-game curiosity that fades to a few percent of production
 export function bigForagerBonus(game) {
+  if (game.challenge) return 1;
   return (game.prestige && game.prestige.flightsTaken || 0) > 0 ? BIG_FORAGER_PRESTIGE_MULT : 1;
 }
 

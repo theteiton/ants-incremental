@@ -164,6 +164,8 @@ export function applySave(game, fresh, data) {
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.rallyTime = data.rallyTime || 0;
   game.rallyCooldown = data.rallyCooldown || 0;
+  game.challenge = data.challenge || null;
+  game.challenges = Object.assign({}, data.challenges || {});
   game.wings = data.wings || 0;
   game.wingStrip = data.wingStrip || 0;
   game.peakCastes = Object.assign({}, data.peakCastes || {});

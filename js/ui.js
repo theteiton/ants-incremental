@@ -58,6 +58,19 @@ import {
   OFFLINE_CAP,
   queenTitle,
   QUEEN_RESERVES,
+  abandonChallenge,
+  CHALLENGES,
+  CHALLENGE_TARGET,
+  activeChallenge,
+  challengeDebuff,
+  challengeDebuffAt,
+  challengeLevel,
+  challengeLevelsTotal,
+  challengeMet,
+  challengeReward,
+  challengesUnlocked,
+  completeChallenge,
+  enterChallenge,
   raidCountdown,
   rallyReady,
   save,
@@ -74,6 +87,8 @@ import {
   buildSettings,
   fmt,
   fmtTime,
+  parseAmount,
+  shortAmount,
   renderAnts,
   renderInspector,
   renderSettings,
@@ -96,7 +111,7 @@ import {
 import { drawSprite } from "./sprites.js";
 
 const el = id => document.getElementById(id);
-const TABS = ["ants", "upgrades", "achievements", "prestige", "settings"];
+const TABS = ["ants", "upgrades", "achievements", "prestige", "challenges", "settings"];
 let activeTab = "ants";
 const casteButtons = {};
 
@@ -293,7 +308,9 @@ function renderBrood() {
   const reserveRow = el("foodReserveRow");
   reserveRow.hidden = !automationUnlocked(game, "foodReserve");
   if (!reserveRow.hidden && document.activeElement !== el("foodReserve")) {
-    el("foodReserve").value = String(foodReserve());
+    // settles to the canonical short form once the player leaves the field:
+    // 1000k becomes 1M. shortAmount() never rounds, so nothing drifts.
+    el("foodReserve").value = shortAmount(foodReserve());
   }
 
   const feedRow = el("feedBroodRow");
@@ -542,7 +559,10 @@ function renderPrestige() {
     ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — taking flight now yields +" +
       fmt(projected) + " Royal Jelly" +
       (perHour > 0 ? ", which is " + fmt(perHour) + " an hour for this colony so far." : ".")
-    : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
+    : activeChallenge(game)
+      ? "No alate leaves a trial. " + activeChallenge(game).name +
+        " has to be claimed or abandoned on the Trials tab before she can fly again."
+      : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
 
   // the tree is finite, and running out of it should read as the edge of what
   // is built rather than as something broken
@@ -555,11 +575,10 @@ function renderPrestige() {
   if (complete) {
     el("lineageDone").textContent =
       "The lineage is complete — all " + PRESTIGE_UPGRADES.length +
-      " adaptations are hers, and there is nothing left here to buy. " +
+      " adaptations are hers. The Trials tab is open: her daughters can now found a colony " +
+      "under conditions that should kill it, and every level cleared feeds every colony after. " +
       "Royal Jelly still gathers with every flight" +
-      (p.royalJelly > 0 ? " (" + fmt(p.royalJelly) + " banked)" : "") +
-      ". Deeper prestige layers are being built, and the beta will carry more of them — " +
-      "this is as far down as the nest goes for now.";
+      (p.royalJelly > 0 ? " (" + fmt(p.royalJelly) + " banked)" : "") + ".";
   }
 
   PRESTIGE_UPGRADES.forEach(upgrade => {
@@ -571,6 +590,119 @@ function renderPrestige() {
     ui.cost.textContent = isOwned ? "owned" : upgrade.cost + " Royal Jelly";
     ui.cost.classList.toggle("affordable", !isOwned && p.royalJelly >= upgrade.cost);
     ui.cost.classList.toggle("owned-tag", isOwned);
+  });
+}
+
+const challengeCards = {};
+
+// A trial is a colony you found on purpose under conditions that should kill
+// it. Entering and abandoning both cost the colony, so both arm on the button
+// itself -- confirm() returns false inside a blocked embed, which is what made
+// the erase button look dead.
+function buildChallenges() {
+  const list = el("challengeList");
+  CHALLENGES.forEach(challenge => {
+    const card = document.createElement("div");
+    card.className = "challenge";
+    card.innerHTML =
+      '<div class="challenge-head"><b></b><span class="challenge-level"></span></div>' +
+      '<span class="challenge-flavour"></span>' +
+      '<span class="challenge-rule"></span>' +
+      '<span class="challenge-target"></span>';
+    card.querySelector("b").textContent = challenge.name;
+    card.querySelector(".challenge-flavour").textContent = challenge.flavour;
+
+    const button = document.createElement("button");
+    button.className = "challenge-enter";
+    button.onclick = () => {
+      if (!challenge.open) return;
+      const running = activeChallenge(game);
+      const mine = !!running && running.id === challenge.id;
+      if (mine && challengeMet()) { completeChallenge(); render(); return; }
+      if (button.dataset.armed !== "yes") {
+        button.dataset.armed = "yes";
+        setTimeout(() => { button.dataset.armed = ""; render(); }, 5000);
+        render();
+        return;
+      }
+      button.dataset.armed = "";
+      if (mine) abandonChallenge(); else enterChallenge(challenge.id);
+      render();
+    };
+    card.appendChild(button);
+
+    watch(card, {
+      title: challenge.name,
+      body: challenge.flavour,
+      note: () => {
+        if (!challenge.open) return challenge.rule;
+        const level = challengeLevel(game, challenge.id);
+        return [
+          challenge.rule,
+          "Cleared " + level + (level === 1 ? " time." : " times.") +
+            " The next attempt runs at " + fmt(challengeDebuffAt(level) * 100) + "% food.",
+          challenge.target,
+          challenge.reward
+        ].filter(Boolean).join("\n");
+      },
+      warn: false
+    });
+
+    challengeCards[challenge.id] = {
+      card, button,
+      level: card.querySelector(".challenge-level"),
+      rule: card.querySelector(".challenge-rule"),
+      target: card.querySelector(".challenge-target")
+    };
+    list.appendChild(card);
+  });
+}
+
+function renderChallenges() {
+  const running = activeChallenge(game);
+  const levels = challengeLevelsTotal(game);
+  const met = challengeMet();
+  el("challengeTally").textContent = levels + (levels === 1 ? " level cleared" : " levels cleared");
+  el("challengeReward").textContent = levels > 0
+    ? "×" + fmt(challengeReward(game)) + " food, held everywhere"
+    : "no reward held yet";
+  el("challengeIntro").textContent = running ? "" :
+    "A trial founds a colony under conditions that should kill it. The lineage's automation comes with " +
+    "you; its strength does not. The target never moves — every level asks for the same " +
+    fmt(CHALLENGE_TARGET) + " ants, and every level makes them harder to raise.";
+
+  const note = el("challengeRunning");
+  note.hidden = !running;
+  if (running) {
+    note.textContent = met
+      ? running.name + " is met — " + fmt(population(game)) + " ants standing. Claim it to bank the level."
+      : "Running " + running.name + ", attempt " + (challengeLevel(game, running.id) + 1) +
+        " — food at " + fmt(challengeDebuff(game) * 100) + "%, " +
+        fmt(Math.max(0, CHALLENGE_TARGET - population(game))) + " ants to go. " +
+        "Abandoning founds a fresh colony and pays nothing.";
+    note.classList.toggle("met", met);
+  }
+
+  CHALLENGES.forEach(challenge => {
+    const ui = challengeCards[challenge.id];
+    const level = challengeLevel(game, challenge.id);
+    const mine = !!running && running.id === challenge.id;
+    ui.card.classList.toggle("locked", !challenge.open);
+    ui.card.classList.toggle("running", mine);
+    ui.level.textContent = !challenge.open ? "sealed"
+      : level > 0 ? "cleared ×" + level : "never cleared";
+    ui.rule.textContent = challenge.rule;
+    ui.target.textContent = challenge.open
+      ? challenge.target + " Next attempt runs at " +
+        fmt(challengeDebuffAt(level) * 100) + "% food."
+      : "";
+    ui.button.hidden = !challenge.open;
+    ui.button.disabled = !challenge.open || (!!running && !mine);
+    ui.button.classList.toggle("danger", mine && !met);
+    ui.button.textContent = mine
+      ? (met ? "Claim the trial"
+             : ui.button.dataset.armed === "yes" ? "Really abandon it?" : "Abandon")
+      : (ui.button.dataset.armed === "yes" ? "Found a colony here?" : "Enter");
   });
 }
 
@@ -599,6 +731,7 @@ function render() {
   if (flown) el("valMatriline").textContent = fmtTime(game.stats.playtime);
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
+  el("tabButton-challenges").hidden = !challengesUnlocked(game);
   el("takeover").hidden = holdsSave();
   renderAway();
   renderBadges();
@@ -612,6 +745,7 @@ function render() {
   else if (activeTab === "upgrades") renderUpgrades();
   else if (activeTab === "achievements") renderAchievements(game);
   else if (activeTab === "prestige") renderPrestige();
+  else if (activeTab === "challenges") renderChallenges();
   else if (activeTab === "settings") {
     renderSettings();
     renderFormulas();
@@ -877,7 +1011,11 @@ el("autoLay").onchange = event => {
 };
 
 el("foodReserve").oninput = event => {
-  setSetting("foodReserve", Math.max(0, Math.floor(Number(event.target.value) || 0)));
+  const amount = parseAmount(event.target.value);
+  // half-typed values like "1." or "25q" are left alone rather than snapped to
+  // zero under the player's cursor
+  if (!isFinite(amount)) return;
+  setSetting("foodReserve", Math.max(0, Math.floor(amount)));
   render();
 };
 
@@ -918,6 +1056,7 @@ buildExileDialog();
 buildUpgrades(render);
 buildAchievements(game);
 buildPrestige(render);
+buildChallenges();
 buildSettings({
   refresh: render,
   applyTheme: () => {

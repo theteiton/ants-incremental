@@ -16,6 +16,8 @@ import {
   effectTotal,
   foodPerSecond,
   globalUpgradeMultiplier,
+  foodPenalty,
+  globalFoodMultiplier,
   hidingPenalty,
   runPeakCount,
   naniticHalflife,
@@ -57,6 +59,7 @@ import {
   prestigeNaniticMult,
   prestigeSoldierMult
 } from "./prestige.js";
+import { activeChallenge, challengeDebuff, challengeReward } from "./challenges.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
 import { fmt, fmtFactor, watch } from "./panels.js";
 
@@ -91,6 +94,27 @@ function casteName(id) {
   return CASTES[id].name.toLowerCase();
 }
 
+// What every caste shares, printed once as its own row. A caste's line names
+// it rather than repeating it, so "Nanitic food" is about nanitics and not
+// about the colony bonus, the achievements and whatever debuff is running.
+function sharedFoodFactor(game) {
+  return globalFoodMultiplier(game) * foodPenalty(game);
+}
+
+function overallFoodFormula(game) {
+  const parts = [
+    "colony " + f(globalUpgradeMultiplier(game)),
+    "achievements " + f(achievementFoodBonus(game))
+  ];
+  if (challengeReward(game) > 1) parts.push("trials " + f(challengeReward(game)));
+  if (prestigeFoodMultiplier(game) > 1) parts.push("lineage " + f(prestigeFoodMultiplier(game)));
+  if (hidingPenalty(game) < 1) parts.push("hiding " + f(hidingPenalty(game)));
+  if (challengeDebuff(game) < 1) {
+    parts.push(activeChallenge(game).name.toLowerCase() + " " + f(challengeDebuff(game)));
+  }
+  return "every caste × " + parts.join(" × ") + " = ×" + f(sharedFoodFactor(game));
+}
+
 function foodFormula(game, caste) {
   const vigour = casteHasMultiplier(caste)
     ? " × vigour " + f(casteMultiplier(game, caste))
@@ -98,22 +122,15 @@ function foodFormula(game, caste) {
   const nanitic = (caste === "nanitic" && prestigeNaniticMult(game) > 1)
     ? " × lineage " + f(prestigeNaniticMult(game))
     : "";
-  const lineage = prestigeFoodMultiplier(game) > 1
-    ? " × lineage " + f(prestigeFoodMultiplier(game))
-    : "";
-  const hidden = hidingPenalty(game) < 1
-    ? " × hiding " + f(hidingPenalty(game))
+  const fading = caste === "nanitic"
+    ? " × spent " + f(naniticVigour(game))
     : "";
   const rally = (caste === "forager" && rallyActive(game))
     ? " × rally " + f(RALLY_MULT)
     : "";
-  const fading = caste === "nanitic"
-    ? " × spent " + f(naniticVigour(game))
-    : "";
   return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
     " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic + fading + rally +
-    " × colony " + f(globalUpgradeMultiplier(game)) +
-    " × achievements " + f(achievementFoodBonus(game)) + lineage + hidden +
+    " × multipliers " + f(sharedFoodFactor(game)) +
     " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
 }
 
@@ -178,7 +195,7 @@ function bigForagerFormula(game) {
 
 // every layer at once, for the Formulas panel in Settings
 export function formulaSummary(game) {
-  const rows = [];
+  const rows = [{ name: "Food multipliers", text: overallFoodFormula(game) }];
   for (const caste of ["nanitic", "forager"]) {
     if (game.ants[caste] > 0) {
       rows.push({ name: CASTES[caste].name + " food", text: foodFormula(game, caste) });
@@ -223,8 +240,7 @@ function formulaLines(upgrade, probe) {
   }
   if (type === "globalFood") {
     return [
-      "all food × colony " + f(globalUpgradeMultiplier(game)) +
-        " × achievements " + f(achievementFoodBonus(game)),
+      overallFoodFormula(game),
       "raises the colony bonus — " + f(globalUpgradeMultiplier(game)) +
         " → " + f(globalUpgradeMultiplier(probe))
     ];
