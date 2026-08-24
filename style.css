@@ -128,6 +128,15 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
 .panel p { margin: 0 0 12px; color: var(--dim); }
 
 .queen-panel { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.wing-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.wing-row .bar { width: 90px; height: 8px; }
+.wing-state { font-size: 12px; color: var(--dim); }
 .milestone {
   margin-top: 10px;
   padding-left: 10px;
@@ -365,6 +374,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   color: var(--text);
 }
 .exile-cell { min-width: 62px; text-align: right; }
+.caste-lifespan { display: block; font-size: 11px; color: var(--dim); white-space: nowrap; }
 .exile-button {
   background: transparent;
   border: 1px solid var(--line);

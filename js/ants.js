@@ -11,7 +11,7 @@ export const CASTES = {
     name: "Nanitic",
     unlockAt: 0,
     layable: false,
-    role: "Undersized first-generation worker. Forages poorly."
+    role: "Undersized first generation, fed on the queen's wing muscle. Forages hard, tends the brood, and fades."
   },
   forager: {
     name: "Forager",
@@ -64,6 +64,25 @@ export const BIG_FORAGER_AGE_CAP = 3;
 // Rallying is the one thing a player can do to the food rate by hand. It is a
 // forager multiplier, so big foragers ride on it too and the founding
 // nanitics do not -- they are not out there to be called back.
+// The queen's four wings survive the shed as something to work on. Stripping
+// one is the only food the colony has before the first nanitics emerge, and
+// nothing is buyable during that wall -- the nanitic upgrades gate on nanitic
+// count -- so the food banks and pays out the moment they hatch.
+export const WING_COUNT = 4;
+export const WING_FOOD = 80;
+export const WING_STRIP_TIME = 10;
+
+// Nanitics burn the queen's dissolved flight muscle. They start far above a
+// forager and fade, so the founding phase is a race to raise a real workforce
+// before the founders are spent -- and the two-hour death stops being a cliff
+// because by then they produce almost nothing.
+export const NANITIC_HALFLIFE = 1200;
+export const NANITIC_HATCH_SPEED = 2;
+// Nanitics tend the queen's second brood -- that is what a founding generation
+// is for. It is also the only lever that moves the opening: the first ten
+// minutes are brood-throughput bound, so no amount of extra food touches them.
+export const NANITIC_BROOD_SLOTS = 1;
+
 export const RALLY_MULT = 3;
 export const RALLY_DURATION = 30;
 export const RALLY_COOLDOWN = 90;
@@ -76,7 +95,7 @@ export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
 export const ACHIEVEMENT_JELLY_PER_LEVEL = 0.05;
 
 const FOOD_PER_SECOND = {
-  nanitic: 0.9,
+  nanitic: 6,
   forager: 1,
   bigforager: 0,
   excavator: 0,
@@ -85,7 +104,7 @@ const FOOD_PER_SECOND = {
 };
 
 export const CASTE_COSTS = {
-  forager: { base: 1.5, exponent: 1.75 },
+  forager: { base: 1.5, exponent: 1.65 },
   // dearer and rarer than they were, and steeper once a colony is past the
   // prestige gate: at 58 cap each, #17 is where the nest first holds 1,000
   excavator: { base: 100, exponent: 1.8, breakAt: 17, exponent2: 2.2 },
@@ -100,9 +119,9 @@ export const UPGRADES = [
   { id: "nanitic_2", name: "Hunger of the First", req: { caste: "nanitic", count: 2 }, cost: 120,
     desc: "The first generation works itself to the bone.", effect: { type: "casteFlat", caste: "nanitic", add: 1.2 } },
   { id: "nanitic_3", name: "Living Larder", req: { caste: "nanitic", count: 3 }, cost: 500,
-    desc: "Nanitics store food in their own crops.", effect: { type: "casteMult", caste: "nanitic", mult: 1.5 } },
+    desc: "Nanitics store food in their own crops. They fade half as fast.", effect: { type: "naniticVigour", add: 1 } },
   { id: "nanitic_4", name: "Borrowed Time", req: { caste: "nanitic", count: 4 }, cost: 1200,
-    desc: "They will not live to see the colony they build.", effect: { type: "casteMult", caste: "nanitic", mult: 2 } },
+    desc: "They will not live to see the colony they build, but they last longer trying.", effect: { type: "naniticVigour", add: 2 } },
 
   { id: "forager_1", name: "Scent Trails", req: { caste: "forager", count: 3 }, cost: 260,
     desc: "Foragers mark the route home. Forager food +50%.", effect: { type: "casteFood", caste: "forager", add: 0.5 } },
@@ -282,6 +301,29 @@ export function casteMultiplier(game, casteId) {
   return productEffect(game, "casteMult", casteId);
 }
 
+// how long the founders take to halve, stretched by the upgrades that buy them
+// time rather than output
+export function naniticHalflife(game) {
+  return NANITIC_HALFLIFE * (1 + sumEffect(game, "naniticVigour"));
+}
+
+// The upgrades that slow the fade extend the life with it. Without this a
+// colony that bought Borrowed Time still lost its founders at two hours while
+// they were producing a quarter of their output -- the cliff the decay exists
+// to remove, handed back to the player who paid to avoid it.
+export function naniticLifespan(game) {
+  return NANITIC_LIFESPAN * (1 + sumEffect(game, "naniticVigour"));
+}
+
+export function naniticVigour(game) {
+  return Math.pow(0.5, (game.runTime || 0) / naniticHalflife(game));
+}
+
+// food per second from the wing currently being stripped
+export function wingYield(game) {
+  return (game.wingStrip || 0) > 0 ? WING_FOOD / WING_STRIP_TIME : 0;
+}
+
 export function rallyActive(game) {
   return (game.rallyTime || 0) > 0;
 }
@@ -293,7 +335,9 @@ export function rallyMultiplier(game, casteId) {
 export function casteFoodPerSecond(game, casteId) {
   const base = FOOD_PER_SECOND[casteId];
   if (!base) return 0;
-  const naniticMult = casteId === "nanitic" ? prestigeNaniticMult(game) : 1;
+  const naniticMult = casteId === "nanitic"
+    ? prestigeNaniticMult(game) * naniticVigour(game)
+    : 1;
   return (base + casteFlatBonus(game, casteId)) *
     casteMultiplier(game, casteId) * naniticMult * rallyMultiplier(game, casteId) *
     globalFoodMultiplier(game);
@@ -335,7 +379,7 @@ export function bigForagerOutput(game) {
 export function foodPerSecond(game) {
   let rate = 0;
   for (const id in game.ants) rate += game.ants[id] * casteFoodPerSecond(game, id);
-  return rate + bigForagerOutput(game);
+  return rate + bigForagerOutput(game) + wingYield(game);
 }
 
 export function populationCap(game) {
@@ -353,7 +397,8 @@ export function slotsPerNurse(game) {
 
 export function broodCapacity(game) {
   return Math.max(1, Math.floor(
-    BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") + slotsPerNurse(game) * game.ants.nurse
+    BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
+    slotsPerNurse(game) * game.ants.nurse + NANITIC_BROOD_SLOTS * game.ants.nanitic
   ));
 }
 

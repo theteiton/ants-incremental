@@ -1,7 +1,6 @@
 import {
   ACHIEVEMENT_FOOD_PER_LEVEL,
   ACHIEVEMENT_HATCH_PER_LEVEL,
-  BASE_BROOD_SLOTS,
   bigForagerOutput,
   upgradeCurrency,
   broodCapacity,
@@ -14,6 +13,9 @@ import {
   incubationTime,
   isUnlocked,
   layableCastes,
+  naniticLifespan,
+  slotsPerNurse,
+  NANITIC_BROOD_SLOTS,
   population,
   populationCap,
   UPGRADES,
@@ -126,6 +128,11 @@ export function buildAnts(onChange) {
     exileButton.title = "Send ants of this caste away permanently";
     exileButton.onclick = () => openExileDialog(id);
     exileCell.appendChild(exileButton);
+    // nanitics cannot be exiled -- they leave on their own, so the cell that
+    // would hold their exile button counts down to it instead
+    const lifespan = document.createElement("span");
+    lifespan.className = "caste-lifespan";
+    exileCell.appendChild(lifespan);
 
     const art = document.createElement("div");
     art.className = "caste-art";
@@ -157,6 +164,7 @@ export function buildAnts(onChange) {
       name: body.querySelector(".caste-name"),
       role: body.querySelector(".caste-role"),
       effect: body.querySelector(".caste-effect"),
+      lifespan,
       held: count.querySelector(".caste-held"),
       pending: count.querySelector(".caste-pending")
     };
@@ -171,9 +179,18 @@ function casteEffectText(id) {
     const per = held > 0 ? (populationCap(game) - 30) / held : 0;
     return held > 0 ? "+" + fmt(per * held) + " cap (" + fmt(per) + " each)" + armed : "";
   }
+  if (id === "nanitic") {
+    if (held <= 0) return "";
+    const each = casteFoodPerSecond(game, id);
+    return fmt(each * held) + "/s total (" + fmt(each) + " each, fading) · +" +
+      fmt(held * NANITIC_BROOD_SLOTS) + " brood slots";
+  }
   if (id === "nurse") {
+    // only what the nurses themselves add -- the base, the upgrades, the
+    // lineage and the founders all feed broodCapacity too, and reading the
+    // total here credited nurses with the nanitics' slots
     return held > 0
-      ? "+" + fmt(broodCapacity(game) - BASE_BROOD_SLOTS) + " brood slots (" +
+      ? "+" + fmt(slotsPerNurse(game) * held) + " brood slots (" +
         broodCapacity(game) + " tended at once)" + armed
       : "";
   }
@@ -204,11 +221,19 @@ export function renderAnts() {
     ui.held.textContent = fmt(held);
     ui.pending.textContent = coming > 0 ? "+" + fmt(coming) + " pending" : "";
 
+    const dying = id === "nanitic" && held > 0
+      ? Math.max(0, naniticLifespan(game) - (game.runTime || 0))
+      : 0;
+    ui.lifespan.hidden = dying <= 0;
+    ui.lifespan.textContent = dying > 0 ? fmtTime(dying) + " left" : "";
+
     const allowed = maxExilable(id);
     // the cell stays on every row so the sprites and counts line up; only the
-    // button goes for castes that cannot be exiled at all
-    ui.exileCell.hidden = !(exileUnlocked() && game.settings.exileEnabled);
-    ui.exileButton.hidden = !CASTES[id].layable;
+    // button goes for castes that cannot be exiled at all, and the nanitics'
+    // countdown keeps the cell whether exiling is on or not
+    ui.exileCell.hidden = !(exileUnlocked() && game.settings.exileEnabled) && dying <= 0;
+    ui.exileButton.hidden = !CASTES[id].layable ||
+      !(exileUnlocked() && game.settings.exileEnabled);
     ui.exileButton.disabled = allowed <= 0;
     ui.exileButton.title = allowed > 0
       ? "Exile up to " + fmt(allowed) + " " + CASTES[id].name

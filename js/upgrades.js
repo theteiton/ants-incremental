@@ -4,6 +4,8 @@ import {
   bigForagerOutput,
   BASE_POPULATION_CAP,
   baseFood,
+  NANITIC_BROOD_SLOTS,
+  NANITIC_HALFLIFE,
   broodCapacity,
   CAP_PER_EXCAVATOR,
   CASTES,
@@ -16,11 +18,16 @@ import {
   globalUpgradeMultiplier,
   hidingPenalty,
   runPeakCount,
+  naniticHalflife,
+  naniticVigour,
   populationCap,
   rallyActive,
   RALLY_MULT,
   slotsPerNurse,
   UPGRADES,
+  wingYield,
+  WING_FOOD,
+  WING_STRIP_TIME,
   upgradeBranch,
   upgradeCurrency,
   upgradeNeedsRaid,
@@ -76,6 +83,10 @@ const upgradeCards = {};
 // shape back out with live numbers, and name the one factor an upgrade moves.
 const f = fmtFactor;
 
+const fmtTimeShort = seconds => seconds >= 60
+  ? Math.round(seconds / 60) + "m"
+  : Math.round(seconds) + "s";
+
 function casteName(id) {
   return CASTES[id].name.toLowerCase();
 }
@@ -96,8 +107,11 @@ function foodFormula(game, caste) {
   const rally = (caste === "forager" && rallyActive(game))
     ? " × rally " + f(RALLY_MULT)
     : "";
+  const fading = caste === "nanitic"
+    ? " × spent " + f(naniticVigour(game))
+    : "";
   return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
-    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic + rally +
+    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic + fading + rally +
     " × colony " + f(globalUpgradeMultiplier(game)) +
     " × achievements " + f(achievementFoodBonus(game)) + lineage + hidden +
     " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
@@ -114,9 +128,12 @@ function capFormula(game) {
 
 function broodFormula(game) {
   const base = BASE_BROOD_SLOTS + effectTotal(game, "broodSlots") + prestigeBroodSlots(game);
+  const founders = game.ants.nanitic > 0
+    ? " + founders " + fmt(game.ants.nanitic) + " × " + f(NANITIC_BROOD_SLOTS)
+    : "";
   return "brood = base " + base +
     " + per nurse " + f(slotsPerNurse(game)) +
-    " × nurses " + fmt(game.ants.nurse) +
+    " × nurses " + fmt(game.ants.nurse) + founders +
     " = " + broodCapacity(game) + " slots";
 }
 
@@ -170,6 +187,10 @@ export function formulaSummary(game) {
   if (game.ants.bigforager > 0) {
     rows.push({ name: "Big Forager food", text: bigForagerFormula(game) });
   }
+  if (wingYield(game) > 0) {
+    rows.push({ name: "Wing muscle", text: "stripping = " + fmt(WING_FOOD) + " food over " +
+      WING_STRIP_TIME + "s = " + fmt(wingYield(game)) + "/s" });
+  }
   rows.push({ name: "Population cap", text: capFormula(game) });
   rows.push({ name: "Brood slots", text: broodFormula(game) });
   if (game.ants.soldier > 0) rows.push({ name: "Soldier strength", text: soldierFormula(game) });
@@ -214,6 +235,14 @@ function formulaLines(upgrade, probe) {
       "adds " + f(effect.add) + " to per excavator — " +
         f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) + " → " +
         f(CAP_PER_EXCAVATOR + effectTotal(probe, "excavatorCap"))
+    ];
+  }
+  if (type === "naniticVigour") {
+    return [
+      foodFormula(game, "nanitic"),
+      "the founders fade half as fast every " + fmtTimeShort(NANITIC_HALFLIFE) +
+        " — halves in " + fmtTimeShort(naniticHalflife(game)) +
+        " → " + fmtTimeShort(naniticHalflife(probe))
     ];
   }
   if (type === "nurseSlots") {
@@ -271,6 +300,11 @@ function previewUpgrade(upgrade) {
     const power = monsterPower(game);
     return "Raid protein " + fmt(raidRewards(game, power).protein) +
       " to " + fmt(raidRewards(probe, power).protein);
+  }
+  if (type === "naniticVigour") {
+    if (game.ants.nanitic === 0) return "The founders are already gone.";
+    return "Founders halve in " + fmtTimeShort(naniticHalflife(game)) +
+      " to " + fmtTimeShort(naniticHalflife(probe));
   }
   if (type === "broodSlots" || type === "nurseSlots") {
     if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";

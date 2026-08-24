@@ -4,7 +4,7 @@ import {
   EGG_TIME,
   emergingCaste,
   incubationTime,
-  NANITIC_LIFESPAN,
+  naniticLifespan,
   nextEggCaste,
   NANITIC_GENERATION,
   eggCost,
@@ -17,7 +17,10 @@ import {
   RALLY_COOLDOWN,
   RALLY_DURATION,
   RALLY_MULT,
-  runPeakCount
+  runPeakCount,
+  wingYield,
+  WING_FOOD,
+  WING_STRIP_TIME
 } from "./ants.js";
 import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
@@ -32,6 +35,7 @@ import {
   buyPrestigeUpgrade,
   canLay,
   doFlight,
+  eggSecondsLeft,
   exportSave,
   game,
   hardReset,
@@ -60,6 +64,8 @@ import {
   setNextCaste,
   shedWings,
   startRally,
+  stripReady,
+  stripWing,
   tick
 } from "./game.js";
 import {
@@ -148,7 +154,7 @@ function renderQueen() {
       "Her wing muscles are being metabolised into eggs. The first " + NANITIC_GENERATION +
       " workers will emerge as undersized nanitics whatever caste is chosen — nothing else will feed this brood.";
   } else if (game.ants.nanitic > 0) {
-    const left = Math.max(0, NANITIC_LIFESPAN - (game.runTime || 0));
+    const left = Math.max(0, naniticLifespan(game) - (game.runTime || 0));
     el("queenText").textContent =
       "The first workers have emerged. Her reserves no longer matter; the colony feeds her now. " +
       "The founding nanitics die of old age in " + fmtTime(left) + ".";
@@ -174,6 +180,30 @@ const MILESTONES = [
   { at: PRESTIGE_UNLOCK,
     text: "the Nuptial Flight: she takes wing, and the colony begins again on Royal Jelly." }
 ];
+
+// The four wings are the only thing to do before the first nanitics emerge, and
+// nothing is buyable in that window -- the nanitic upgrades gate on nanitic
+// count -- so the food banks and pays out the moment they hatch.
+function renderWings() {
+  const row = el("wingRow");
+  const left = game.wings || 0;
+  const stripping = (game.wingStrip || 0) > 0;
+  row.hidden = !game.wingsShed || (left <= 0 && !stripping);
+  if (row.hidden) return;
+  el("btnStripWing").disabled = !stripReady();
+  el("btnStripWing").textContent = left > 0 ? "Strip a wing" : "Stripping";
+  const bar = el("wingBar");
+  bar.hidden = !stripping;
+  if (stripping) {
+    bar.querySelector("i").style.width =
+      (100 - (game.wingStrip / WING_STRIP_TIME) * 100).toFixed(1) + "%";
+  }
+  el("wingState").textContent = stripping
+    ? fmt(wingYield(game)) + " food/s, " + Math.ceil(game.wingStrip) + "s left" +
+      (left > 0 ? " · " + left + " still folded" : " · the last one")
+    : left + (left === 1 ? " wing left" : " wings left") + " — " +
+      fmt(WING_FOOD) + " food each, over " + WING_STRIP_TIME + "s.";
+}
 
 function renderMilestone() {
   const box = el("queenMilestone");
@@ -286,11 +316,11 @@ function renderBrood() {
     el("eggSummary").textContent =
       "No eggs in the brood chamber. " + slots + " can be tended at once.";
   } else {
-    let soonest = 0;
-    for (let i = 0; i < tended; i++) soonest = Math.max(soonest, eggs[i].progress);
+    let soonest = Infinity;
+    for (let i = 0; i < tended; i++) soonest = Math.min(soonest, eggSecondsLeft(eggs[i], i));
     el("eggSummary").textContent =
       tended + " of " + slots + " brood slots working — next hatches in " +
-      Math.max(0, (EGG_TIME - soonest) / (EGG_TIME / period)).toFixed(1) + "s" +
+      soonest.toFixed(1) + "s" +
       (waiting > 0 ? ", " + fmt(waiting) + " waiting for a slot" : "");
   }
   const detailsButton = el("btnBroodDetails");
@@ -574,6 +604,7 @@ function render() {
   renderBadges();
   renderInspector();
   renderQueen();
+  renderWings();
   renderMilestone();
   renderBrood();
   renderRaid();
@@ -712,7 +743,7 @@ function updateBroodDialog() {
     pos: "#" + (i + 1),
     what: CASTES[emergingCaste(game, egg, i)].name + (egg.fed ? " ·fed" : ""),
     progress: Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1),
-    note: Math.max(0, (EGG_TIME - egg.progress) / (EGG_TIME / period)).toFixed(0) + "s"
+    note: eggSecondsLeft(egg, i).toFixed(0) + "s"
   })));
 
   const runs = waitingRuns();
@@ -857,6 +888,10 @@ el("feedBrood").onchange = event => {
 
 el("btnShed").onclick = () => {
   shedWings();
+  render();
+};
+el("btnStripWing").onclick = () => {
+  stripWing();
   render();
 };
 el("btnRally").onclick = () => {
