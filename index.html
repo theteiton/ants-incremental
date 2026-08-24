@@ -87,7 +87,7 @@
       <input type="checkbox" id="autoLay"> <span id="autoLayLabel">Lay eggs automatically</span>
     </label>
     <label class="field inline brood-field" id="foodReserveRow" hidden>Keep
-      <input type="number" id="foodReserve" min="0" value="0"> food banked, unspent by laying
+      <input type="text" id="foodReserve" value="0" spellcheck="false" title="Accepts 25000, 25k, 1.5M, 1e10"> food banked, unspent by laying
     </label>
     <label class="toggle row-toggle" id="feedBroodRow" hidden>
       <input type="checkbox" id="feedBrood"> <span id="feedBroodLabel">Feed the brood protein</span>
@@ -100,6 +100,7 @@
     <button id="tabButton-upgrades">Upgrades<span class="badge" id="badge-upgrades" hidden></span></button>
     <button id="tabButton-achievements">Achievements<span class="badge" id="badge-achievements" hidden></span></button>
     <button id="tabButton-prestige" hidden>Nuptial<span class="badge" id="badge-prestige" hidden></span></button>
+    <button id="tabButton-challenges" hidden>Trials</button>
     <button id="tabButton-settings">Settings</button>
   </nav>
 
@@ -166,6 +167,16 @@
     <div id="prestigeUpgradeList"></div>
   </section>
 
+  <section class="panel tab" id="tab-challenges" hidden>
+    <div class="panel-head">
+      <span class="tally" id="challengeTally">0 levels cleared</span>
+      <span class="dim" id="challengeReward"></span>
+    </div>
+    <p class="dim" id="challengeIntro"></p>
+    <p class="challenge-running" id="challengeRunning" hidden></p>
+    <div id="challengeList"></div>
+  </section>
+
   <section class="panel tab" id="tab-settings" hidden>
     <h2>Colony rules</h2>
     <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
@@ -178,6 +189,7 @@
       <div id="automationList"></div>
       <div id="ratioRow" hidden>
         <p class="dim">Share of the colony each caste should hold. Zero leaves a caste to you.</p>
+        <p class="dim ratio-guide">Measured best: <b>80% foragers, 0% excavators, 5% nurses, 8% soldiers</b>. Excavators dig on their own when the nest runs out of room, so giving them a share only builds chambers you never fill. Under 7% soldiers — or over 85% foragers, which outbids them — wins the early raids and loses the late ones, because monsters grow with every win and with the colony. Over 10% soldiers never loses a raid and costs you the ants that would have fed it.</p>
         <div class="ratios" id="ratioList"></div>
       </div>
     </section>

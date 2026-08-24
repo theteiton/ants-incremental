@@ -42,6 +42,37 @@ import { spriteFor } from "./sprites.js";
 
 const SUFFIXES = ["", "K", "M", "B", "T", "Qa", "Qi"];
 
+// The inverse of fmt(): reads back the same suffixes it writes, so a player can
+// type what the game showed them. Also takes plain digits, commas and
+// scientific notation. Returns NaN on anything it cannot read, so the caller
+// can leave a half-typed value alone rather than treating it as zero.
+const SUFFIX_VALUE = { k: 1e3, m: 1e6, b: 1e9, t: 1e12, qa: 1e15, qi: 1e18 };
+
+export function parseAmount(text) {
+  const clean = String(text).trim().toLowerCase().replace(/[\s,]/g, "");
+  if (!clean) return 0;
+  const match = clean.match(/^(\d*\.?\d+(?:e[+-]?\d+)?)(qa|qi|k|m|b|t)?$/);
+  if (!match) return NaN;
+  const value = Number(match[1]);
+  if (!isFinite(value)) return NaN;
+  return value * (match[2] ? SUFFIX_VALUE[match[2]] : 1);
+}
+
+// The shortest suffixed form that reads back as exactly n. fmt() cannot be used
+// for a field the player edits: it keeps three significant figures, so
+// 9,999,999K comes back as 10.00B -- a different number -- and refusing the
+// short form on that ground leaves a ten-digit string in a narrow box.
+export function shortAmount(n) {
+  if (!isFinite(n) || n < 1000) return String(n);
+  for (let tier = SUFFIXES.length - 1; tier > 0; tier--) {
+    const scaled = n / Math.pow(1000, tier);
+    if (scaled < 1) continue;
+    const text = String(scaled) + SUFFIXES[tier];
+    if (parseAmount(text) === n) return text;
+  }
+  return String(n);
+}
+
 export function fmt(n) {
   if (!isFinite(n)) return "0";
   if (n < 0) return "-" + fmt(-n);
