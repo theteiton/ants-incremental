@@ -4,6 +4,8 @@ A browser-based ant colony incremental game. Vanilla HTML, CSS and JavaScript �
 
 **[▶ Play it here](https://theteiton.github.io/ants-incremental/)** — nothing to download or install.
 
+Every release is listed in [DEVLOG.md](DEVLOG.md).
+
 ## The game
 
 You play a mated queen who has already landed. Her first act is to shed her wings, which frees a finite pool of body reserves — 100 units, and she will never get more. Those reserves buy her first eggs.
