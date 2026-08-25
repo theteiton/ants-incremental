@@ -22,7 +22,7 @@ import {
   WING_FOOD,
   WING_STRIP_TIME
 } from "./ants.js";
-import { combatPower, hunting, huntRate, inHiding, monsterPower, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
+import { combatPerCaste, combatPower, hunting, huntRate, inHiding, monsterPower, proteinPerSecond, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
 import {
   affordableEggs,
   autoCaste,
@@ -60,12 +60,19 @@ import {
   QUEEN_RESERVES,
   abandonChallenge,
   CHALLENGES,
+  CHALLENGE_MAX_LEVEL,
+  CHALLENGE_REWARD_STEP,
+  bestTrialLevel,
+  masteryFood,
   CHALLENGE_TARGET,
+  TRIAL_GIVES_UP,
+  TRIAL_KEEPS,
   activeChallenge,
   challengeDebuff,
   challengeDebuffAt,
   challengeLevel,
   challengeLevelsTotal,
+  challengeMastered,
   challengeMet,
   challengeReward,
   challengesUnlocked,
@@ -111,7 +118,7 @@ import {
 import { drawSprite } from "./sprites.js";
 
 const el = id => document.getElementById(id);
-const TABS = ["ants", "upgrades", "achievements", "prestige", "challenges", "settings"];
+const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "challenges", "settings"];
 let activeTab = "ants";
 const casteButtons = {};
 
@@ -240,14 +247,14 @@ function renderRally() {
   el("btnRally").disabled = !rallyReady();
   state.classList.toggle("live", rallyActive(game));
   if (rallyActive(game)) {
-    state.textContent = "Out in force — ×" + RALLY_MULT + " forager food for another " +
+    state.textContent = "Her call is out — ×" + RALLY_MULT + " forager food for another " +
       Math.ceil(game.rallyTime) + "s, the colony on " + fmt(foodPerSecond(game)) + "/s.";
   } else if (game.rallyCooldown > 0) {
-    state.textContent = "The foragers are resting. Ready again in " +
+    state.textContent = "The foragers are resting. She can call again in " +
       Math.ceil(game.rallyCooldown) + "s.";
   } else {
-    state.textContent = "Work the trails hard: ×" + RALLY_MULT + " forager food for " +
-      RALLY_DURATION + "s, then " + RALLY_COOLDOWN + "s to recover.";
+    state.textContent = "She can drive them onto the trails: ×" + RALLY_MULT +
+      " forager food for " + RALLY_DURATION + "s, then " + RALLY_COOLDOWN + "s to recover.";
   }
 }
 
@@ -378,10 +385,66 @@ function renderSlots(eggs, slots, tended) {
     : "";
 }
 
+// Three numbers in the stats bar are all a player needs while a fight is
+// coming: what they field, what is coming, and how long they have.
+function renderCombatBar() {
+  const active = raidsUnlocked(game);
+  const hidden = inHiding(game);
+  const left = raidCountdown(game);
+  const defence = combatPower(game);
+  const threat = monsterPower(game);
+  const soon = active && !hidden && left <= RAID_WARNING;
+  el("combatGroup").hidden = !active;
+  if (!active) return;
+  el("valFighters").textContent = fmt(defence);
+  el("valThreat").textContent = fmt(threat);
+  el("valRaidIn").textContent = hidden ? "gone to ground" : fmtTime(left);
+  el("readoutFighters").classList.toggle("losing", defence < threat);
+  el("readoutRaidIn").classList.toggle("imminent", soon);
+}
+
+// Nothing in the game said which castes were fighting or for how much. The
+// rows are pooled and updated in place, never rebuilt.
+function renderFighters() {
+  const list = el("combatList");
+  const rows = [];
+  for (const id of Object.keys(CASTES)) {
+    const each = combatPerCaste(game, id);
+    const held = game.ants[id];
+    if (each <= 0 || held <= 0) continue;
+    rows.push({ name: CASTES[id].name, held, each, total: held * each });
+  }
+  rows.sort((a, b) => b.total - a.total);
+  while (list.children.length > rows.length) list.removeChild(list.lastChild);
+  while (list.children.length < rows.length) {
+    const li = document.createElement("li");
+    li.className = "fighter-row";
+    li.innerHTML = "<b></b><span></span><i></i>";
+    list.appendChild(li);
+  }
+  rows.forEach((r, i) => {
+    const li = list.children[i];
+    li.querySelector("b").textContent = r.name;
+    li.querySelector("span").textContent = fmt(r.held) + " × " + fmt(r.each) + " each";
+    li.querySelector("i").textContent = fmt(r.total);
+  });
+  const none = el("combatNone");
+  none.hidden = rows.length > 0;
+  if (rows.length === 0) {
+    none.textContent = "Nothing in the colony can fight. Soldiers fight from birth; " +
+      "every other caste needs the Combat adaptations before it will stand.";
+  }
+}
+
 function renderRaid() {
   const active = raidsUnlocked(game);
-  el("raidPanel").hidden = !active;
-  if (!active) return;
+  el("tabButton-combat").hidden = !active;
+  if (!active || activeTab !== "combat") return;
+
+  el("combatTally").textContent = fmt(game.raidsWon || 0) +
+    ((game.raidsWon || 0) === 1 ? " raid won" : " raids won");
+  el("combatRecord").textContent = (game.raidsLost || 0) > 0
+    ? fmt(game.raidsLost) + " lost" : "none lost";
 
   const hidden = inHiding(game);
   const left = raidCountdown(game);
@@ -392,8 +455,8 @@ function renderRaid() {
   el("raidDefence").classList.toggle("losing", defence < threat);
 
   const soon = !hidden && left <= RAID_WARNING;
-  el("raidPanel").classList.toggle("imminent", soon);
-  el("raidPanel").classList.toggle("hiding", hidden);
+  el("tab-combat").classList.toggle("imminent", soon);
+  el("tab-combat").classList.toggle("hiding", hidden);
   el("raidCountdown").textContent = hidden
     ? "The nest is shut. With no soldiers left the colony has gone to ground — nothing is coming while it stays that way."
     : soon
@@ -470,6 +533,15 @@ function renderAway() {
   box.textContent = "While you were away — " + fmtTime(away.seconds) + ": " + bits.join(", ") + ".";
 }
 
+// Every factor on its own line under the total it feeds, named by its kind --
+// upgrades, achievements, trials, lineage -- with the individual sources
+// nested underneath. Short labels keep the columns narrow enough for three.
+//
+// Pooled and updated in place, never rebuilt: this redraws every frame while
+// Settings is open, and a node detached mid-click never receives it. Expanding
+// binds to mousedown for the same reason.
+const openFactors = new Set();
+
 function renderFormulas() {
   const box = el("formulaList");
   const rows = formulaSummary(game);
@@ -477,12 +549,49 @@ function renderFormulas() {
   while (box.children.length < rows.length) {
     const row = document.createElement("div");
     row.className = "formula-row";
-    row.innerHTML = "<b></b><span></span>";
+    row.innerHTML = '<div class="formula-head"><b></b><span class="formula-total"></span></div>' +
+      '<div class="formula-parts"></div>';
     box.appendChild(row);
   }
   rows.forEach((entry, i) => {
-    box.children[i].querySelector("b").textContent = entry.name;
-    box.children[i].querySelector("span").textContent = entry.text;
+    const row = box.children[i];
+    row.querySelector("b").textContent = entry.name;
+    row.querySelector(".formula-total").textContent = entry.shape.total;
+
+    // flatten parent factors and any expanded children into one list of lines
+    const lines = [];
+    entry.shape.rows.forEach(part => {
+      const key = entry.name + "/" + part.label;
+      const has = part.children.length > 0;
+      const open = has && openFactors.has(key);
+      lines.push({ key, label: (has ? (open ? "▾ " : "▸ ") : "") + part.label,
+                   value: part.value, child: false, toggles: has });
+      if (open) part.children.forEach(c =>
+        lines.push({ key: "", label: c.label, value: c.value, child: true, toggles: false }));
+    });
+
+    const parts = row.querySelector(".formula-parts");
+    while (parts.children.length > lines.length) parts.removeChild(parts.lastChild);
+    while (parts.children.length < lines.length) {
+      const line = document.createElement("div");
+      line.className = "formula-part";
+      line.innerHTML = "<span></span><i></i>";
+      line.addEventListener("mousedown", () => {
+        const k = line.dataset.key;
+        if (!k) return;
+        if (openFactors.has(k)) openFactors.delete(k); else openFactors.add(k);
+        render();
+      });
+      parts.appendChild(line);
+    }
+    lines.forEach((line, j) => {
+      const node = parts.children[j];
+      node.dataset.key = line.toggles ? line.key : "";
+      node.classList.toggle("child", line.child);
+      node.classList.toggle("expandable", line.toggles);
+      node.querySelector("span").textContent = line.label;
+      node.querySelector("i").textContent = line.value;
+    });
   });
 }
 
@@ -560,8 +669,8 @@ function renderPrestige() {
       fmt(projected) + " Royal Jelly" +
       (perHour > 0 ? ", which is " + fmt(perHour) + " an hour for this colony so far." : ".")
     : activeChallenge(game)
-      ? "No alate leaves a trial. " + activeChallenge(game).name +
-        " has to be claimed or abandoned on the Trials tab before she can fly again."
+      ? "The queen cannot fly out of a trial. Claim or abandon " +
+        activeChallenge(game).name + " on the Trials tab first."
       : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
 
   // the tree is finite, and running out of it should read as the edge of what
@@ -575,8 +684,9 @@ function renderPrestige() {
   if (complete) {
     el("lineageDone").textContent =
       "The lineage is complete — all " + PRESTIGE_UPGRADES.length +
-      " adaptations are hers. The Trials tab is open: her daughters can now found a colony " +
-      "under conditions that should kill it, and every level cleared feeds every colony after. " +
+      " adaptations are hers. The Trials tab is open: her daughters can now establish colonies " +
+      "under conditions that should kill them, and every level cleared strengthens every colony " +
+      "founded afterwards. " +
       "Royal Jelly still gathers with every flight" +
       (p.royalJelly > 0 ? " (" + fmt(p.royalJelly) + " banked)" : "") + ".";
   }
@@ -595,6 +705,71 @@ function renderPrestige() {
 
 const challengeCards = {};
 
+const pct = value => fmt(value * 100) + "%";
+
+// The cards used to say "cut hard" and leave it there. Every figure a trial
+// changes is now stated as a number, and the hover lists what is taken, what is
+// kept, what clears it and what clearing pays -- players could not tell that
+// the lineage stays behind at all, and asked.
+function trialDetail(challenge) {
+  const level = challengeLevel(game, challenge.id);
+  const running = activeChallenge(game);
+  const mine = !!running && running.id === challenge.id;
+  const lines = [];
+
+  if (!challenge.open) {
+    lines.push("Not playable yet.", "", challenge.plan);
+    return lines.join("\n");
+  }
+
+  if (challengeMastered(game, challenge.id)) {
+    lines.push("Mastered — all " + CHALLENGE_MAX_LEVEL + " levels cleared.");
+    lines.push("");
+    lines.push("You hold × " + fmt(challengeReward(game) * masteryFood(game)) +
+      " food from it, permanently.");
+    return lines.join("\n");
+  }
+  lines.push("Attempt " + (level + 1) + " of " + CHALLENGE_MAX_LEVEL + " — cleared " + level +
+    (level === 1 ? " level so far." : " levels so far."));
+  lines.push("");
+  lines.push("WHILE IT RUNS");
+  lines.push("  · All food production × " + pct(challengeDebuffAt(level)));
+  TRIAL_GIVES_UP.forEach(line => lines.push("  · " + line));
+  lines.push("");
+  lines.push("WHAT COMES WITH YOU");
+  TRIAL_KEEPS.forEach(line => lines.push("  · " + line));
+  lines.push("");
+  lines.push("TO CLEAR IT");
+  lines.push("  · Raise " + fmt(CHALLENGE_TARGET) + " ants in one colony" +
+    (mine ? " — you have " + fmt(population(game)) : ""));
+  lines.push("");
+  lines.push("WHAT CLEARING PAYS");
+  lines.push("  · The trial pays × " + CHALLENGE_REWARD_STEP + " food per level cleared.");
+  lines.push("    You hold × " + fmt(challengeReward(game)) + " from " +
+    challengeLevelsTotal(game) + " levels across all trials.");
+  const m = challenge.mastery;
+  if (m) {
+    const level = bestTrialLevel(game, challenge.id);
+    lines.push("  · " + m.name + ", its own achievement, pays × " + m.step + " " + m.type +
+      " per level reached.");
+    lines.push("    You hold × " + fmt(Math.pow(m.step, level)) + " from level " + level +
+      ". This one is the big half.");
+  }
+  lines.push("    Both apply everywhere, inside trials as well as outside.");
+  lines.push("");
+  lines.push("IF YOU CLEAR IT");
+  if (challenge.mastery) {
+    const m2 = challenge.mastery;
+    lines.push("  · " + m2.name + " would rise to × " +
+      fmt(Math.pow(m2.step, Math.max(bestTrialLevel(game, challenge.id), level + 1))) +
+      " " + m2.type + ".");
+  }
+  lines.push(level + 1 >= CHALLENGE_MAX_LEVEL
+    ? "  · That is the last level. The trial would be mastered."
+    : "  · Attempt " + (level + 2) + " would run at × " + pct(challengeDebuffAt(level + 1)) + " food.");
+  return lines.join("\n");
+}
+
 // A trial is a colony you found on purpose under conditions that should kill
 // it. Entering and abandoning both cost the colony, so both arm on the button
 // itself -- confirm() returns false inside a blocked embed, which is what made
@@ -608,7 +783,8 @@ function buildChallenges() {
       '<div class="challenge-head"><b></b><span class="challenge-level"></span></div>' +
       '<span class="challenge-flavour"></span>' +
       '<span class="challenge-rule"></span>' +
-      '<span class="challenge-target"></span>';
+      '<span class="challenge-target"></span>' +
+      '<span class="challenge-reward"></span>';
     card.querySelector("b").textContent = challenge.name;
     card.querySelector(".challenge-flavour").textContent = challenge.flavour;
 
@@ -634,17 +810,7 @@ function buildChallenges() {
     watch(card, {
       title: challenge.name,
       body: challenge.flavour,
-      note: () => {
-        if (!challenge.open) return challenge.rule;
-        const level = challengeLevel(game, challenge.id);
-        return [
-          challenge.rule,
-          "Cleared " + level + (level === 1 ? " time." : " times.") +
-            " The next attempt runs at " + fmt(challengeDebuffAt(level) * 100) + "% food.",
-          challenge.target,
-          challenge.reward
-        ].filter(Boolean).join("\n");
-      },
+      note: () => trialDetail(challenge),
       warn: false
     });
 
@@ -652,7 +818,8 @@ function buildChallenges() {
       card, button,
       level: card.querySelector(".challenge-level"),
       rule: card.querySelector(".challenge-rule"),
-      target: card.querySelector(".challenge-target")
+      target: card.querySelector(".challenge-target"),
+      reward: card.querySelector(".challenge-reward")
     };
     list.appendChild(card);
   });
@@ -664,21 +831,27 @@ function renderChallenges() {
   const met = challengeMet();
   el("challengeTally").textContent = levels + (levels === 1 ? " level cleared" : " levels cleared");
   el("challengeReward").textContent = levels > 0
-    ? "×" + fmt(challengeReward(game)) + " food, held everywhere"
+    ? "× " + fmt(challengeReward(game) * masteryFood(game)) + " food in every colony — × " +
+      fmt(challengeReward(game)) + " from levels cleared, × " + fmt(masteryFood(game)) +
+      " from Deep Cisterns"
     : "no reward held yet";
   el("challengeIntro").textContent = running ? "" :
-    "A trial founds a colony under conditions that should kill it. The lineage's automation comes with " +
-    "you; its strength does not. The target never moves — every level asks for the same " +
-    fmt(CHALLENGE_TARGET) + " ants, and every level makes them harder to raise.";
+    "A trial founds a brand new colony under conditions that should kill it. The Royal Lineage's " +
+    "automation comes with her — Nest Memory, Brood Instinct, Standing Orders, Granary Instinct — " +
+    "and its strength does not: no food multipliers, no extra cap, brood or reserves. Everything " +
+    "earned on the Achievements tab still pays, and Colony and Combat upgrades are still bought " +
+    "as normal. Point at a trial for the full list. Abandon whenever you like; you lose the colony " +
+    "and nothing else.";
 
   const note = el("challengeRunning");
   note.hidden = !running;
   if (running) {
     note.textContent = met
-      ? running.name + " is met — " + fmt(population(game)) + " ants standing. Claim it to bank the level."
-      : "Running " + running.name + ", attempt " + (challengeLevel(game, running.id) + 1) +
-        " — food at " + fmt(challengeDebuff(game) * 100) + "%, " +
-        fmt(Math.max(0, CHALLENGE_TARGET - population(game))) + " ants to go. " +
+      ? running.name + " is met — " + fmt(population(game)) + " ants standing, " +
+        fmt(CHALLENGE_TARGET) + " needed. Claim it to bank the level and found a fresh colony."
+      : running.name + ", attempt " + (challengeLevel(game, running.id) + 1) +
+        " — food at × " + pct(challengeDebuff(game)) + ", " +
+        fmt(population(game)) + " of " + fmt(CHALLENGE_TARGET) + " ants raised. " +
         "Abandoning founds a fresh colony and pays nothing.";
     note.classList.toggle("met", met);
   }
@@ -689,21 +862,67 @@ function renderChallenges() {
     const mine = !!running && running.id === challenge.id;
     ui.card.classList.toggle("locked", !challenge.open);
     ui.card.classList.toggle("running", mine);
-    ui.level.textContent = !challenge.open ? "sealed"
-      : level > 0 ? "cleared ×" + level : "never cleared";
-    ui.rule.textContent = challenge.rule;
-    ui.target.textContent = challenge.open
-      ? challenge.target + " Next attempt runs at " +
-        fmt(challengeDebuffAt(level) * 100) + "% food."
+    const mastered = challengeMastered(game, challenge.id);
+    ui.card.classList.toggle("mastered", mastered);
+    ui.level.textContent = !challenge.open ? "not playable yet"
+      : mastered ? "mastered"
+      : level > 0 ? level + " of " + CHALLENGE_MAX_LEVEL + " cleared"
+      : "0 of " + CHALLENGE_MAX_LEVEL + " cleared";
+    ui.rule.textContent = !challenge.open ? challenge.plan
+      : mastered ? "Every level survived. Nothing here is left to prove."
+      : "All food production × " + pct(challengeDebuffAt(level)) + " on the next attempt — against " +
+        "× " + fmt(challengeReward(game) * masteryFood(game)) + " you already hold, so about × " +
+        pct(challengeDebuffAt(level) * challengeReward(game) * masteryFood(game)) +
+        " of a normal colony.";
+    ui.target.textContent = challenge.open && !mastered
+      ? "Clear it by raising " + fmt(CHALLENGE_TARGET) + " ants." +
+        (mine ? " You have " + fmt(population(game)) + "." : "")
       : "";
-    ui.button.hidden = !challenge.open;
-    ui.button.disabled = !challenge.open || (!!running && !mine);
+    ui.reward.textContent = challenge.open && !mastered
+      ? "Each level pays × " + CHALLENGE_REWARD_STEP + " food, and " + challenge.mastery.name +
+        " pays × " + challenge.mastery.step + " " + challenge.mastery.type + ". Both for good."
+      : "";
+    ui.button.hidden = !challenge.open || mastered;
+    ui.button.disabled = !challenge.open || mastered || (!!running && !mine);
     ui.button.classList.toggle("danger", mine && !met);
     ui.button.textContent = mine
       ? (met ? "Claim the trial"
              : ui.button.dataset.armed === "yes" ? "Really abandon it?" : "Abandon")
       : (ui.button.dataset.armed === "yes" ? "Found a colony here?" : "Enter");
   });
+}
+
+// Settings was one 2,282px column of everything. Same sub-tab pattern as
+// Achievements and Upgrades, so each thing has a place.
+const SETTINGS_TABS = [
+  { id: "colony", name: "Colony" },
+  { id: "automation", name: "Automation" },
+  { id: "formulas", name: "Formulas" },
+  { id: "record", name: "Record" },
+  { id: "save", name: "Save" }
+];
+let settingsTab = "colony";
+
+function selectSettingsTab(name) {
+  settingsTab = name;
+  SETTINGS_TABS.forEach(tab => {
+    el("settingsPanel-" + tab.id).hidden = tab.id !== name;
+  });
+  for (const button of el("settingsTabs").children) {
+    button.classList.toggle("active", button.dataset.tab === name);
+  }
+  render();
+}
+
+function buildSettingsTabs() {
+  SETTINGS_TABS.forEach(tab => {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.dataset.tab = tab.id;
+    button.onclick = () => selectSettingsTab(tab.id);
+    el("settingsTabs").appendChild(button);
+  });
+  selectSettingsTab("colony");
 }
 
 function render() {
@@ -717,6 +936,8 @@ function render() {
   const proteinRow = el("readoutProtein");
   proteinRow.hidden = !raidsUnlocked(game) && game.protein <= 0;
   el("valProtein").textContent = fmt(game.protein);
+  el("readoutProteinRate").hidden = proteinRow.hidden;
+  el("valProteinRate").textContent = fmt(proteinPerSecond(game)) + "/s";
   
   const p = game.prestige || {};
   const jellyRow = el("readoutRoyalJelly");
@@ -740,15 +961,19 @@ function render() {
   renderWings();
   renderMilestone();
   renderBrood();
+  renderCombatBar();
   renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
   else if (activeTab === "achievements") renderAchievements(game);
+  else if (activeTab === "combat") renderFighters();
   else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "challenges") renderChallenges();
   else if (activeTab === "settings") {
     renderSettings();
-    renderFormulas();
+    if (settingsTab === "formulas") renderFormulas();
+    const unlocked = !el("automationSection").hidden;
+    el("automationLocked").hidden = unlocked;
   }
 }
 
@@ -1049,6 +1274,80 @@ el("btnLayMax").onclick = () => {
   render();
 };
 
+// Nothing in the stats bar or the left column explained itself -- the inspector
+// only ever answered for things on the right.
+function buildReadoutHelp() {
+  const help = [
+    ["readoutReserves", "Reserves", "What the queen's own body is worth.",
+      () => "She sheds her wings for a fixed pool and it never regenerates. Eggs cost 20 each until the first worker emerges, after which reserves stop mattering for good."],
+    ["valFood", "Food", "Everything the colony has gathered and not yet spent.",
+      () => "Eggs cost food once the founding generation is out. " + fmt(game.food) + " banked, earning " + fmt(foodPerSecond(game)) + " a second."],
+    ["valRate", "Food per second", "What the whole colony brings home.",
+      () => "Every caste's output multiplied by everything that scales it. Settings has the full breakdown under Formulas."],
+    ["valProtein", "Protein", "Meat off the things that attack the nest.",
+      () => "Spent on the Combat adaptations, and on feeding the brood so eggs develop twice as fast. " + fmt(game.protein) + " banked."],
+    ["valProteinRate", "Protein per second", "Hunting, plus each raid's share.",
+      () => "Soldiers hunt between attacks and come home when one is close. Raids pay their protein in a lump, counted here across the six minutes between them."],
+    ["valPop", "Population", "Every ant alive, against the room the nest has.",
+      () => "Excavators raise the cap. At the cap only excavators can be laid, so a colony can always dig itself out."],
+    ["valEggs", "Eggs incubating", "Everything laid and not yet hatched.",
+      () => "Only the tended ones develop; the rest queue behind them. See details in the brood panel."],
+    ["valFighters", "Fighters", "What the colony can field.",
+      () => "Soldiers fight from birth. Every other caste needs the Combat adaptations first. The Combat tab breaks it down by caste."],
+    ["valThreat", "Next attacker", "How strong the next monster is.",
+      () => "It scales with the largest this colony has been and grows five per cent with every raid you win."],
+    ["valRaidIn", "Attack in", "Time until the next monster arrives.",
+      () => "Soldiers hunt while it is far off and come home in the last thirty seconds. With no soldiers at all the colony goes to ground and nothing comes."],
+    ["valRoyalJelly", "Royal Jelly", "What a nuptial flight pays.",
+      () => "Spent on the Royal Lineage, which survives every flight."],
+    ["valTime", "Colony age", "How long this colony has stood.",
+      () => "It resets with every nuptial flight. The founding nanitics measure their lives against it."],
+    ["valMatriline", "Matriline", "Every colony in the line, added up.",
+      () => "This one never resets. It is the whole line of queens, not the nest standing now."]
+  ];
+  for (const [id, title, body, note] of help) {
+    const node = el(id);
+    if (node) watch(node.closest(".readout") || node, { title, body, note, warn: false });
+  }
+  watch(el("queenPanel"), {
+    title: "The queen", body: "One queen per colony, always.",
+    note: () => game.wingsShed
+      ? "She will never fly again. Everything the colony becomes comes out of her."
+      : "She has landed and shed nothing yet. The first click is hers.",
+    warn: false });
+  watch(el("broodPanel"), {
+    title: "The brood", body: "Eggs develop here, a few at a time.",
+    note: () => broodCapacity(game) + " tended at once, " +
+      fmt(Math.max(0, game.eggs.length - broodCapacity(game))) + " waiting behind them. " +
+      "Nurses widen it, and so does every living founder.",
+    warn: false });
+}
+
+// E opens whatever the inspector is currently showing, at full size, without
+// the player having to move the mouse off the thing they are reading about.
+function openInspectModal() {
+  if (!el("inspectTitle").textContent || el("inspectTitle").textContent === "Point at anything") return;
+  el("inspectModalTitle").textContent = el("inspectTitle").textContent;
+  el("inspectModalBody").textContent = el("inspectBody").textContent;
+  el("inspectModalNote").textContent = el("inspectNote").textContent;
+  el("inspectModalNote").className = el("inspectNote").className.replace("inspect-note", "inspect-note");
+  el("inspectModal").hidden = false;
+}
+
+el("inspectModalClose").onclick = () => { el("inspectModal").hidden = true; };
+el("inspectModal").onclick = event => {
+  if (event.target === el("inspectModal")) el("inspectModal").hidden = true;
+};
+el("inspector").onclick = openInspectModal;
+document.addEventListener("keydown", event => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
+  if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "e") { event.preventDefault(); openInspectModal(); }
+  else if (key === "escape") el("inspectModal").hidden = true;
+});
+
+buildReadoutHelp();
 buildTabs();
 buildCasteChoice();
 buildAnts(render);
@@ -1057,6 +1356,7 @@ buildUpgrades(render);
 buildAchievements(game);
 buildPrestige(render);
 buildChallenges();
+buildSettingsTabs();
 buildSettings({
   refresh: render,
   applyTheme: () => {

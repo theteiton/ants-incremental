@@ -122,6 +122,8 @@ export function renderInspector() {
   if (!box) return;
   const entry = lastInspected;
   if (!entry) {
+    const blankHint = el("inspectHint");
+    if (blankHint) blankHint.hidden = true;
     el("inspectTitle").textContent = "Point at anything";
     el("inspectBody").textContent =
       "Hover an ant, an upgrade or an achievement and what it does appears here.";
@@ -133,6 +135,10 @@ export function renderInspector() {
   const note = typeof entry.note === "function" ? entry.note() : entry.note || "";
   el("inspectNote").textContent = note;
   el("inspectNote").className = entry.warn ? "inspect-note warn" : "inspect-note";
+  // tied to the inspector rather than the frame loop, so the hint appears the
+  // instant something is pointed at
+  const hint = el("inspectHint");
+  if (hint) hint.hidden = false;
 }
 
 export function watch(element, entry) {

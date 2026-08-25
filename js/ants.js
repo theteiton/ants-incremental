@@ -1,4 +1,4 @@
-import { challengeDebuff, challengeReward } from "./challenges.js";
+import { challengeDebuff, challengeReward, masteryFood } from "./challenges.js";
 import {
   prestigeFoodMultiplier,
   prestigeBaseCap,
@@ -91,9 +91,9 @@ export const RALLY_COOLDOWN = 90;
 
 export const HIDING_FOOD_PENALTY = 0.5;
 
-export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.03;
-export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.01;
-export const ACHIEVEMENT_JELLY_PER_LEVEL = 0.05;
+export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.035;
+export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.02;
+export const ACHIEVEMENT_JELLY_PER_LEVEL = 0.047;
 
 const FOOD_PER_SECOND = {
   nanitic: 6,
@@ -147,7 +147,7 @@ export const UPGRADES = [
     desc: "Halls big enough to lose a queen in. +24 cap per excavator.", effect: { type: "excavatorCap", add: 24 } },
 
   { id: "nurse_1", name: "Warm Brood Pile", req: { caste: "nurse", count: 3 }, cost: 15000,
-    desc: "Eggs are moved to follow the sun. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.05 } },
+    desc: "Brood is carried up to the sun-warmed chambers near the surface. Each nurse tends more.", effect: { type: "nurseSlots", add: 0.05 } },
   { id: "nurse_2", name: "Trophallaxis", req: { caste: "nurse", count: 12 }, cost: 50000,
     desc: "Mouth-to-mouth feeding of the brood. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.08 } },
   { id: "nurse_3", name: "Fungal Bedding", req: { caste: "nurse", count: 30 }, cost: 220000,
@@ -280,15 +280,15 @@ export function casteHasMultiplier(casteId) {
 }
 
 export function achievementFoodBonus(game) {
-  return 1 + ACHIEVEMENT_FOOD_PER_LEVEL * game.achievementLevel;
+  return Math.pow(1 + ACHIEVEMENT_FOOD_PER_LEVEL, game.achievementLevel);
 }
 
 export function achievementHatchBonus(game) {
-  return 1 + ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel;
+  return Math.pow(1 + ACHIEVEMENT_HATCH_PER_LEVEL, game.achievementLevel);
 }
 
 export function achievementJellyBonus(game) {
-  return 1 + ACHIEVEMENT_JELLY_PER_LEVEL * game.achievementLevel;
+  return Math.pow(1 + ACHIEVEMENT_JELLY_PER_LEVEL, game.achievementLevel);
 }
 
 // flat food added to a caste's base: casteFood upgrades are stored as a share of
@@ -353,7 +353,7 @@ export function hidingPenalty(game) {
 // something hidden inside a factor called "colony".
 export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game) *
-    prestigeFoodMultiplier(game) * challengeReward(game);
+    prestigeFoodMultiplier(game) * challengeReward(game) * masteryFood(game);
 }
 
 // Everything that takes food away, multiplied together. Trials plug in here,
@@ -374,8 +374,11 @@ export function bigForagerMultiplier(game, bornAt) {
 
 // the flight teaches the colony to raise them properly; before it they are an
 // early-game curiosity that fades to a few percent of production
+// Earned on the Achievements tab rather than bought in the lineage, and every
+// achievement bonus stays live inside a trial. Suppressing this one made the
+// Bonuses page contradict itself: it says the colony knows how to feed an
+// oversized forager, and then it did not.
 export function bigForagerBonus(game) {
-  if (game.challenge) return 1;
   return (game.prestige && game.prestige.flightsTaken || 0) > 0 ? BIG_FORAGER_PRESTIGE_MULT : 1;
 }
 
