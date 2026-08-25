@@ -10,15 +10,27 @@
 <header>
   <h1>Ant Colony</h1>
   <div class="readouts">
-    <div class="readout" id="readoutReserves"><b data-value>0</b><i>reserves</i></div>
-    <div class="readout"><b id="valFood">0</b><i>food</i></div>
-    <div class="readout"><b id="valRate">0/s</b><i>food per second</i></div>
-    <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
-    <div class="readout" id="readoutProtein" hidden><b id="valProtein">0</b><i>protein</i></div>
-    <div class="readout" id="readoutRoyalJelly" hidden><b id="valRoyalJelly">0</b><i>royal jelly</i></div>
-    <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
-    <div class="readout"><b id="valTime">0s</b><i>colony age</i></div>
-    <div class="readout" id="readoutMatriline" hidden><b id="valMatriline">0s</b><i>matriline</i></div>
+    <div class="readout-group">
+      <div class="readout" id="readoutReserves"><b data-value>0</b><i>reserves</i></div>
+      <div class="readout"><b id="valFood">0</b><i>food</i></div>
+      <div class="readout"><b id="valRate">0/s</b><i>food per second</i></div>
+      <div class="readout" id="readoutProtein" hidden><b id="valProtein">0</b><i>protein</i></div>
+      <div class="readout" id="readoutProteinRate" hidden><b id="valProteinRate">0/s</b><i>protein per second</i></div>
+    </div>
+    <div class="readout-group">
+      <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
+      <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
+    </div>
+    <div class="readout-group" id="combatGroup" hidden>
+      <div class="readout" id="readoutFighters"><b id="valFighters">0</b><i>fighters</i></div>
+      <div class="readout" id="readoutThreat"><b id="valThreat">0</b><i>next attacker</i></div>
+      <div class="readout" id="readoutRaidIn"><b id="valRaidIn">—</b><i>attack in</i></div>
+    </div>
+    <div class="readout-group">
+      <div class="readout" id="readoutRoyalJelly" hidden><b id="valRoyalJelly">0</b><i>royal jelly</i></div>
+      <div class="readout"><b id="valTime">0s</b><i>colony age</i></div>
+      <div class="readout" id="readoutMatriline" hidden><b id="valMatriline">0s</b><i>matriline</i></div>
+    </div>
   </div>
 </header>
 
@@ -44,30 +56,14 @@
         <span class="bar" id="wingBar" hidden><i></i></span>
         <span class="wing-state" id="wingState"></span>
       </div>
+      <div class="rally-row">
+        <button id="btnRally">Rally the foragers</button>
+        <span class="rally-state" id="rallyState"></span>
+      </div>
       <p class="milestone" id="queenMilestone" hidden></p>
     </div>
   </section>
 
-  <section class="panel raid-panel" id="raidPanel" hidden>
-    <h2>The nest under threat</h2>
-    <p id="raidCountdown"></p>
-    <div class="raid-scales">
-      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
-      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
-    </div>
-    <p class="raid-report" id="raidReport"></p>
-    <p class="raid-hunt" id="raidHunt" hidden></p>
-    <p class="raid-notice" id="raidNotice" hidden></p>
-  </section>
-
-  <section class="panel inspector" id="inspector">
-    <b id="inspectTitle">Point at anything</b>
-    <span id="inspectBody"></span>
-    <span class="inspect-note" id="inspectNote"></span>
-  </section>
-  </div>
-
-  <div class="col action">
   <section class="panel" id="broodPanel" hidden>
     <h2>Brood</h2>
     <p id="eggCost"></p>
@@ -77,10 +73,6 @@
       <button id="btnLayMax">Lay max</button>
     </div>
     <div id="casteChoice"></div>
-    <div class="rally-row">
-      <button id="btnRally">Rally the foragers</button>
-      <span class="rally-state" id="rallyState"></span>
-    </div>
     <p class="egg-summary" id="eggSummary"></p>
     <button id="btnBroodDetails" class="cancel-eggs" hidden>See details</button>
     <label class="toggle row-toggle" id="autoLayRow" hidden>
@@ -95,9 +87,19 @@
     <div id="eggSlots"></div>
     <p class="dim" id="slotOverflow" hidden></p>
   </section>
+  <section class="panel inspector" id="inspector">
+    <b id="inspectTitle">Point at anything</b>
+    <span id="inspectBody"></span>
+    <span class="inspect-note" id="inspectNote"></span>
+    <span class="inspect-hint" id="inspectHint" hidden>Press E to read it in full</span>
+  </section>
+  </div>
+
+  <div class="col action">
   <nav class="tabs">
     <button id="tabButton-ants">Ants</button>
     <button id="tabButton-upgrades">Upgrades<span class="badge" id="badge-upgrades" hidden></span></button>
+    <button id="tabButton-combat" hidden>Combat</button>
     <button id="tabButton-achievements">Achievements<span class="badge" id="badge-achievements" hidden></span></button>
     <button id="tabButton-prestige" hidden>Nuptial<span class="badge" id="badge-prestige" hidden></span></button>
     <button id="tabButton-challenges" hidden>Trials</button>
@@ -129,6 +131,24 @@
     <div class="subtabs" id="upgradeFilters"></div>
     <p class="empty-note" id="upgradeEmpty" hidden></p>
     <div id="upgradeList"></div>
+  </section>
+
+  <section class="panel tab" id="tab-combat" hidden>
+    <div class="panel-head">
+      <span class="tally" id="combatTally">0 raids won</span>
+      <span class="dim" id="combatRecord"></span>
+    </div>
+    <p id="raidCountdown"></p>
+    <div class="raid-scales">
+      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
+      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+    </div>
+    <p class="raid-report" id="raidReport"></p>
+    <p class="raid-hunt" id="raidHunt" hidden></p>
+    <p class="raid-notice" id="raidNotice" hidden></p>
+    <h2>Who fights</h2>
+    <ul id="combatList"></ul>
+    <p class="dim" id="combatNone" hidden></p>
   </section>
 
   <section class="panel tab" id="tab-achievements" hidden>
@@ -178,62 +198,76 @@
   </section>
 
   <section class="panel tab" id="tab-settings" hidden>
-    <h2>Colony rules</h2>
-    <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
+    <div class="subtabs" id="settingsTabs"></div>
 
-    <p class="dim" id="exileStatus"></p>
+    <div id="settingsPanel-colony">
+      <h2>Colony rules</h2>
+      <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
+      <p class="dim" id="exileStatus"></p>
 
-    <section id="automationSection" hidden>
-      <h2>Automation</h2>
-      <p class="dim">Bought with Royal Jelly on the Nuptial tab. Each one can be switched off here.</p>
-      <div id="automationList"></div>
-      <div id="ratioRow" hidden>
-        <p class="dim">Share of the colony each caste should hold. Zero leaves a caste to you.</p>
-        <p class="dim ratio-guide">Measured best: <b>80% foragers, 0% excavators, 5% nurses, 8% soldiers</b>. Excavators dig on their own when the nest runs out of room, so giving them a share only builds chambers you never fill. Under 7% soldiers — or over 85% foragers, which outbids them — wins the early raids and loses the late ones, because monsters grow with every win and with the colony. Over 10% soldiers never loses a raid and costs you the ants that would have fed it.</p>
-        <div class="ratios" id="ratioList"></div>
-      </div>
-    </section>
+      <h2>Her majesty</h2>
+      <label class="field">Queen's name
+        <input type="text" id="setQueenName" maxlength="24" placeholder="unnamed">
+      </label>
 
-    <h2>Her majesty</h2>
-    <label class="field">Queen's name
-      <input type="text" id="setQueenName" maxlength="24" placeholder="unnamed">
-    </label>
-
-    <h2>Appearance</h2>
-    <label class="field">Theme
-      <select id="setTheme">
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-        <option value="soil">Soil</option>
-      </select>
-    </label>
-
-    <h2>Colony record</h2>
-    <div class="stats">
-      <div>This colony<span id="statRunTime">0s</span></div>
-      <div>Matriline<span id="statPlaytime">0s</span></div>
-      <div>Eggs hatched<span id="statHatched">0</span></div>
-      <div>Ants exiled<span id="statExiled">0</span></div>
-      <div>Eggs destroyed<span id="statCancelled">0</span></div>
-      <div>Food gathered<span id="statFood">0</span></div>
-      <div>Largest colony<span id="statPeak">0</span></div>
-      <div>Best colony in one run<span id="statBestRun">0</span></div>
-      <div>Best flight<span id="statBestJelly">0</span></div>
-      <div>Fastest to 1,000<span id="statBest1000">never</span></div>
-      <div>Raids<span id="statRaids">0 won / 0 lost</span></div>
-      <div>Nuptial flights<span id="statFlights">0</span></div>
-      <div>Royal Jelly gathered<span id="statJelly">0</span></div>
+      <h2>Appearance</h2>
+      <label class="field">Theme
+        <select id="setTheme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="soil">Soil</option>
+        </select>
+      </label>
     </div>
 
-    <h2>Formulas</h2>
-    <p class="dim">How every rate in the colony is built, with live numbers. Each upgrade moves one factor.</p>
-    <div class="formulas" id="formulaList"></div>
+    <div id="settingsPanel-automation" hidden>
+      <section id="automationSection" hidden>
+        <h2>Automation</h2>
+        <p class="dim">Bought with Royal Jelly on the Nuptial tab. Each one can be switched off here.</p>
+        <div id="automationList"></div>
+        <div id="ratioRow" hidden>
+          <p class="dim">Share of the colony each caste should hold. Standing Orders lays whichever caste sits furthest below its share, and a caste set to zero is never laid to meet a target.</p>
+        <p class="dim">Two exceptions, both deliberate. <b>Excavators are dug whenever the nest is nearly full</b>, whatever their share says — a colony that cannot grow is the one case a ratio gets wrong, and that is why zero is the right number for them. And once every share is met the surplus goes to <b>foragers</b>, so they are laid whether or not you give them one.</p>
+          <p class="dim ratio-guide">Measured over five hours: <b>80% foragers, 5% nurses, 8% soldiers</b>, and nothing for excavators. Soldiers under 7% win the early raids and lose the late ones, because monsters grow with every win and with the colony; over 10% never loses one and costs you the ants that would have fed it. Foragers below about 85% change nothing at all — they naturally sit near that share, so a target they already meet never wins.</p>
+          <div class="ratios" id="ratioList"></div>
+        </div>
+      </section>
+      <p class="dim" id="automationLocked" hidden>Nothing is automated yet. The Royal Lineage sells it, on the Nuptial tab.</p>
+    </div>
 
-    <h2>Save</h2>
-    <div class="tools">
-      <button id="btnExport">Export save</button>
-      <button id="btnImport">Import save</button>
-      <button id="btnReset" class="danger">Erase colony</button>
+    <div id="settingsPanel-formulas" hidden>
+      <h2>Formulas</h2>
+      <p class="dim">How every rate in the colony is built, with live numbers. Each upgrade moves one factor.</p>
+      <div class="formulas" id="formulaList"></div>
+    </div>
+
+    <div id="settingsPanel-record" hidden>
+      <h2>Colony record</h2>
+      <div class="stats">
+        <div>This colony<span id="statRunTime">0s</span></div>
+        <div>Matriline<span id="statPlaytime">0s</span></div>
+        <div>Eggs hatched<span id="statHatched">0</span></div>
+        <div>Ants exiled<span id="statExiled">0</span></div>
+        <div>Eggs destroyed<span id="statCancelled">0</span></div>
+        <div>Food gathered<span id="statFood">0</span></div>
+        <div>Largest colony<span id="statPeak">0</span></div>
+        <div>Best colony in one run<span id="statBestRun">0</span></div>
+        <div>Best flight<span id="statBestJelly">0</span></div>
+        <div>Fastest to 1,000<span id="statBest1000">never</span></div>
+        <div>Raids<span id="statRaids">0 won / 0 lost</span></div>
+        <div>Nuptial flights<span id="statFlights">0</span></div>
+        <div>Royal Jelly gathered<span id="statJelly">0</span></div>
+      </div>
+    </div>
+
+    <div id="settingsPanel-save" hidden>
+      <h2>Save</h2>
+      <p class="dim">The code is long — a mature colony runs to tens of thousands of characters. Copy the whole thing.</p>
+      <div class="tools">
+        <button id="btnExport">Export save</button>
+        <button id="btnImport">Import save</button>
+        <button id="btnReset" class="danger">Erase colony</button>
+      </div>
     </div>
   </section>
   </div>
@@ -250,6 +284,17 @@
       <button id="saveClose">Close</button>
       <button id="saveCopy">Copy</button>
       <button id="saveLoad" class="danger">Load this save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal inspect-modal" id="inspectModal" hidden>
+  <div class="modal-box inspect-box">
+    <h2 id="inspectModalTitle"></h2>
+    <p id="inspectModalBody"></p>
+    <p class="inspect-note" id="inspectModalNote"></p>
+    <div class="modal-actions">
+      <button id="inspectModalClose">Close</button>
     </div>
   </div>
 </div>

@@ -1,5 +1,11 @@
-import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, ACHIEVEMENT_JELLY_PER_LEVEL, population, UPGRADES, upgradeBranch } from "./ants.js";
+import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, ACHIEVEMENT_JELLY_PER_LEVEL,
+  achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
+  population, UPGRADES, upgradeBranch } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
+import {
+  CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
+  bestTrialLevel, trialLevelsEver, trialsWithMastery
+} from "./challenges.js";
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch } from "./panels.js";
 
@@ -142,6 +148,11 @@ export const ACHIEVEMENT_TRACKS = [
     value: g => (g.prestige && g.prestige.flightsTaken) || 0,
     thresholds: [1, 2, 3, 5, 8, 12, 20, 35, 50] },
 
+  { id: "trials", name: "Trials cleared", unit: "levels",
+    desc: "Levels of the trials survived. Each one doubles what every colony gathers.",
+    value: g => trialLevelsEver(g),
+    thresholds: [1, 2, 3, 4, 5] },
+
   { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
     desc: "Total royal jelly earned across all flights.",
     value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
@@ -222,22 +233,51 @@ let achTab = "tracks";
 const BONUS_BOXES = [
   { id: "food", name: "Colony appetite",
     desc: "Every achievement level feeds the whole colony better.",
-    value: game => "+" + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * game.achievementLevel * 100) + "% food",
+    value: game => "×" + fmt(achievementFoodBonus(game)) + " food",
+    formula: game => "(1 + " + ACHIEVEMENT_FOOD_PER_LEVEL + ")^level " +
+      game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ", worth " + Math.round(ACHIEVEMENT_FOOD_PER_LEVEL * 100) + "% each. It multiplies every caste at once." },
+      ". Each level compounds, so the late ones are worth more than the early ones. " +
+      "It multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
-    value: game => "+" + Math.round(ACHIEVEMENT_JELLY_PER_LEVEL * game.achievementLevel * 100) +
-      "% Royal Jelly",
+    formula: game => "(1 + " + ACHIEVEMENT_JELLY_PER_LEVEL + ")^level " +
+      game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
+    value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ", worth " + Math.round(ACHIEVEMENT_JELLY_PER_LEVEL * 100) +
-      "% each. It multiplies what every nuptial flight pays." },
+      ". Each level compounds. It multiplies what every nuptial flight pays." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
-    value: game => "+" + Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * game.achievementLevel * 100) + "% hatch speed",
+    value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
+    formula: game => "(1 + " + ACHIEVEMENT_HATCH_PER_LEVEL + ")^level " +
+      game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ", worth " + Math.round(ACHIEVEMENT_HATCH_PER_LEVEL * 100) + "% each. Incubation is 24s divided by this." }
+      ". Each level compounds. Incubation is 24s divided by this." }
 ];
+
+// One box per trial, because each trial gives back the thing it took. The
+// Drought starves the colony and pays in food; the others will pay in cap,
+// brood and soldiers when they are built.
+const TRIAL_BOXES = trialsWithMastery().map(challenge => ({
+  id: "mastery_" + challenge.id,
+  name: challenge.mastery.name,
+  desc: challenge.mastery.desc,
+  value: game => "×" + fmt(Math.pow(challenge.mastery.step, bestTrialLevel(game, challenge.id))) +
+    " " + challenge.mastery.type,
+  formula: game => challenge.mastery.step + "^highest clear " +
+    bestTrialLevel(game, challenge.id) + " = ×" +
+    fmt(Math.pow(challenge.mastery.step, bestTrialLevel(game, challenge.id))),
+  note: game => {
+    const level = bestTrialLevel(game, challenge.id);
+    return "Highest clear of " + challenge.name + ": level " + level + " of " +
+      CHALLENGE_MAX_LEVEL + "." +
+      (level < CHALLENGE_MAX_LEVEL
+        ? " Level " + (level + 1) + " would take it to ×" +
+          fmt(Math.pow(challenge.mastery.step, level + 1)) + "."
+        : " Every level of it is behind you.") +
+      " Separate from the ×" + CHALLENGE_REWARD_STEP + " per level the trials themselves pay.";
+  }
+}));
 
 const UNLOCK_BOXES = [
   { id: "bigforager", name: "Raised on royal jelly",
@@ -263,11 +303,16 @@ const bonusBoxes = {};
 function buildBox(list, entry, game) {
   const box = document.createElement("div");
   box.className = "bonus-box";
-  box.innerHTML = '<b></b><span class="bonus-value"></span><span class="bonus-note"></span>';
+  box.innerHTML = '<b></b><span class="bonus-value"></span>' +
+    '<span class="bonus-formula"></span><span class="bonus-note"></span>';
   box.querySelector("b").textContent = entry.name;
   box.querySelector(".bonus-note").textContent = entry.desc;
   watch(box, { title: entry.name, body: entry.desc, note: () => entry.note(game) });
-  bonusBoxes[entry.id] = { box, value: box.querySelector(".bonus-value") };
+  bonusBoxes[entry.id] = {
+    box,
+    value: box.querySelector(".bonus-value"),
+    formula: entry.formula ? box.querySelector(".bonus-formula") : null
+  };
   list.appendChild(box);
 }
 
@@ -289,6 +334,7 @@ export function buildAchievements(game) {
     el("achievementTabs").appendChild(button);
   });
   BONUS_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
+  TRIAL_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
   UNLOCK_BOXES.forEach(entry => buildBox(el("unlockList"), entry, game));
   selectAchievementTab("tracks");
   buildTracks(game);
@@ -358,10 +404,11 @@ export function renderAchievements(game) {
       : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
   });
 
-  BONUS_BOXES.concat(UNLOCK_BOXES).forEach(entry => {
+  BONUS_BOXES.concat(TRIAL_BOXES, UNLOCK_BOXES).forEach(entry => {
     const ui = bonusBoxes[entry.id];
     if (!ui) return;
     ui.value.textContent = entry.value(game);
+    if (ui.formula) ui.formula.textContent = entry.formula ? entry.formula(game) : "";
     if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked(game));
   });
 

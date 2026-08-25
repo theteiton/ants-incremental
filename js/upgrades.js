@@ -52,6 +52,8 @@ import {
   SOLDIER_COMBAT
 } from "./raids.js";
 import {
+  PRESTIGE_UPGRADES,
+  prestigeUpgradeOwned,
   prestigeBaseCap,
   prestigeBroodSlots,
   prestigeExcavatorCap,
@@ -59,7 +61,7 @@ import {
   prestigeNaniticMult,
   prestigeSoldierMult
 } from "./prestige.js";
-import { activeChallenge, challengeDebuff, challengeReward } from "./challenges.js";
+import { activeChallenge, challengeDebuff, challengeReward, masteryFood } from "./challenges.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
 import { fmt, fmtFactor, watch } from "./panels.js";
 
@@ -94,125 +96,203 @@ function casteName(id) {
   return CASTES[id].name.toLowerCase();
 }
 
-// What every caste shares, printed once as its own row. A caste's line names
-// it rather than repeating it, so "Nanitic food" is about nanitics and not
-// about the colony bonus, the achievements and whatever debuff is running.
+// A formula is a total and the factors that make it, so it can be read down a
+// column instead of parsed left to right. One long "a x b x c x d x e" line was
+// unreadable by the time a food rate had six terms in it, and the trials add
+// more. Falsey rows drop out, so a factor that is doing nothing never shows.
+function formula(total, rows) {
+  return { total, rows: rows.filter(Boolean) };
+}
+
+// A factor names its kind -- upgrades, achievements, trials, lineage -- and
+// carries the individual sources underneath it. Short labels keep the columns
+// narrow; the nested rows say which upgrade, which trial, which adaptation.
+const row = (label, value, children) => ({ label, value, children: (children || []).filter(Boolean) });
+
+// every owned upgrade of one effect type, as child rows
+function ownedRows(list, ownedTest, match, format) {
+  return list.filter(u => match(u) && ownedTest(u)).map(u => row(u.name, format(u)));
+}
+
+function upgradeMultRows(game) {
+  return ownedRows(UPGRADES, u => upgradeOwned(game, u),
+    u => u.effect.type === "globalFood", u => "×" + f(u.effect.mult));
+}
+
+function casteYieldRows(game, caste) {
+  return ownedRows(UPGRADES, u => upgradeOwned(game, u),
+    u => (u.effect.type === "casteFlat" || u.effect.type === "casteFood") && u.effect.caste === caste,
+    u => "+" + f(u.effect.type === "casteFlat" ? u.effect.add : baseFood(caste) * u.effect.add));
+}
+
+function lineageFoodRows(game) {
+  return ownedRows(PRESTIGE_UPGRADES, u => prestigeUpgradeOwned(game, u),
+    u => u.effect.type === "prestigeGlobalFood", u => "×" + f(u.effect.mult));
+}
+
+// for the inspector, which is one block of text rather than a grid
+export function formulaText(shape) {
+  const lines = [];
+  for (const r of shape.rows) {
+    lines.push("    " + r.label + "  " + r.value);
+    for (const child of r.children || []) lines.push("        " + child.label + "  " + child.value);
+  }
+  lines.push("    ——  " + shape.total);
+  return lines.join("\n");
+}
+
+// What every caste shares, built once. A caste's own formula names it as a
+// single factor rather than repeating all of it.
 function sharedFoodFactor(game) {
   return globalFoodMultiplier(game) * foodPenalty(game);
 }
 
-function overallFoodFormula(game) {
-  const parts = [
-    "colony " + f(globalUpgradeMultiplier(game)),
-    "achievements " + f(achievementFoodBonus(game))
-  ];
-  if (challengeReward(game) > 1) parts.push("trials " + f(challengeReward(game)));
-  if (prestigeFoodMultiplier(game) > 1) parts.push("lineage " + f(prestigeFoodMultiplier(game)));
-  if (hidingPenalty(game) < 1) parts.push("hiding " + f(hidingPenalty(game)));
-  if (challengeDebuff(game) < 1) {
-    parts.push(activeChallenge(game).name.toLowerCase() + " " + f(challengeDebuff(game)));
+function colonyFoodFormula(game) {
+  const rows = [];
+  for (const caste of ["nanitic", "forager", "excavator", "nurse", "soldier"]) {
+    const each = casteFoodPerSecond(game, caste);
+    const held = game.ants[caste];
+    if (held <= 0 || each <= 0) continue;
+    rows.push(row(fmt(held) + " " + casteName(caste) + (held === 1 ? "" : "s") +
+      " at " + fmt(each) + "/s", fmt(held * each) + "/s"));
   }
-  return "every caste × " + parts.join(" × ") + " = ×" + f(sharedFoodFactor(game));
+  if (game.ants.bigforager > 0) {
+    rows.push(row(fmt(game.ants.bigforager) + " big foragers", fmt(bigForagerOutput(game)) + "/s"));
+  }
+  if (wingYield(game) > 0) rows.push(row("stripping a wing", fmt(wingYield(game)) + "/s"));
+  if (!rows.length) rows.push(row("nothing is gathering yet", "0/s"));
+  return formula(fmt(foodPerSecond(game)) + "/s", rows);
 }
 
+function overallFoodFormula(game) {
+  const trials = challengeReward(game) * masteryFood(game);
+  return formula("×" + f(sharedFoodFactor(game)), [
+    globalUpgradeMultiplier(game) !== 1 &&
+      row("upgrades", "×" + f(globalUpgradeMultiplier(game)), upgradeMultRows(game)),
+    achievementFoodBonus(game) !== 1 &&
+      row("achievements", "×" + f(achievementFoodBonus(game)), [
+        row("level " + game.achievementLevel, "×" + ACHIEVEMENT_FOOD_PER_LEVEL_SHOWN + " each")
+      ]),
+    trials > 1 && row("trials", "×" + f(trials), [
+      challengeReward(game) > 1 && row("levels cleared", "×" + f(challengeReward(game))),
+      masteryFood(game) > 1 && row("Deep Cisterns", "×" + f(masteryFood(game)))
+    ]),
+    prestigeFoodMultiplier(game) > 1 &&
+      row("lineage", "×" + f(prestigeFoodMultiplier(game)), lineageFoodRows(game)),
+    hidingPenalty(game) < 1 && row("hiding", "×" + f(hidingPenalty(game))),
+    challengeDebuff(game) < 1 &&
+      row(activeChallenge(game).name.toLowerCase(), "×" + f(challengeDebuff(game)))
+  ]);
+}
+
+const ACHIEVEMENT_FOOD_PER_LEVEL_SHOWN = 1.035;
+
 function foodFormula(game, caste) {
-  const vigour = casteHasMultiplier(caste)
-    ? " × vigour " + f(casteMultiplier(game, caste))
-    : "";
-  const nanitic = (caste === "nanitic" && prestigeNaniticMult(game) > 1)
-    ? " × lineage " + f(prestigeNaniticMult(game))
-    : "";
-  const fading = caste === "nanitic"
-    ? " × spent " + f(naniticVigour(game))
-    : "";
-  const rally = (caste === "forager" && rallyActive(game))
-    ? " × rally " + f(RALLY_MULT)
-    : "";
-  return "each " + casteName(caste) + " = (base " + f(baseFood(caste)) +
-    " + yield " + f(casteFlatBonus(game, caste)) + ")" + vigour + nanitic + fading + rally +
-    " × multipliers " + f(sharedFoodFactor(game)) +
-    " = " + fmt(casteFoodPerSecond(game, caste)) + "/s";
+  return formula(fmt(casteFoodPerSecond(game, caste)) + "/s", [
+    row("base", f(baseFood(caste))),
+    casteFlatBonus(game, caste) !== 0 &&
+      row("+ upgrades", f(casteFlatBonus(game, caste)), casteYieldRows(game, caste)),
+    casteHasMultiplier(caste) && row("× vigour", "×" + f(casteMultiplier(game, caste))),
+    caste === "nanitic" && prestigeNaniticMult(game) > 1 &&
+      row("× lineage", "×" + f(prestigeNaniticMult(game))),
+    caste === "nanitic" && row("× fading", "×" + f(naniticVigour(game))),
+    caste === "forager" && rallyActive(game) && row("× rally", "×" + f(RALLY_MULT)),
+    row("× multipliers", "×" + f(sharedFoodFactor(game)))
+  ]);
 }
 
 function capFormula(game) {
   const base = BASE_POPULATION_CAP + prestigeBaseCap(game);
   const per = CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap") + prestigeExcavatorCap(game);
-  return "cap = base " + base +
-    " + per excavator " + f(per) +
-    " × excavators " + fmt(game.ants.excavator) +
-    " = " + fmt(populationCap(game));
+  return formula(fmt(populationCap(game)), [
+    row("base", fmt(base)),
+    row("+ per excavator", f(per)),
+    row("× excavators", fmt(game.ants.excavator))
+  ]);
 }
 
 function broodFormula(game) {
   const base = BASE_BROOD_SLOTS + effectTotal(game, "broodSlots") + prestigeBroodSlots(game);
-  const founders = game.ants.nanitic > 0
-    ? " + founders " + fmt(game.ants.nanitic) + " × " + f(NANITIC_BROOD_SLOTS)
-    : "";
-  return "brood = base " + base +
-    " + per nurse " + f(slotsPerNurse(game)) +
-    " × nurses " + fmt(game.ants.nurse) + founders +
-    " = " + broodCapacity(game) + " slots";
+  return formula(fmt(broodCapacity(game)), [
+    row("base", fmt(base)),
+    row("+ per nurse", f(slotsPerNurse(game))),
+    row("× nurses", fmt(game.ants.nurse)),
+    game.ants.nanitic > 0 && row("+ founders", fmt(game.ants.nanitic) +
+      " × " + f(NANITIC_BROOD_SLOTS))
+  ]);
 }
 
 function soldierFormula(game) {
-  const lineage = prestigeSoldierMult(game) > 1
-    ? " × lineage " + f(prestigeSoldierMult(game))
-    : "";
-  return "each soldier = base " + SOLDIER_COMBAT +
-    " × power " + f(1 + effectTotal(game, "soldierPower")) + lineage +
-    " = " + fmt(combatPerSoldier(game)) + " strength";
+  return formula(fmt(combatPerSoldier(game)) + " each", [
+    row("base", fmt(SOLDIER_COMBAT)),
+    row("× upgrades", "×" + f(1 + effectTotal(game, "soldierPower"))),
+    prestigeSoldierMult(game) > 1 && row("× lineage", "×" + f(prestigeSoldierMult(game)))
+  ]);
 }
 
 function armsFormula(game, caste, type) {
-  return "each " + casteName(caste) + " = " + f(effectTotal(game, type)) +
-    " strength, " + fmt(game.ants[caste]) + " of them = " +
-    fmt(game.ants[caste] * effectTotal(game, type));
+  return formula(fmt(game.ants[caste] * effectTotal(game, type)), [
+    row("each fights at", f(effectTotal(game, type))),
+    row("× count", fmt(game.ants[caste]))
+  ]);
 }
 
 function proteinFormula(game) {
-  return "hunting = soldiers " + fmt(game.ants.soldier) +
-    " × base " + f(HUNT_PROTEIN_PER_SOLDIER) +
-    " × yield " + f(1 + effectTotal(game, "proteinYield")) +
-    " = " + f(game.ants.soldier * HUNT_PROTEIN_PER_SOLDIER *
-      (1 + effectTotal(game, "proteinYield"))) + "/s";
+  const rate = game.ants.soldier * HUNT_PROTEIN_PER_SOLDIER * (1 + effectTotal(game, "proteinYield"));
+  return formula(f(rate) + "/s", [
+    row("soldiers", fmt(game.ants.soldier)),
+    row("× each brings", f(HUNT_PROTEIN_PER_SOLDIER)),
+    row("× upgrades", "×" + f(1 + effectTotal(game, "proteinYield")))
+  ]);
 }
 
 function monsterFormula(game) {
   const reach = Math.max(MONSTER_REFERENCE, runPeakCount(game, "population"));
   const ramp = monsterRamp(game);
-  return "next attacker = base " + MONSTER_BASE +
-    " × (this colony " + fmt(reach) + " / " + MONSTER_REFERENCE + ")^" + MONSTER_EXPONENT +
-    " × wins " + f(1 + MONSTER_GROWTH * (game.raidsWon || 0)) +
-    (ramp < 1 ? " × ramp " + f(ramp) : "") +
-    " = " + fmt(monsterPower(game));
+  return formula(fmt(monsterPower(game)), [
+    row("base, nest of " + MONSTER_REFERENCE, fmt(MONSTER_BASE)),
+    row("× nest size", "×" + f(Math.pow(reach / MONSTER_REFERENCE, MONSTER_EXPONENT))),
+    row("× your wins", "×" + f(1 + MONSTER_GROWTH * (game.raidsWon || 0))),
+    ramp < 1 && row("× ramp", "×" + f(ramp))
+  ]);
 }
 
 function bigForagerFormula(game) {
-  return "each big forager = a forager " + fmt(casteFoodPerSecond(game, "forager")) +
-    "/s × 5 × her age, " + game.ants.bigforager + " of them = " +
-    fmt(bigForagerOutput(game)) + "/s";
+  return formula(fmt(bigForagerOutput(game)) + "/s", [
+    row("a forager", fmt(casteFoodPerSecond(game, "forager")) + "/s"),
+    row("× big forager", "×" + fmt(BIG_FORAGER_BASE_SHOWN)),
+    row("× age", "up to ×3"),
+    row("× count", fmt(game.ants.bigforager))
+  ]);
 }
+
+const BIG_FORAGER_BASE_SHOWN = 5;
 
 // every layer at once, for the Formulas panel in Settings
 export function formulaSummary(game) {
-  const rows = [{ name: "Food multipliers", text: overallFoodFormula(game) }];
+  const rows = [
+    { name: "Colony food", shape: colonyFoodFormula(game) },
+    { name: "Shared multipliers", shape: overallFoodFormula(game) }
+  ];
   for (const caste of ["nanitic", "forager"]) {
     if (game.ants[caste] > 0) {
-      rows.push({ name: CASTES[caste].name + " food", text: foodFormula(game, caste) });
+      rows.push({ name: CASTES[caste].name + " food", shape: foodFormula(game, caste) });
     }
   }
   if (game.ants.bigforager > 0) {
-    rows.push({ name: "Big Forager food", text: bigForagerFormula(game) });
+    rows.push({ name: "Big Forager food", shape: bigForagerFormula(game) });
   }
   if (wingYield(game) > 0) {
-    rows.push({ name: "Wing muscle", text: "stripping = " + fmt(WING_FOOD) + " food over " +
-      WING_STRIP_TIME + "s = " + fmt(wingYield(game)) + "/s" });
+    rows.push({ name: "Wing muscle", shape: formula(fmt(wingYield(game)) + "/s", [
+      row("per wing", fmt(WING_FOOD) + " food"),
+      row("over", WING_STRIP_TIME + "s")
+    ]) });
   }
-  rows.push({ name: "Population cap", text: capFormula(game) });
-  rows.push({ name: "Brood slots", text: broodFormula(game) });
-  if (game.ants.soldier > 0) rows.push({ name: "Soldier strength", text: soldierFormula(game) });
-  if (raidsUnlocked(game)) rows.push({ name: "Next attacker", text: monsterFormula(game) });
-  if (game.ants.soldier > 0) rows.push({ name: "Hunting", text: proteinFormula(game) });
+  rows.push({ name: "Population cap", shape: capFormula(game) });
+  rows.push({ name: "Brood slots", shape: broodFormula(game) });
+  if (game.ants.soldier > 0) rows.push({ name: "Soldier strength", shape: soldierFormula(game) });
+  if (raidsUnlocked(game)) rows.push({ name: "Next attacker", shape: monsterFormula(game) });
+  if (game.ants.soldier > 0) rows.push({ name: "Hunting", shape: proteinFormula(game) });
   return rows;
 }
 
@@ -225,7 +305,7 @@ function formulaLines(upgrade, probe) {
     const caste = effect.caste;
     const added = type === "casteFlat" ? effect.add : baseFood(caste) * effect.add;
     return [
-      foodFormula(game, caste),
+      formulaText(foodFormula(game, caste)),
       "adds " + f(added) + " to " + casteName(caste) + " yield → " +
         f(casteFlatBonus(game, caste)) + " → " + f(casteFlatBonus(probe, caste))
     ];
@@ -233,21 +313,21 @@ function formulaLines(upgrade, probe) {
   if (type === "casteMult") {
     const caste = effect.caste;
     return [
-      foodFormula(game, caste),
+      formulaText(foodFormula(game, caste)),
       "raises " + casteName(caste) + " vigour → " +
         f(casteMultiplier(game, caste)) + " → " + f(casteMultiplier(probe, caste))
     ];
   }
   if (type === "globalFood") {
     return [
-      overallFoodFormula(game),
+      formulaText(overallFoodFormula(game)),
       "raises the colony bonus — " + f(globalUpgradeMultiplier(game)) +
         " → " + f(globalUpgradeMultiplier(probe))
     ];
   }
   if (type === "excavatorCap") {
     return [
-      capFormula(game),
+      formulaText(capFormula(game)),
       "adds " + f(effect.add) + " to per excavator — " +
         f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) + " → " +
         f(CAP_PER_EXCAVATOR + effectTotal(probe, "excavatorCap"))
@@ -255,7 +335,7 @@ function formulaLines(upgrade, probe) {
   }
   if (type === "naniticVigour") {
     return [
-      foodFormula(game, "nanitic"),
+      formulaText(foodFormula(game, "nanitic")),
       "the founders fade half as fast every " + fmtTimeShort(NANITIC_HALFLIFE) +
         " — halves in " + fmtTimeShort(naniticHalflife(game)) +
         " → " + fmtTimeShort(naniticHalflife(probe))
@@ -263,14 +343,14 @@ function formulaLines(upgrade, probe) {
   }
   if (type === "nurseSlots") {
     return [
-      broodFormula(game),
+      formulaText(broodFormula(game)),
       "adds " + f(effect.add) + " to per nurse — " + f(slotsPerNurse(game)) +
         " → " + f(slotsPerNurse(probe))
     ];
   }
   if (type === "broodSlots") {
     return [
-      broodFormula(game),
+      formulaText(broodFormula(game)),
       "adds " + f(effect.add) + " to the base — " +
         (BASE_BROOD_SLOTS + effectTotal(game, "broodSlots")) + " → " +
         (BASE_BROOD_SLOTS + effectTotal(probe, "broodSlots"))
@@ -278,7 +358,7 @@ function formulaLines(upgrade, probe) {
   }
   if (type === "soldierPower") {
     return [
-      soldierFormula(game),
+      formulaText(soldierFormula(game)),
       "raises soldier power — " + f(1 + effectTotal(game, "soldierPower")) +
         " → " + f(1 + effectTotal(probe, "soldierPower"))
     ];
@@ -287,14 +367,14 @@ function formulaLines(upgrade, probe) {
     const caste = type === "combatForager" ? "forager"
       : type === "combatExcavator" ? "excavator" : "nurse";
     return [
-      armsFormula(game, caste, type),
+      formulaText(armsFormula(game, caste, type)),
       "adds " + f(effect.add) + " to " + casteName(caste) + " strength — " +
         f(effectTotal(game, type)) + " → " + f(effectTotal(probe, type))
     ];
   }
   if (type === "proteinYield") {
     return [
-      proteinFormula(game),
+      formulaText(proteinFormula(game)),
       "raises protein yield — " + f(1 + effectTotal(game, "proteinYield")) +
         " → " + f(1 + effectTotal(probe, "proteinYield"))
     ];
@@ -394,6 +474,7 @@ export function buildUpgrades(onChange) {
       '<span class="upgrade-head"><b></b><span class="upgrade-cost"></span></span>' +
       '<span class="upgrade-desc"></span>' +
       '<span class="upgrade-effect"></span>' +
+      '<span class="upgrade-formula"></span>' +
       '<span class="upgrade-lock"></span>';
     card.querySelector("b").textContent = upgrade.name;
     card.querySelector(".upgrade-desc").textContent = upgrade.desc;
@@ -419,6 +500,7 @@ export function buildUpgrades(onChange) {
       card,
       cost: card.querySelector(".upgrade-cost"),
       effect: card.querySelector(".upgrade-effect"),
+      formula: card.querySelector(".upgrade-formula"),
       lock: card.querySelector(".upgrade-lock")
     };
     list.appendChild(card);
@@ -475,6 +557,12 @@ export function renderUpgrades() {
 
     ui.lock.textContent = isOwned ? "" : upgradeLockText(game, upgrade);
     ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
+    if (isOwned || !isOpen) {
+      ui.formula.textContent = "";
+    } else {
+      const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
+      ui.formula.textContent = (formulaLines(upgrade, probe)[1] || "");
+    }
   });
   // An empty grid with nothing said reads as a broken tab. It is usually
   // "Hide owned" doing exactly what it promises, and at 29 of 29 it hides

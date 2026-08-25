@@ -46,6 +46,7 @@ import {
   activeChallenge,
   challengeActive,
   challengeById,
+  challengeMastered,
   challengesUnlocked,
   CHALLENGE_TARGET
 } from "./challenges.js";
@@ -71,9 +72,12 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
-export { CHALLENGES, CHALLENGE_TARGET, activeChallenge, challengeActive, challengeById,
-  challengeDebuff, challengeDebuffAt, challengeLevel, challengeLevelsTotal,
-  challengeReward, challengesUnlocked } from "./challenges.js";
+export { CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP, CHALLENGE_TARGET,
+  TRIAL_GIVES_UP, TRIAL_KEEPS, bestTrialLevel, challengeMastered, masteryFood, masteryOf,
+  trialLevelsEver, trialsWithMastery,
+  activeChallenge, challengeActive, challengeById, challengeDebuff, challengeDebuffAt,
+  challengeLevel, challengeLevelsTotal, challengeReward,
+  challengesUnlocked } from "./challenges.js";
 export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, AUTOMATIONS, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour, automationUnlocked } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
@@ -132,7 +136,7 @@ function blankGame() {
     best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
-      raidsWonTotal: 0, eggsCancelled: 0 },
+      raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {} },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -466,7 +470,7 @@ function refoundColony(extra) {
 export function enterChallenge(id) {
   if (!challengesUnlocked(game) || game.challenge) return false;
   const challenge = challengeById(id);
-  if (!challenge || !challenge.open) return false;
+  if (!challenge || !challenge.open || challengeMastered(game, id)) return false;
   refoundColony({ challenge: id });
   return true;
 }
@@ -491,6 +495,9 @@ export function completeChallenge() {
   cleared[id] = (cleared[id] || 0) + 1;
   game.challenges = cleared;
   game.stats.challengeLevels = (game.stats.challengeLevels || 0) + 1;
+  const best = Object.assign({}, game.stats.bestTrial || {});
+  best[id] = Math.max(best[id] || 0, cleared[id]);
+  game.stats.bestTrial = best;
   refoundColony({ challenge: null });
   return true;
 }

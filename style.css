@@ -80,7 +80,12 @@ h1 {
   color: var(--accent-soft);
 }
 
-.readouts { display: flex; flex-wrap: wrap; gap: 22px; }
+.readouts { display: flex; flex-wrap: wrap; align-items: center; row-gap: 10px; }
+/* resources, colony, combat, lineage -- ruled off from each other so the bar
+   reads as four things rather than eleven */
+.readout-group { display: flex; flex-wrap: wrap; gap: 22px; padding: 0 20px; }
+.readout-group:first-child { padding-left: 0; }
+.readout-group + .readout-group { border-left: 1px solid var(--line); }
 .readout { display: flex; flex-direction: column; line-height: 1.2; }
 .readout b { font-size: 18px; }
 .readout i {
@@ -93,19 +98,38 @@ h1 {
 
 main { max-width: 860px; margin: 0 auto; padding: 20px; }
 
+/* The left column is everything you watch and press -- queen, raid, brood,
+   inspector -- and it stays put whichever tab is open. The right column is the
+   tab and nothing else, so it starts at the top of the page instead of 551px
+   down behind the brood. */
+/* Hover-to-inspect only works if the inspector is visible without moving the
+   mouse. At the bottom of a 1000px column it was not: reading it meant
+   scrolling, and scrolling took the cursor off the thing being read about. */
 @media (min-width: 1000px) {
   main { max-width: 1240px; }
+  .col.status { display: flex; flex-direction: column; }
+  .inspector {
+    position: sticky;
+    bottom: 16px;
+    margin-top: auto;
+    max-height: 42vh;
+    overflow-y: auto;
+    z-index: 8;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
   .columns {
     display: grid;
-    grid-template-columns: minmax(320px, 0.85fr) 1.15fr;
+    grid-template-columns: minmax(380px, 0.95fr) 1.05fr;
     gap: 18px;
-    align-items: start;
+    /* stretch, not start: the status column has to reach the full row height or
+       the sticky inspector runs out of column to stick to and scrolls away */
+    align-items: stretch;
   }
 }
 
 @media (min-width: 1500px) {
-  main { max-width: 1460px; }
-  .columns { grid-template-columns: minmax(360px, 0.8fr) 1.2fr; }
+  main { max-width: 1500px; }
+  .columns { grid-template-columns: minmax(420px, 0.9fr) 1.1fr; }
 }
 
 .panel {
@@ -137,9 +161,12 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
 }
 .wing-row .bar { width: 90px; height: 8px; }
 .wing-state { font-size: 12px; color: var(--dim); }
-.milestone {
-  margin-top: 10px;
-  padding-left: 10px;
+/* .panel p sets margin: 0 0 12px and outspecifies a bare .milestone, so this
+   needs two classes to land at all -- the rally row and the milestone were
+   sitting flush against each other. */
+.queen-panel .milestone {
+  margin: 18px 0 0;
+  padding: 2px 0 2px 10px;
   border-left: 2px solid var(--accent);
   font-size: 12px;
   color: var(--dim);
@@ -158,6 +185,20 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
   white-space: pre-line;
 }
 .inspect-note.warn { color: var(--accent) !important; }
+.inspect-hint { font-size: 11px; color: var(--dim); opacity: 0.75; }
+
+/* Reading a long note by scrolling the panel meant moving the cursor to it, and
+   the cursor passes over other watched things on the way, which swaps the note
+   before you arrive. A key needs no mouse movement at all. */
+.inspect-modal { backdrop-filter: blur(6px); background: rgba(8, 5, 5, 0.6); }
+/* .modal-box caps at 380px and is declared later with equal specificity, so a
+   bare .inspect-box loses to it and the panel came out phone-width on a
+   desktop. Two classes to win, and it widens with the screen. */
+.modal-box.inspect-box { max-width: 560px; max-height: 82vh; overflow-y: auto; }
+@media (min-width: 1000px) { .modal-box.inspect-box { max-width: 820px; padding: 24px 28px; } }
+@media (min-width: 1400px) { .modal-box.inspect-box { max-width: 1000px; } }
+.inspect-box h2 { color: var(--accent-soft); font-size: 18px; }
+.modal-box .inspect-note { white-space: pre-line; color: var(--good); font-size: 13px; }
 .queen-sprite { flex: none; }
 
 .sprite { image-rendering: pixelated; display: block; }
@@ -187,6 +228,7 @@ button.danger { background: var(--danger); color: #fff; }
 }
 
 .rally-row {
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -222,11 +264,27 @@ button.danger { background: var(--danger); color: #fff; }
 .slot.empty { opacity: 0.35; }
 .slot .bar { height: 10px; }
 
-.raid-panel.imminent { border-color: var(--danger); }
-.raid-panel.hiding { border-color: var(--dim); opacity: 0.9; }
 .raid-scales { display: flex; gap: 32px; margin-bottom: 14px; }
 .raid-scales div { display: flex; flex-direction: column; gap: 2px; }
 .raid-scales b { font-size: 28px; font-weight: 700; color: var(--good); line-height: 1.1; }
+
+/* combat readouts in the stats bar go red as the attack closes */
+.readout.imminent b { color: var(--danger); }
+.readout.losing b { color: var(--danger); }
+
+#combatList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.fighter-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.fighter-row:last-child { border-bottom: none; }
+.fighter-row b { font-size: 13px; font-weight: 600; }
+.fighter-row span { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.fighter-row i { font-style: normal; font-size: 13px; color: var(--good); white-space: nowrap; }
 .raid-scales b.losing { color: var(--danger); }
 .raid-report { font-size: 14px; margin: 0; line-height: 1.5; }
 
@@ -418,6 +476,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 12px;
 }
 .challenge.locked { opacity: 0.5; border-left-color: var(--line); }
+.challenge.mastered { border-left-color: var(--good); opacity: 0.8; }
 .challenge.running { border-color: var(--good); border-left-color: var(--good); }
 .challenge-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .challenge-head b { font-size: 14px; }
@@ -425,6 +484,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .challenge-flavour { font-size: 12px; color: var(--dim); font-style: italic; }
 .challenge-rule { font-size: 12px; color: var(--text); }
 .challenge-target { font-size: 12px; color: var(--good); }
+.challenge-reward { font-size: 12px; color: var(--accent-soft); }
 .challenge-enter { align-self: flex-start; margin-top: 4px; }
 .modal-box .challenge-running,
 .challenge-running {
@@ -471,6 +531,10 @@ ul { list-style: none; margin: 0; padding: 0; }
 .upgrade-desc { display: block; margin-top: 4px; font-size: 12px; color: var(--dim); }
 .upgrade-effect { display: block; margin-top: 6px; font-size: 12px; color: var(--good); }
 .upgrade-lock { display: block; margin-top: 6px; font-size: 12px; color: var(--accent); }
+/* On a phone the inspector stays in the flow, so the cards carry the detail it
+   would otherwise have shown. */
+.upgrade-formula { display: block; margin-top: 6px; font-size: 11px; color: var(--dim); }
+@media (min-width: 1000px) { .upgrade-formula { display: none; } }
 
 #achievementList {
   display: grid;
@@ -494,6 +558,11 @@ ul { list-style: none; margin: 0; padding: 0; }
 #tab-achievements > .bar { margin-bottom: 16px; }
 #achievementTabs { margin-bottom: 4px; }
 #bonusList, #unlockList { display: grid; gap: 10px; margin-top: 14px; }
+#achievementPanel-bonuses > h2 {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
 .bonus-box {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -508,11 +577,17 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .bonus-box b { font-size: 13px; }
 .bonus-box .bonus-value { font-size: 20px; font-weight: 700; color: var(--good); line-height: 1.2; }
+.bonus-box .bonus-formula { font-size: 11px; color: var(--accent-soft); font-variant-numeric: tabular-nums; }
 .bonus-box .bonus-note { font-size: 12px; color: var(--dim); }
 .bonus-box.locked { opacity: 0.55; }
 .bonus-box.locked .bonus-value { color: var(--dim); }
 
 .formulas { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+/* Each formula is a narrow label/value pair, so one per row left a lot of empty
+   width. auto-fit takes two columns when there is room for them and falls back
+   to one on its own. */
+.formulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); align-items: start; }
+.formula-row { min-width: 0; }
 .formula-row {
   display: flex;
   flex-direction: column;
@@ -522,7 +597,33 @@ ul { list-style: none; margin: 0; padding: 0; }
   border-radius: 8px;
 }
 .formula-row b { font-size: 11px; color: var(--dim); letter-spacing: 0.04em; text-transform: uppercase; }
-.formula-row span { font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.formula-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.formula-total { font-size: 15px; font-weight: 700; color: var(--good); white-space: nowrap; }
+/* display:contents on each part lets its label and value join the parent grid,
+   so the numbers line up in a column instead of trailing their labels */
+/* auto/auto with justify-content:start keeps the two columns tight together --
+   a 1fr label column stretched the whole panel width and left a gulf between
+   each label and its number */
+.formula-parts {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  gap: 2px 18px;
+  padding-left: 10px;
+}
+.formula-part { display: contents; }
+.formula-part span { font-size: 12px; color: var(--dim); }
+.formula-part.expandable span { cursor: pointer; color: var(--text); }
+.formula-part.expandable:hover span { color: var(--accent-soft); }
+.formula-part.child span { padding-left: 14px; opacity: 0.8; }
+.formula-part.child i { opacity: 0.8; }
+.formula-part i {
+  font-style: normal;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .track-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .track-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
