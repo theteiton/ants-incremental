@@ -8,7 +8,9 @@ A browser-based ant colony incremental game. Vanilla HTML, CSS and JavaScript �
 
 You play a mated queen who has already landed. Her first act is to shed her wings, which frees a finite pool of body reserves — 100 units, and she will never get more. Those reserves buy her first eggs.
 
-She shed four wings, so the first four workers to emerge are **nanitics**: undersized, feeble foragers. This is not a balance bug, it is how real founding colonies work. Once they are out the reserves stop mattering forever, the colony feeds itself, and the nanitics themselves die of old age two hours later.
+She shed four wings, so the first four workers to emerge are **nanitics** — and the wings themselves survive the shed as something to work on. Strip one and it yields food over ten seconds; they are the only food that exists before the first workers are out.
+
+Nanitics are undersized but not feeble. They are fed on the queen's dissolved flight muscle, so they work at six times a forager's rate and **halve every twenty minutes** as it runs out. The founding phase is a race to raise a real workforce before the founders are spent. They also hatch at double speed and each one tends a brood chamber, which is what a founding generation is actually for. They die at two hours, by which point they produce almost nothing.
 
 From there you choose what each egg becomes.
 
@@ -17,9 +19,9 @@ From there you choose what each egg becomes.
 | Caste | Role | Unlocks at |
 |---|---|---|
 | Forager | Gathers food, the main currency | start |
-| Excavator | Digs chambers, raising the population cap | 25 ants |
-| Nurse | Tends the brood, so more eggs develop at once | 100 ants |
-| Soldier | Fights raids, and hunts between them for protein | 400 ants |
+| Excavator | Digs chambers, raising the population cap | 16 ants |
+| Nurse | Tends the brood, so more eggs develop at once | 64 ants |
+| Soldier | Fights raids, and hunts between them for protein | 256 ants |
 | Big Forager | A rare oversized variant — never laid on purpose | chance |
 
 Castes differ in kind, not degree — none is a strictly better version of another, and each one feeds a different constraint. Unlocks are gated by colony population, never by purchases.
@@ -36,7 +38,7 @@ Only a few eggs develop at once — the rest queue. Nurses widen the brood, whic
 
 ### Raids and protein
 
-From 400 ants a monster attacks every six minutes. Soldiers fight hard from birth; every other caste fights at nothing until the **Combat** upgrades arm them, and that branch only appears once you have survived your first attack. The first three raids come at a quarter, half and three quarters strength, so there is room to react.
+From 256 ants a monster attacks every six minutes. Soldiers fight hard from birth; every other caste fights at nothing until the **Combat** upgrades arm them, and that branch only appears once you have survived your first attack. The first three raids come at a quarter, half and three quarters strength, so there is room to react.
 
 Win and the corpse is stripped for **protein** and a burst of food. Lose and ants die — soldiers first, then foragers, with excavators last so the population cap survives — capped at a fifth of the colony.
 
@@ -57,7 +59,7 @@ adds 0.50 to forager yield → 1.25 → 1.75
 
 ### Achievements
 
-Sixteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level worth **+3% food and +1% hatch speed**, up to level 20. Tracks read your peak values, so a bad raid never takes a tier back.
+Sixteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level, up to 20. The bonuses **compound** rather than add — food `1.035^level`, hatch `1.02^level`, Royal Jelly `1.047^level` — so level 20 pays ×1.99 food, ×1.49 hatch speed and ×2.51 jelly, and the late levels are the ones worth chasing. Tracks read your peak values, so a bad raid never takes a tier back.
 
 Each track carries a ladder of pips, one per tier and filled for the ones you have earned, so you can see how far up every ladder you are without clicking. A track that has gained a tier since you last looked at it shows a dot, and the dot clears when you point at that track — so the tab tells you *which* achievement you just earned, not merely that you earned one.
 
@@ -67,13 +69,20 @@ Measured under strong simulated play, so a human runs slower:
 
 | ants | 20 | 50 | 100 | 250 | 500 | 1000 | 2000 |
 |---|---|---|---|---|---|---|---|
-| time | 3m | 7m | 13m | 29m | 51m | **80m** | 166m |
+| idle | 1m | 3m | 7m | 28m | 53m | **87m** | 129m |
+| working the rally | 1m | 3m | 6m | 17m | 37m | **62m** | 92m |
+
+**Rallying the foragers** is the one thing a hand can do to the food rate: the queen drives them onto the trails for ×3 food over thirty seconds, then they rest for ninety. Working it holds about ×1.5 on average against an idler's ×1.
 
 ## Interface
 
-Five tabs — Ants, Upgrades, Achievements, Nuptial, Settings — with the brood above them so eggs can be laid from anywhere. On a wide screen it is two columns: the queen, the raid box and an inspector on the left; the brood and the tabs on the right.
+Seven tabs — Ants, Upgrades, Combat, Achievements, Nuptial, Trials, Settings. On a wide screen it is two columns: everything you watch and press on the left (queen, brood, inspector), the tab you are reading on the right. Eggs can be laid from any tab.
 
-The **inspector** explains whatever the mouse is pointing at — an ant, an upgrade, an achievement track — including what it still needs, and it keeps showing the last thing you pointed at.
+A **stats bar** across the top carries four ruled groups — resources, colony, combat, lineage — and every readout explains itself when you point at it.
+
+The **inspector** explains whatever the mouse is pointing at, including what it still needs, and keeps showing the last thing you pointed at. Press **E** to open it full size; the notes get long, and moving the mouse toward the panel would swap what it is showing before you arrived.
+
+The **Formulas** panel in Settings lists every layer the colony runs on, each as a total with its factors stacked underneath. Factors are named by kind — upgrades, achievements, trials, lineage — and expand to the individual sources behind each one.
 
 Every caste has a pixel sprite drawn in JavaScript onto a canvas. Three themes (dark, light, soil) live in Settings, along with the queen's name, save export and import, and a hard reset.
 
@@ -83,6 +92,16 @@ At **1,000 ants**, the **Nuptial** tab unlocks. Taking flight releases winged al
 - Earns **Royal Jelly** scaled by population and raids won.
 - Resets live food, ants, brood, queen wings, and colony upgrades.
 - Retains all achievements, peak records, Royal Jelly, and **Royal Lineage adaptations** (prestige upgrades).
+
+Thirteen adaptations. Eight make the next colony stronger; four sell **automation** — the colony buying its own upgrades, laying into free slots, holding a caste balance you set, and keeping a food reserve back. Nothing is automated before the first flight.
+
+## The Trials
+
+The last adaptation opens a tab. A **trial** founds a colony under conditions that should kill it — the lineage's automation comes with her, its strength does not, and everything earned on the Achievements tab still pays.
+
+**Drought** starves the colony to a fraction of its usual food, and asks for 600 ants anyway. Five levels, each harder than the last, roughly half an hour each. Clearing one pays twice: a small compounding buff from the trial, and a permanent doubling from its own achievement, **Deep Cisterns**. Both apply everywhere, inside trials as well as outside.
+
+Five more are listed with what they would do. They are honest about not being built yet.
 
 ## Running it locally
 
@@ -105,8 +124,8 @@ js/save.js          save keys, migrations, the one-tab lock, import and export
 js/ants.js          castes, production, costs, upgrades
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/achievements.js  achievement tracks, tiers, levels
-js/prestige.js      prestige formulas, upgrades, flight reset
-js/upgrades.js      upgrade panel and effect previews
+js/challenges.js    the trials: debuff and reward curves, what each one does
+js/upgrades.js      upgrade panel, formulas, effect previews
 js/panels.js        shared formatting, the inspector, ants and settings panels
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
@@ -120,4 +139,4 @@ Only one tab writes the save. The most recently opened tab owns it and older one
 
 ## Not built yet
 
-Automation (which belongs to subsequent prestige expansions). Nothing lays an egg, buys an upgrade or picks a caste for you.
+Prestige layers beyond the first, and five of the six trials. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.
