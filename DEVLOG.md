@@ -1,15 +1,19 @@
 # Devlog
 
-Every release, newest first. Versions are `layer.system.feature.fix`:
+Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
-- **layer** — prestige layers built. `0` while only the founding colony exists, `1` since the Nuptial Flight.
-- **system** — a system that did not exist before: raids, prestige, trials.
-- **feature** — something new inside an existing system.
+- **epoch** — stays `0` until the game is finished. **1.0.0.0** is the release
+  where the last planned prestige layer ships, somewhere around the fifth or
+  sixth. Everything before that is the run-up to it.
+- **layer** — which prestige layer the work belongs to. `0` is the founding
+  game before any prestige existed, `1` is the Nuptial Flight and everything
+  built on it, and the Matriline will be `2`.
+- **feature** — a new system or feature inside that layer.
 - **fix** — corrections, balance and interface work.
 
 ---
 
-## 1.3.0.0 — 25 August 2026
+## 0.1.4.0 — 25 August 2026
 
 **Five-level trials, and a UI that fits on a screen.**
 
@@ -47,7 +51,7 @@ became five sub-tabs. Formulas stack their factors in a column, name them by
 kind, and expand to the individual upgrades behind each. The inspector is sticky
 on a desktop, in the flow on a phone, and **E** opens it full size.
 
-## 1.2.0.0 — 24 August 2026
+## 0.1.3.0 — 24 August 2026
 
 **The Trials open at the end of the lineage.**
 
@@ -61,7 +65,7 @@ the single term any future debuff plugs into.
 Fixed on the way: a colony that pushed past 1,000 inside a trial could take a
 nuptial flight, silently leaving the trial *and* being paid jelly for it.
 
-## 1.1.0.0 — 24 August 2026
+## 0.1.2.0 — 24 August 2026
 
 **The founding generation gets something to do and something to lose.**
 
@@ -80,7 +84,7 @@ exponent coming down from 1.75 to 1.65.
 
 1,000 ants: 114m → 93m idle, 64m rallying.
 
-## 1.0.2.2 — 23 August 2026
+## 0.1.1.2 — 23 August 2026
 
 **Clicks get through the sticky header.**
 
@@ -91,7 +95,7 @@ at the bottom of the Upgrades tab. Nothing in the header is interactive, so it
 now passes every pointer through. The header background also stopped being
 hard-coded, which had left it a near-black bar on the light theme.
 
-## 1.0.2.1 — 23 August 2026
+## 0.1.1.1 — 23 August 2026
 
 **Acting on the itch.io playtest feedback.**
 
@@ -109,7 +113,7 @@ read and destroy ranges from.
 `MONSTER_REFERENCE` was split from `RAID_UNLOCK` so moving the raid gate did not
 silently make every attacker 60% stronger.
 
-## 1.0.1.0 — 22 August 2026
+## 0.1.1.0 — 22 August 2026
 
 **Automation, sold rather than given.**
 
@@ -123,7 +127,7 @@ A beaten colony now goes to ground instead of being ground to nothing: with no
 soldiers the raids stop and foraging halves, which is a trade rather than a death
 spiral.
 
-## 1.0.0.0 — 21 August 2026
+## 0.1.0.0 — 21 August 2026
 
 **Prestige Layer 1: the Nuptial Flight.**
 
@@ -133,7 +137,7 @@ not. Gates were scoped to the run rather than to the player's whole history — 
 brand-new colony was otherwise past every gate and facing a monster scaled to the
 best nest the player had ever had.
 
-## 0.3.0.0 — 20 August 2026
+## 0.0.4.0 — 20 August 2026
 
 **Raids, soldiers and protein.**
 
@@ -146,7 +150,7 @@ Also: achievements rebuilt as levelling tracks, the inspector, four nanitics,
 formula-driven upgrade previews, the status and action columns, and a one-tab
 save lock so a forgotten background tab cannot bury real progress.
 
-## 0.2.0.0 — 19 August 2026
+## 0.0.3.0 — 19 August 2026
 
 **Nurses, brood slots and the Big Forager.**
 
@@ -157,7 +161,7 @@ hatch by chance from ordinary forager eggs and grow stronger with age.
 Also: per-caste egg costs, exiling, tabs, sprites, themes, a named queen, and
 credit for time spent in a background tab.
 
-## 0.1.0.0 — 19 August 2026
+## 0.0.2.0 — 19 August 2026
 
 **Upgrades, achievements and the cap softlock.**
 
