@@ -1,7 +1,6 @@
 import {
   achievementFoodBonus,
-  achievementRate,
-  ACHIEVEMENT_FOOD_TOP,
+  ACHIEVEMENT_FOOD_RATE,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
   BASE_POPULATION_CAP,
@@ -236,7 +235,7 @@ function overallFoodFormula(game) {
       row("upgrades", "×" + f(globalUpgradeMultiplier(game)), upgradeMultRows(game)),
     achievementFoodBonus(game) !== 1 &&
       row("achievements", "×" + f(achievementFoodBonus(game)), [
-        row("level " + game.achievementLevel, "×" + f(1 + achievementRate(ACHIEVEMENT_FOOD_TOP)) + " each")
+        row("level " + game.achievementLevel, "×" + f(ACHIEVEMENT_FOOD_RATE) + " each")
       ]),
     trials > 1 && row("trials", "×" + f(trials), [
       challengeReward(game) > 1 && row("levels cleared", "×" + f(challengeReward(game))),

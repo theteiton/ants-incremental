@@ -1,10 +1,10 @@
-import { ACHIEVEMENT_FOOD_TOP, ACHIEVEMENT_HATCH_TOP, ACHIEVEMENT_JELLY_TOP,
-  achievementRate, registerAchievementCap,
+import { ACHIEVEMENT_FOOD_RATE, ACHIEVEMENT_HATCH_RATE, ACHIEVEMENT_JELLY_RATE,
+  achievementTop, registerAchievementCap,
   achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
   population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
 import {
-  CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
+  CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
   bestTrialLevel, trialLevelsEver, trialsWithMastery
 } from "./challenges.js";
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
@@ -23,7 +23,15 @@ const el = id => document.getElementById(id);
 // hit it in about two hours. Level 30 now costs 930 XP, which is 78% of every
 // rung in the game, and the deep rungs are where most of that lives.
 export const POINTS_PER_LEVEL = 5;
-export const XP_LEVEL_STEP = 2;
+
+// A level costs COMPOUNDING XP, not a fixed step more than the last. Under the
+// old n(n+1) the cost rose by a flat 2 XP a level, which is barely a curve at
+// all once the ladders got long -- 235 tiers would have run the cap out to 46,
+// and with it the food top to x8.7, undoing the very reduction the 1.0479 rate
+// was chosen for. Compounding keeps the late levels genuinely expensive: level
+// 1 costs 9 XP and level 33 costs 190.
+export const XP_LEVEL_BASE = 9;
+export const XP_LEVEL_GROWTH = 1.10;
 
 // what the i-th tier of any track is worth (1-based)
 export function tierXp(index) {
@@ -44,7 +52,8 @@ export function totalXp(game) {
 
 // cumulative XP needed to have reached a level
 export function xpForLevel(level) {
-  return (XP_LEVEL_STEP * level * (level + 1)) / 2;
+  if (level <= 0) return 0;
+  return XP_LEVEL_BASE * (Math.pow(XP_LEVEL_GROWTH, level) - 1) / (XP_LEVEL_GROWTH - 1);
 }
 // MAX_ACHIEVEMENT_LEVEL is derived, below, once the ladders are known.
 
@@ -94,6 +103,63 @@ const BRANCH_TOTALS = {
   combat: definedLevelsIn("combat")
 };
 
+// ---------------------------------------------------------------- the ladders
+//
+// A ladder is generated from three stated numbers rather than typed out rung by
+// rung: where it starts, where it tops out, and how far apart the rungs are.
+//
+// The SPACING is the interesting one, and it comes from how fast that resource
+// actually grows. Measured on a finished colony, food accumulates x2.13 an hour,
+// protein x1.92, fighting strength x1.44, and everything population-linked
+// x1.32. A rung every two hours of late play means the step is that growth
+// squared -- so food rungs sit x4.5 apart, protein x3.7, and colony size x1.7.
+// Hand-typed ladders could not express that: they were all roughly decades or
+// doublings whatever the resource did, which is why food and protein filled up
+// in an hour while big foragers never moved.
+//
+// Slow discrete tracks -- big foragers, raids, flights, trials, royal jelly --
+// do not grow by a ratio at all, so they state their own step.
+export const RUNG_HOURS = 2;
+
+// Every level of every trial that can actually be played. It was fixed at 5 --
+// one mastered trial -- which two playable trials already passed.
+export const TRIAL_TIER_TOP = CHALLENGE_MAX_LEVEL * CHALLENGES.filter(c => c.open).length;
+
+// rounds to something a player would recognise: 1, 1.5, 2, 3, 5, 7 x 10^k
+const NICE = [1, 1.5, 2, 3, 5, 7];
+
+function niceNumber(value) {
+  if (value <= 10) return Math.max(1, Math.round(value));
+  const power = Math.pow(10, Math.floor(Math.log10(value)));
+  const scaled = value / power;
+  let best = NICE[0];
+  for (const candidate of NICE) {
+    if (Math.abs(candidate - scaled) < Math.abs(best - scaled)) best = candidate;
+  }
+  return Math.round(best * power);
+}
+
+// start, top and the ratio between rungs -> a strictly increasing ladder that
+// ends exactly on the top
+export function ladder(start, top, step) {
+  const rungs = Math.max(2, Math.round(Math.log(top / start) / Math.log(step)) + 1);
+  const out = [];
+  for (let i = 0; i < rungs; i++) {
+    const raw = start * Math.pow(top / start, i / (rungs - 1));
+    const value = niceNumber(raw);
+    if (out.length === 0 || value > out[out.length - 1]) out.push(value);
+  }
+  // the top is stated, so it is the top whatever the rounding did
+  if (out[out.length - 1] !== top) {
+    if (out[out.length - 1] > top) out.pop();
+    out.push(top);
+  }
+  return out;
+}
+
+// a resource that multiplies by `hourly` each hour of late play
+const grown = (start, top, hourly) => ladder(start, top, Math.pow(hourly, RUNG_HOURS));
+
 // Every ladder ends on a number a colony actually reaches, and the tops are set
 // against what a *finished* colony reaches -- whole lineage, Drought mastered --
 // because that colony exists now. Measured at 8 hours it holds 122K ants, 104K
@@ -108,35 +174,32 @@ export const ACHIEVEMENT_TRACKS = [
   { id: "population", name: "Colony size", unit: "ants",
     desc: "The largest colony you have raised.",
     value: g => Math.max(g.peakPopulation || 0, population(g)),
-    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000,
-      15000, 25000, 40000, 65000, 100000] },
+    thresholds: grown(1, 400000, 1.32) },
 
   { id: "food", name: "Food gathered", unit: "food",
     desc: "Every crumb the colony has ever brought home.",
     value: g => g.stats.foodEarned,
-    thresholds: DECADES(2, 14) },
+    thresholds: grown(100, 3e14, 2.13) },
 
   { id: "eggs", name: "Eggs hatched", unit: "eggs",
     desc: "Workers raised from egg to adult.",
     value: g => g.stats.eggsHatched,
-    thresholds: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000,
-      50000, 100000, 200000] },
+    thresholds: grown(10, 400000, 1.32) },
 
   { id: "forager", name: "Foragers", unit: "foragers",
     desc: "The most foragers the colony has held at once.",
     value: g => peakOf(g, "forager"),
-    thresholds: [5, 25, 50, 100, 250, 500, 1000, 2000, 4000, 6000, 8000,
-      15000, 30000, 50000, 80000] },
+    thresholds: grown(5, 350000, 1.32) },
 
   { id: "excavator", name: "Excavators", unit: "excavators",
     desc: "The most diggers the colony has held at once.",
     value: g => peakOf(g, "excavator"),
-    thresholds: [3, 10, 25, 50, 75, 100, 150, 200, 400, 750, 1500, 2500] },
+    thresholds: grown(3, 8000, 1.32) },
 
   { id: "nurse", name: "Nurses", unit: "nurses",
     desc: "The most nurses the colony has held at once.",
     value: g => peakOf(g, "nurse"),
-    thresholds: [3, 10, 25, 50, 100, 200, 350, 500, 1000, 2000, 4000, 6000] },
+    thresholds: grown(3, 20000, 1.32) },
 
   // the k-th big forager needs round(3 x 3.5^k) forager hatches since the last,
   // so twelve is about 4,600 hatches and twenty is about 690,000. The old ladder
@@ -144,30 +207,29 @@ export const ACHIEVEMENT_TRACKS = [
   { id: "bigforager", name: "Big Foragers", unit: "big foragers",
     desc: "Oversized foragers that hatched by chance.",
     value: g => peakOf(g, "bigforager"),
-    thresholds: [1, 2, 3, 5, 8, 12, 14, 16, 18] },
+    thresholds: ladder(1, 20, 1.33) },
 
   { id: "soldier", name: "Soldiers", unit: "soldiers",
     desc: "The standing army at its largest.",
     value: g => peakOf(g, "soldier"),
-    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 750, 1000,
-      2000, 4000, 7000, 10000] },
+    thresholds: grown(1, 30000, 1.32) },
 
   { id: "raids", name: "Raids won", unit: "raids",
     desc: "Attackers killed at the nest gate.",
     value: g => Math.max(g.raidsWon || 0, (g.stats && g.stats.raidsWonTotal) || 0),
-    thresholds: [1, 3, 5, 10, 20, 35, 50, 75, 100, 150, 250, 400] },
+    thresholds: ladder(1, 500, 1.7) },
 
   { id: "strength", name: "Fighting strength", unit: "strength",
     desc: "The most fighting strength the colony has fielded.",
     value: g => g.peakStrength || 0,
-    thresholds: [25, 100, 500, 1000, 2500, 10000, 25000, 50000, 100000,
-      250000, 500000, 1e6, 2e6] },
+    thresholds: grown(25, 8e6, 1.44) },
 
   { id: "protein", name: "Protein gathered", unit: "protein",
     desc: "Everything the soldiers have dragged home.",
     value: g => g.stats.proteinEarned || 0,
-    thresholds: [10, 50, 100, 250, 1000, 5000, 25000, 100000, 250000,
-      1e6, 5e6, 2e7] },
+    // protein grows x1.92 an hour, so two-hourly rungs would sit x3.7 apart --
+    // but the old ladder was denser than that low down, and no rung may be lost
+    thresholds: ladder(10, 25e6, 2.97) },
 
   { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
     desc: "Every adaptation the colony has paid for.",
@@ -190,17 +252,17 @@ export const ACHIEVEMENT_TRACKS = [
   { id: "flights", name: "Nuptial flights", unit: "flights",
     desc: "Times the queen has taken wing and founded a new colony.",
     value: g => (g.prestige && g.prestige.flightsTaken) || 0,
-    thresholds: [1, 2, 3, 5, 8, 12, 20, 35, 50] },
+    thresholds: ladder(1, 50, 1.68) },
 
   { id: "trials", name: "Trials cleared", unit: "levels",
     desc: "Levels of the trials survived. Each one doubles what every colony gathers.",
     value: g => trialLevelsEver(g),
-    thresholds: [1, 2, 3, 4, 5] },
+    thresholds: ladder(1, TRIAL_TIER_TOP, 1.42) },
 
   { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
     desc: "Total royal jelly earned across all flights.",
     value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
-    thresholds: [1, 2, 5, 10, 25, 50, 100, 250] }
+    thresholds: ladder(1, 250, 1.9) }
 ];
 
 // Every XP the game contains: each track fully cleared is 1+2+...+n.
@@ -304,16 +366,16 @@ const BONUS_BOXES = [
   { id: "food", name: "Colony appetite",
     desc: "Every achievement level feeds the whole colony better.",
     value: game => "×" + fmt(achievementFoodBonus(game)) + " food",
-    formula: game => "×" + ACHIEVEMENT_FOOD_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
-      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_FOOD_TOP)) + " a level — level " +
+    formula: game => "×" + ACHIEVEMENT_FOOD_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_FOOD_RATE)) +
+      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
       game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
       ". Each level compounds, so the late ones are worth more than the early ones. " +
       "It multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
-    formula: game => "×" + ACHIEVEMENT_JELLY_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
-      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_JELLY_TOP)) + " a level — level " +
+    formula: game => "×" + ACHIEVEMENT_JELLY_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_JELLY_RATE)) +
+      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
       game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
     value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
@@ -321,8 +383,8 @@ const BONUS_BOXES = [
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
-    formula: game => "×" + ACHIEVEMENT_HATCH_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
-      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_HATCH_TOP)) + " a level — level " +
+    formula: game => "×" + ACHIEVEMENT_HATCH_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_HATCH_RATE)) +
+      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
       game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
       ". Each level compounds. Incubation is 24s divided by this." }

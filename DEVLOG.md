@@ -25,15 +25,22 @@ you, it can never be sat at, and it re-derives itself when a ladder is extended.
 A hand-set cap of 20 was reached in half an hour and then paid nothing for the
 rest of the run; this rules that out by construction.
 
-The same fix went to the bonus. What the **top** of the ladder pays is now the
-number written down — ×10 food, ×2.5 hatch, ×6 jelly — and the per-level rate
-derives from it and the cap. It used to be a hand-set rate with the top falling
-out of it, which quietly broke whenever the cap moved: extending the ladders
-pushed the cap 30 to 34 and the food bonus ×2.81 to ×3.11 as a side effect nobody
-chose. Raising the top raises every level with it, so a first run to 1,000 ants
-went from 80 minutes to 57 — back-loading the curve would keep the opening, but
-it cuts the bonus at middle levels that are live in saves, and no level may ever
-pay less than it did.
+**The ladders generate themselves too.** Each track states where it starts,
+where it tops out and how far apart its rungs sit, and the spacing comes from how
+fast that resource actually grows: food accumulates ×2.13 an hour on a finished
+colony, protein ×1.92, strength ×1.44, everything population-linked ×1.32. A rung
+every two hours of late play makes the step that growth squared — food rungs ×4.5
+apart, protein ×3.4, colony size ×1.7. Hand-typed ladders could not express that,
+which is why food and protein filled up inside an hour while big foragers never
+moved. 181 tiers became 235, and swept across 1,452 values not one scores fewer
+tiers than before.
+
+A level now costs compounding XP rather than a flat 2 more than the last, and the
+bonus is a stated ×1.0479 a level — ×4.68 at the highest reachable level. The
+result is a ladder that keeps paying: a finished colony had 12 of 17 tracks maxed
+by eight hours and its level stuck, and now has 3 maxed at eight hours, 12 by
+sixteen, and climbs 26 → 33 across a day. The cost is pacing — denser early rungs
+mean a first run to 1,000 ants lands at 59 minutes against 80.
 
 A trial pays in two halves — its own achievement, and another rung on every
 upgrade line it pays into — and the cards only ever named the first. Clearing a
