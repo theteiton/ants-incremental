@@ -25,6 +25,16 @@ you, it can never be sat at, and it re-derives itself when a ladder is extended.
 A hand-set cap of 20 was reached in half an hour and then paid nothing for the
 rest of the run; this rules that out by construction.
 
+The same fix went to the bonus. What the **top** of the ladder pays is now the
+number written down — ×10 food, ×2.5 hatch, ×6 jelly — and the per-level rate
+derives from it and the cap. It used to be a hand-set rate with the top falling
+out of it, which quietly broke whenever the cap moved: extending the ladders
+pushed the cap 30 to 34 and the food bonus ×2.81 to ×3.11 as a side effect nobody
+chose. Raising the top raises every level with it, so a first run to 1,000 ants
+went from 80 minutes to 57 — back-loading the curve would keep the opening, but
+it cuts the bonus at middle levels that are live in saves, and no level may ever
+pay less than it did.
+
 A trial pays in two halves — its own achievement, and another rung on every
 upgrade line it pays into — and the cards only ever named the first. Clearing a
 level of Drought lifts the cap on the three food lines, and Endless Siege on the

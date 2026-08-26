@@ -1,6 +1,4 @@
 import {
-  ACHIEVEMENT_FOOD_PER_LEVEL,
-  ACHIEVEMENT_HATCH_PER_LEVEL,
   bigForagerOutput,
   upgradeCurrency,
   broodCapacity,

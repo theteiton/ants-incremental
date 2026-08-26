@@ -145,9 +145,42 @@ export const RALLY_COOLDOWN = 90;
 
 export const HIDING_FOOD_PENALTY = 0.5;
 
-export const ACHIEVEMENT_FOOD_PER_LEVEL = 0.035;
-export const ACHIEVEMENT_HATCH_PER_LEVEL = 0.02;
-export const ACHIEVEMENT_JELLY_PER_LEVEL = 0.047;
+// What the TOP of the achievement ladder is worth. These are the numbers that
+// were actually being decided, so they are the ones written down; the per-level
+// rate derives from them and the cap.
+//
+// It used to be the other way round -- a hand-set rate per level, with the top
+// falling out of it -- and that quietly broke the moment the cap moved. When the
+// ladders went from 142 tiers to 181 the cap went 30 to 34, and the food bonus
+// went x2.81 to x3.11 as a side effect nobody chose. Stating the top instead
+// means extending a ladder adds levels without inflating what the ladder pays.
+export const ACHIEVEMENT_FOOD_TOP = 10;
+export const ACHIEVEMENT_HATCH_TOP = 2.5;
+export const ACHIEVEMENT_JELLY_TOP = 6;
+
+// The cap lives in achievements.js, which already imports this file. Rather than
+// import it back -- a cycle that would evaluate achievements.js before UPGRADES
+// exists and throw -- achievements.js hands the cap over once it has derived it.
+let achievementCap = 34;
+
+export function registerAchievementCap(levels) {
+  if (levels > 0) achievementCap = levels;
+}
+
+export function achievementCapLevels() {
+  return achievementCap;
+}
+
+// top^(level/cap): level 0 pays 1, the cap pays exactly the top, and every level
+// in between is a even step of the same curve.
+function achievementBonus(game, top) {
+  return Math.pow(top, (game.achievementLevel || 0) / achievementCap);
+}
+
+// the equivalent per-level rate, for anything that wants to print one
+export function achievementRate(top) {
+  return Math.pow(top, 1 / achievementCap) - 1;
+}
 
 const FOOD_PER_SECOND = {
   nanitic: 6,
@@ -552,15 +585,15 @@ function masteryLevels(game, type) {
 }
 
 export function achievementFoodBonus(game) {
-  return Math.pow(1 + ACHIEVEMENT_FOOD_PER_LEVEL, game.achievementLevel);
+  return achievementBonus(game, ACHIEVEMENT_FOOD_TOP);
 }
 
 export function achievementHatchBonus(game) {
-  return Math.pow(1 + ACHIEVEMENT_HATCH_PER_LEVEL, game.achievementLevel);
+  return achievementBonus(game, ACHIEVEMENT_HATCH_TOP);
 }
 
 export function achievementJellyBonus(game) {
-  return Math.pow(1 + ACHIEVEMENT_JELLY_PER_LEVEL, game.achievementLevel);
+  return achievementBonus(game, ACHIEVEMENT_JELLY_TOP);
 }
 
 // flat food added to a caste's base: casteFood upgrades are stored as a share of

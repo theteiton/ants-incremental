@@ -1,5 +1,7 @@
 import {
   achievementFoodBonus,
+  achievementRate,
+  ACHIEVEMENT_FOOD_TOP,
   BASE_BROOD_SLOTS,
   bigForagerOutput,
   BASE_POPULATION_CAP,
@@ -234,7 +236,7 @@ function overallFoodFormula(game) {
       row("upgrades", "×" + f(globalUpgradeMultiplier(game)), upgradeMultRows(game)),
     achievementFoodBonus(game) !== 1 &&
       row("achievements", "×" + f(achievementFoodBonus(game)), [
-        row("level " + game.achievementLevel, "×" + ACHIEVEMENT_FOOD_PER_LEVEL_SHOWN + " each")
+        row("level " + game.achievementLevel, "×" + f(1 + achievementRate(ACHIEVEMENT_FOOD_TOP)) + " each")
       ]),
     trials > 1 && row("trials", "×" + f(trials), [
       challengeReward(game) > 1 && row("levels cleared", "×" + f(challengeReward(game))),
@@ -248,7 +250,6 @@ function overallFoodFormula(game) {
   ]);
 }
 
-const ACHIEVEMENT_FOOD_PER_LEVEL_SHOWN = 1.035;
 
 function foodFormula(game, caste) {
   return formula(fmt(casteFoodPerSecond(game, caste)) + "/s", [

@@ -1,4 +1,5 @@
-import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, ACHIEVEMENT_JELLY_PER_LEVEL,
+import { ACHIEVEMENT_FOOD_TOP, ACHIEVEMENT_HATCH_TOP, ACHIEVEMENT_JELLY_TOP,
+  achievementRate, registerAchievementCap,
   achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
   population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
@@ -224,6 +225,8 @@ export const MAX_ACHIEVEMENT_LEVEL = (() => {
   return level + 1;
 })();
 
+registerAchievementCap(MAX_ACHIEVEMENT_LEVEL);
+
 export function trackTier(game, track) {
   const value = track.value(game);
   let tier = 0;
@@ -301,14 +304,16 @@ const BONUS_BOXES = [
   { id: "food", name: "Colony appetite",
     desc: "Every achievement level feeds the whole colony better.",
     value: game => "×" + fmt(achievementFoodBonus(game)) + " food",
-    formula: game => "(1 + " + ACHIEVEMENT_FOOD_PER_LEVEL + ")^level " +
+    formula: game => "×" + ACHIEVEMENT_FOOD_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
+      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_FOOD_TOP)) + " a level — level " +
       game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
       ". Each level compounds, so the late ones are worth more than the early ones. " +
       "It multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
-    formula: game => "(1 + " + ACHIEVEMENT_JELLY_PER_LEVEL + ")^level " +
+    formula: game => "×" + ACHIEVEMENT_JELLY_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
+      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_JELLY_TOP)) + " a level — level " +
       game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
     value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
@@ -316,7 +321,8 @@ const BONUS_BOXES = [
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
-    formula: game => "(1 + " + ACHIEVEMENT_HATCH_PER_LEVEL + ")^level " +
+    formula: game => "×" + ACHIEVEMENT_HATCH_TOP + " at level " + MAX_ACHIEVEMENT_LEVEL +
+      ", so ×" + fmt(1 + achievementRate(ACHIEVEMENT_HATCH_TOP)) + " a level — level " +
       game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
       ". Each level compounds. Incubation is 24s divided by this." }
