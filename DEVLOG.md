@@ -15,7 +15,15 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ## 0.1.5.1 — 26 August 2026
 
-**Saying what clearing a trial is actually worth.**
+**Saying what clearing a trial is actually worth, and a level cap that derives
+itself.**
+
+The achievement cap is no longer a number to remember. It is one level above
+what every XP in the game can buy — 34 today, against a highest reachable 33 —
+so it is a bound rather than a wall: there is always one more level in front of
+you, it can never be sat at, and it re-derives itself when a ladder is extended.
+A hand-set cap of 20 was reached in half an hour and then paid nothing for the
+rest of the run; this rules that out by construction.
 
 A trial pays in two halves — its own achievement, and another rung on every
 upgrade line it pays into — and the cards only ever named the first. Clearing a

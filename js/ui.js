@@ -987,8 +987,8 @@ function masteryLineText(type) {
   const raised = linesWithMastery(type);
   if (!raised.length) return "nothing else";
   return raised.length === 1
-    ? raised[0].name + " gains a level"
-    : "all " + raised.length + " " + type + " upgrade lines gain a level";
+    ? "the max level of " + raised[0].name + " rises by one"
+    : "the max level of all " + raised.length + " " + type + " upgrade lines rises by one";
 }
 
 // What a trial actually does, in its own terms. Every card and hover used to
@@ -1083,9 +1083,9 @@ function trialDetail(challenge) {
   if (m) {
     const raised = linesWithMastery(m.type);
     if (raised.length) {
-      lines.push("  · " + listNames(raised.map(l => l.name)) +
-        (raised.length === 1 ? " gains" : " each gain") +
-        " another level to buy — every level of this trial raises their cap.");
+      lines.push("  · Max level rises by one on " + listNames(raised.map(l => l.name)) +
+        " — every level of this trial raises their cap, and the levels past the" +
+        " defined top cost protein as well as food.");
     }
   }
   lines.push("  · All of it applies everywhere, inside trials as well as outside.");

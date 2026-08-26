@@ -45,13 +45,7 @@ export function totalXp(game) {
 export function xpForLevel(level) {
   return (XP_LEVEL_STEP * level * (level + 1)) / 2;
 }
-// Raised from 20, because a finished player reached the old cap in half an hour
-// and every tier past it paid nothing. Measured on a colony with the whole
-// lineage and Drought mastered: 181 tiers exist, 170 are reachable inside one
-// 24h colony and about 180 across a lifetime, and 150 of them -- level 30 --
-// lands at roughly two hours. The slack is the point: no single rung is
-// load-bearing, which is what made the old cap unreachable.
-export const MAX_ACHIEVEMENT_LEVEL = 30;
+// MAX_ACHIEVEMENT_LEVEL is derived, below, once the ladders are known.
 
 const DECADES = (from, to) => {
   const out = [];
@@ -207,6 +201,28 @@ export const ACHIEVEMENT_TRACKS = [
     value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
     thresholds: [1, 2, 5, 10, 25, 50, 100, 250] }
 ];
+
+// Every XP the game contains: each track fully cleared is 1+2+...+n.
+export function maxEarnableXp() {
+  let total = 0;
+  for (const track of ACHIEVEMENT_TRACKS) {
+    const rungs = track.thresholds.length;
+    total += (rungs * (rungs + 1)) / 2;
+  }
+  return total;
+}
+
+// The cap is one level above what all of that XP can buy, so it is a bound
+// rather than a wall: there is always one more level in front of you, and it
+// re-derives itself whenever a ladder is extended instead of having to be
+// remembered and hand-edited. A hand-set 20 was reached in half an hour and
+// then paid nothing for the rest of the run, which is what this prevents.
+export const MAX_ACHIEVEMENT_LEVEL = (() => {
+  const ceiling = maxEarnableXp();
+  let level = 0;
+  while (xpForLevel(level + 1) <= ceiling) level++;
+  return level + 1;
+})();
 
 export function trackTier(game, track) {
   const value = track.value(game);
