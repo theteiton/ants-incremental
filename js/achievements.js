@@ -1,7 +1,8 @@
 import { ACHIEVEMENT_FOOD_RATE, ACHIEVEMENT_HATCH_RATE, ACHIEVEMENT_JELLY_RATE,
   achievementTop, registerAchievementCap,
   achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
-  population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn } from "./ants.js";
+  population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn,
+  upgradeLevel } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
 import {
   CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
@@ -75,6 +76,13 @@ export function upgradeSteps(total) {
   }
   if (steps[steps.length - 1] !== total) steps.push(total);
   return steps;
+}
+
+// the furthest any one upgrade line has been pushed
+function deepestUpgradeLevel(game) {
+  let deepest = 0;
+  for (const line of UPGRADES) deepest = Math.max(deepest, upgradeLevel(game, line));
+  return deepest;
 }
 
 function peakOf(game, caste) {
@@ -232,7 +240,7 @@ export const ACHIEVEMENT_TRACKS = [
     thresholds: ladder(10, 25e6, 2.97) },
 
   { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
-    desc: "Every adaptation the colony has paid for.",
+    desc: "Every level bought across all twelve upgrade lines.",
     value: g => ownedIn(g, null),
     thresholds: upgradeSteps(BRANCH_TOTALS.all) },
 
@@ -255,14 +263,51 @@ export const ACHIEVEMENT_TRACKS = [
     thresholds: ladder(1, 50, 1.68) },
 
   { id: "trials", name: "Trials cleared", unit: "levels",
-    desc: "Levels of the trials survived. Each one doubles what every colony gathers.",
+    desc: "Levels of the trials survived. Each pays back the thing its trial took.",
     value: g => trialLevelsEver(g),
     thresholds: ladder(1, TRIAL_TIER_TOP, 1.42) },
 
   { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
     desc: "Total royal jelly earned across all flights.",
     value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
-    thresholds: ladder(1, 250, 1.9) }
+    thresholds: ladder(1, 250, 1.9) },
+
+  // ---- what nothing else was watching -----------------------------------
+  // Six tracks that recognise things the colony already did and got no credit
+  // for. Growth-driven ladders take their spacing from measurement like the
+  // rest; the ones a player chooses rather than earns -- exiling, destroying --
+  // cannot be measured that way and state round numbers instead.
+
+  { id: "trained", name: "Soldiers trained", unit: "promotions",
+    desc: "Soldiers raised into a higher grade in the Units menu, and survived it.",
+    value: g => (g.stats && g.stats.trained) || 0,
+    thresholds: ladder(1, 20000, 2.2) },
+
+  { id: "guard", name: "Phragmotic Guards", unit: "guards",
+    desc: "The heaviest grade the colony can make. Her head is the door.",
+    value: g => peakOf(g, "guard"),
+    thresholds: ladder(1, 2000, 1.9) },
+
+  { id: "deepest", name: "Deepest adaptation", unit: "levels",
+    desc: "The highest level reached on any single upgrade line.",
+    value: g => Math.max((g.peakUpgrades && g.peakUpgrades.deepest) || 0,
+      deepestUpgradeLevel(g)),
+    thresholds: ladder(1, 20, 1.3) },
+
+  { id: "matriline", name: "Matriline age", unit: "hours",
+    desc: "Hours across every colony in the line, not just the one standing.",
+    value: g => (g.stats && g.stats.playtime || 0) / 3600,
+    thresholds: ladder(1, 300, 1.7) },
+
+  { id: "exiled", name: "Ants exiled", unit: "ants",
+    desc: "Sent away for good. Nothing else in the colony remembers them.",
+    value: g => (g.stats && g.stats.exiled) || 0,
+    thresholds: ladder(1, 5000, 2.2) },
+
+  { id: "destroyed", name: "Eggs destroyed", unit: "eggs",
+    desc: "Brood the queen laid and the colony decided against.",
+    value: g => (g.stats && g.stats.eggsCancelled) || 0,
+    thresholds: ladder(1, 10000, 2.4) }
 ];
 
 // Every XP the game contains: each track fully cleared is 1+2+...+n.
@@ -370,8 +415,8 @@ const BONUS_BOXES = [
       " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
       game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ". Each level compounds, so the late ones are worth more than the early ones. " +
-      "It multiplies every caste at once." },
+      ". Every level is the same step up, and every level costs more XP than the one " +
+      "before it. It multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
     formula: game => "×" + ACHIEVEMENT_JELLY_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_JELLY_RATE)) +
@@ -379,7 +424,8 @@ const BONUS_BOXES = [
       game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
     value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ". Each level compounds. It multiplies what every nuptial flight pays." },
+      ". Every level is the same step up, and each costs more than the last. " +
+      "It multiplies what every nuptial flight pays." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
@@ -387,7 +433,8 @@ const BONUS_BOXES = [
       " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
       game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
     note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
-      ". Each level compounds. Incubation is 24s divided by this." }
+      ". Every level is the same step up, and each costs more than the last. " +
+      "Incubation is 24s divided by this." }
 ];
 
 // One box per trial, because each trial gives back the thing it took. The

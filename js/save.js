@@ -207,7 +207,7 @@ export function applySave(game, fresh, data) {
   game.wingStrip = data.wingStrip || 0;
   game.peakCastes = Object.assign({}, data.peakCastes || {});
   game.runTime = typeof data.runTime === "number" ? data.runTime : (data.stats && data.stats.playtime) || 0;
-  game.peakUpgrades = Object.assign({ all: 0, colony: 0, combat: 0 }, data.peakUpgrades || {});
+  game.peakUpgrades = Object.assign({ all: 0, colony: 0, combat: 0, deepest: 0 }, data.peakUpgrades || {});
   game.best = Object.assign({ population: 0, jelly: 0, timeTo1000: 0 }, data.best || {});
   const savedRun = data.run;
   game.run = savedRun && typeof savedRun === "object"

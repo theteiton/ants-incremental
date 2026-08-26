@@ -13,34 +13,53 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.6.0 — 26 August 2026
+
+**The achievement rework.**
+
+Nothing about achievements was decided any more — the numbers were just typed in,
+and they went stale the moment anything else moved. Three things now derive
+themselves instead.
+
+**The cap.** It is one level above what every XP in the game can buy — 36 today
+against a highest reachable 35 — so it is a bound rather than a wall: there is
+always one more level in front of you, it can never be sat at, and it recomputes
+when a ladder changes. The hand-set 20 it replaces was reached in half an hour
+and paid nothing for the rest of the run.
+
+**The ladders.** Each track states where it starts, where it tops out and how far
+apart its rungs sit, and `ladder()` fills in the rest, rounding to numbers a
+player recognises. The spacing comes from how fast that resource actually grows:
+measured on a finished colony, food accumulates ×2.13 an hour, protein ×1.92,
+fighting strength ×1.44 and everything population-linked ×1.32. A rung every two
+hours of late play makes the step that growth squared — so food rungs sit ×4.5
+apart, protein ×3.4, colony size ×1.7. Hand-typed ladders could not express that;
+they were all roughly decades or doublings whatever the resource did, which is
+why food and protein filled up inside an hour while big foragers never moved.
+Four tracks state a tighter step than their growth implies, because the old
+ladder was denser there and **no rung may ever be lost** — swept across 1,452
+values, nothing scores fewer tiers than it did.
+
+**The level cost.** Compounding — `9 × (1.10ⁿ − 1) / 0.10`, so level 1 costs 9 XP
+and level 33 costs 190. The old flat `n(n+1)` is barely a curve once the ladders
+are long: at 314 tiers it would have run the cap past 45 and the food bonus with
+it. The bonus is a stated ×1.0479 a level, ×5.14 at the highest reachable.
+
+**Six new tracks**, for the things nothing was watching: soldiers trained,
+Phragmotic Guards raised, the deepest single upgrade line, matriline age, ants
+exiled and eggs destroyed. The last four are player choices rather than growth,
+so they state round numbers instead of measured ones — and they hold only 13% of
+the XP, so a player who never exiles an ant still reaches level 34 of 36.
+
+The result is a ladder that keeps paying. A finished colony used to have 12 of 17
+tracks maxed by eight hours with its level stuck; it now has 3 of 23 maxed at
+eight hours, 13 by a full day, and climbs 26 → 33 across it. The cost is pacing:
+denser early rungs mean more tiers sooner, so a first run to 1,000 ants lands
+around 59 minutes against the 80 it took before.
+
 ## 0.1.5.1 — 26 August 2026
 
-**Saying what clearing a trial is actually worth, and a level cap that derives
-itself.**
-
-The achievement cap is no longer a number to remember. It is one level above
-what every XP in the game can buy — 34 today, against a highest reachable 33 —
-so it is a bound rather than a wall: there is always one more level in front of
-you, it can never be sat at, and it re-derives itself when a ladder is extended.
-A hand-set cap of 20 was reached in half an hour and then paid nothing for the
-rest of the run; this rules that out by construction.
-
-**The ladders generate themselves too.** Each track states where it starts,
-where it tops out and how far apart its rungs sit, and the spacing comes from how
-fast that resource actually grows: food accumulates ×2.13 an hour on a finished
-colony, protein ×1.92, strength ×1.44, everything population-linked ×1.32. A rung
-every two hours of late play makes the step that growth squared — food rungs ×4.5
-apart, protein ×3.4, colony size ×1.7. Hand-typed ladders could not express that,
-which is why food and protein filled up inside an hour while big foragers never
-moved. 181 tiers became 235, and swept across 1,452 values not one scores fewer
-tiers than before.
-
-A level now costs compounding XP rather than a flat 2 more than the last, and the
-bonus is a stated ×1.0479 a level — ×4.68 at the highest reachable level. The
-result is a ladder that keeps paying: a finished colony had 12 of 17 tracks maxed
-by eight hours and its level stuck, and now has 3 maxed at eight hours, 12 by
-sixteen, and climbs 26 → 33 across a day. The cost is pacing — denser early rungs
-mean a first run to 1,000 ants lands at 59 minutes against 80.
+**Saying what clearing a trial is actually worth.**
 
 A trial pays in two halves — its own achievement, and another rung on every
 upgrade line it pays into — and the cards only ever named the first. Clearing a

@@ -166,7 +166,7 @@ function blankGame() {
     runTime: 0,
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
     best: { population: 0, jelly: 0, timeTo1000: 0 },
-    peakUpgrades: { all: 0, colony: 0, combat: 0 },
+    peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
       trained: 0, trainingDeaths: 0 },
@@ -631,6 +631,9 @@ function recordUpgradePeaks(game) {
   const peaks = game.peakUpgrades || (game.peakUpgrades = { all: 0, colony: 0, combat: 0 });
   const colony = levelsOwned(game, "colony");
   const combat = levelsOwned(game, "combat");
+  let deepest = 0;
+  for (const line of UPGRADES) deepest = Math.max(deepest, upgradeLevel(game, line));
+  peaks.deepest = Math.max(peaks.deepest || 0, deepest);
   peaks.all = Math.max(peaks.all || 0, colony + combat);
   peaks.colony = Math.max(peaks.colony || 0, colony);
   peaks.combat = Math.max(peaks.combat || 0, combat);
