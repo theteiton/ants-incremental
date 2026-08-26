@@ -13,6 +13,22 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.5.1 — 26 August 2026
+
+**Saying what clearing a trial is actually worth.**
+
+A trial pays in two halves — its own achievement, and another rung on every
+upgrade line it pays into — and the cards only ever named the first. Clearing a
+level of Drought lifts the cap on the three food lines, and Endless Siege on the
+four combat ones; neither the card nor the hover mentioned it, so a large part of
+the reward was invisible. The line names come from the `mastery` tags rather than
+being written out, so they cannot drift.
+
+Also: the full-size inspector had lost every line break. `paintNote` splits a
+note into one span per line, and the full-size view was built by reading the
+sidebar's `textContent` back out, which concatenates spans with nothing between
+them. It takes the note as written now.
+
 ## 0.1.5.0 — 26 August 2026
 
 **Soldiers get ranks, upgrades get levels, and the second trial opens.**

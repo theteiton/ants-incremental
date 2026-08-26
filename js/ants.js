@@ -343,6 +343,14 @@ export function upgradeMaxLevel(game, line) {
   return line.levels.length + masteryLevels(game, line.mastery);
 }
 
+// Which upgrade lines a trial's mastery raises the cap on. The trials pay in
+// two halves and the cards only ever named one of them: clearing a level of
+// Drought also gives every food line another rung, which is a large part of
+// what clearing is worth and went unmentioned entirely.
+export function linesWithMastery(type) {
+  return UPGRADES.filter(line => line.mastery === type);
+}
+
 export function upgradeMaxed(game, line) {
   return upgradeLevel(game, line) >= upgradeMaxLevel(game, line);
 }

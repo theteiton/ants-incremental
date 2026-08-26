@@ -7,6 +7,7 @@ import {
   RANK_IDS,
   rankOf,
   soldierCount,
+  linesWithMastery,
   incubationTime,
   naniticLifespan,
   nextEggCaste,
@@ -975,6 +976,21 @@ const challengeCards = {};
 
 const pct = value => fmt(value * 100) + "%";
 
+function listNames(names) {
+  if (names.length <= 1) return names[0] || "";
+  return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+
+// the half of a trial's reward the cards never mentioned: another rung on every
+// upgrade line that trial pays into
+function masteryLineText(type) {
+  const raised = linesWithMastery(type);
+  if (!raised.length) return "nothing else";
+  return raised.length === 1
+    ? raised[0].name + " gains a level"
+    : "all " + raised.length + " " + type + " upgrade lines gain a level";
+}
+
 // What a trial actually does, in its own terms. Every card and hover used to
 // print Drought's food multiplier whatever trial it was describing, so Endless
 // Siege -- which does not touch food at all -- announced a 25% food penalty.
@@ -1063,6 +1079,14 @@ function trialDetail(challenge) {
     lines.push("  · You would hold × " + fmt(rewardThen * masteryFood(game)) + " food and × " +
       fmt(Math.pow(m.step, Math.max(bestTrialLevel(game, challenge.id), level + 1))) +
       " " + m.type + ", in every colony.");
+  }
+  if (m) {
+    const raised = linesWithMastery(m.type);
+    if (raised.length) {
+      lines.push("  · " + listNames(raised.map(l => l.name)) +
+        (raised.length === 1 ? " gains" : " each gain") +
+        " another level to buy — every level of this trial raises their cap.");
+    }
   }
   lines.push("  · All of it applies everywhere, inside trials as well as outside.");
   lines.push(level + 1 >= CHALLENGE_MAX_LEVEL
@@ -1192,8 +1216,9 @@ function renderChallenges() {
         (mine ? " You have " + fmt(challengeCount()) + "." : "")
       : "";
     ui.reward.textContent = challenge.open && !mastered
-      ? "Each level pays × " + CHALLENGE_REWARD_STEP + " food, and " + challenge.mastery.name +
-        " pays × " + challenge.mastery.step + " " + challenge.mastery.type + ". Both for good."
+      ? "Each level pays × " + CHALLENGE_REWARD_STEP + " food, " + challenge.mastery.name +
+        " pays × " + challenge.mastery.step + " " + challenge.mastery.type + ", and " +
+        masteryLineText(challenge.mastery.type) + ". All for good."
       : "";
     ui.button.hidden = !challenge.open || mastered;
     ui.button.disabled = !challenge.open || mastered || (!!running && !mine);

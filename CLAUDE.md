@@ -290,6 +290,14 @@ Upgrade unlocks are spaced against measured caste counts so a reward lands every
 
 **The debuff scale has to beat the doubling.** At `0.44` the drought and the ×2 mastery cancelled almost exactly and level 5 came in *no harder* than level 1 — a ladder whose last rung is the easiest. `0.36` restores the ramp.
 
+**A trial's reward has two halves and the cards only named one.** Clearing a
+level pays its achievement — Deep Cisterns, Hardened Line — and *also* raises the
+max level of every upgrade line that trial pays into: Drought lifts the three
+food lines, Endless Siege the four combat ones. That second half went unmentioned
+on the card and in the hover, so a large part of what clearing is worth was
+invisible. Both now say it, and the line names are read from the `mastery` tags
+rather than written out, so they cannot drift when a line is added or retagged.
+
 **Each trial gives back the thing it took.** Drought starves the colony and pays in food; Sealed Nest would pay in population cap, Barren Brood in brood slots, Endless Siege in soldier strength. A trial declares `mastery: { type, step, name, desc }` and the bonus box, the hover, the card line and the formula term all follow from it — only the consuming site needs wiring per type. **Sterile's restriction is the twenty-nine bought upgrades**, not the lineage, because every trial already leaves the lineage behind and Akami spotted that this left Sterile with no identity of its own.
 
 **One place takes food away.** `hidingPenalty` used to sit inside `globalFoodMultiplier`, a penalty hidden among the boosts. It now lives in `foodPenalty()` with the trial debuff, and that is the single term any future debuff plugs into. The formula prints both halves — `× trials 1.69 × drought 0.14` — because a rate the formula does not explain is worse than no formula.
