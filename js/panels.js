@@ -23,6 +23,7 @@ import {
   upgradeUnlocked
 } from "./ants.js";
 import { combatPerCaste, combatPerSoldier } from "./raids.js";
+import { rankOf } from "./ants.js";
 import {
   buyUpgrade,
   automationOn,
@@ -112,6 +113,45 @@ const el = id => document.getElementById(id);
 
 let lastInspected = null;
 
+// A note is plain text built by whoever owns the thing being inspected. Rather
+// than teach every caller about markup, the renderer reads the ALL-CAPS section
+// headers it already writes and tones the lines beneath them: what it costs you
+// reads as a cost, what you get reads as a gain.
+const NOTE_TONES = {
+  "WHILE IT RUNS": "cost",
+  "WHAT IT TAKES": "cost",
+  "WHAT COMES WITH YOU": "keep",
+  "TO CLEAR IT": "goal",
+  "IF YOU CLEAR IT": "reward",
+  "WHAT CLEARING PAYS": "reward",
+  "NEXT": "goal"
+};
+
+function isHeading(line) {
+  const bare = line.trim();
+  return bare.length > 0 && bare === bare.toUpperCase() && /[A-Z]/.test(bare);
+}
+
+// pooled: the inspector redraws every frame, and rebuilding nodes under the
+// cursor is what broke clicking on the upgrade cards
+function paintNote(box, text) {
+  const lines = String(text || "").split("\n");
+  while (box.children.length > lines.length) box.removeChild(box.lastChild);
+  while (box.children.length < lines.length) {
+    const line = document.createElement("span");
+    line.className = "note-line";
+    box.appendChild(line);
+  }
+  let tone = "plain";
+  lines.forEach((raw, i) => {
+    const node = box.children[i];
+    const head = isHeading(raw);
+    if (head) tone = NOTE_TONES[raw.trim()] || "plain";
+    node.textContent = raw;
+    node.className = "note-line" + (head ? " note-head" : "") + " note-" + tone;
+  });
+}
+
 export function setInspect(entry) {
   lastInspected = entry;
   renderInspector();
@@ -133,13 +173,15 @@ export function renderInspector() {
   el("inspectTitle").textContent = entry.title || "";
   el("inspectBody").textContent = typeof entry.body === "function" ? entry.body() : entry.body || "";
   const note = typeof entry.note === "function" ? entry.note() : entry.note || "";
-  el("inspectNote").textContent = note;
+  paintNote(el("inspectNote"), note);
   el("inspectNote").className = entry.warn ? "inspect-note warn" : "inspect-note";
   // tied to the inspector rather than the frame loop, so the hint appears the
   // instant something is pointed at
   const hint = el("inspectHint");
   if (hint) hint.hidden = false;
 }
+
+export { paintNote };
 
 export function watch(element, entry) {
   element.addEventListener("mouseenter", () => setInspect(entry));
@@ -231,10 +273,12 @@ function casteEffectText(id) {
         broodCapacity(game) + " tended at once)" + armed
       : "";
   }
-  if (id === "soldier") {
-    return held > 0
-      ? fmt(held * combatPerSoldier(game)) + " fighting strength (" + fmt(combatPerSoldier(game)) + " each)"
-      : "";
+  if (rankOf(id)) {
+    if (held <= 0) return "";
+    const each = combatPerCaste(game, id);
+    const rank = rankOf(id);
+    return fmt(held * each) + " fighting strength (" + fmt(each) + " each)" +
+      (rank.hunt > 0 ? " · hunts at " + fmt(rank.hunt * 100) + "%" : " · never hunts");
   }
   if (id === "bigforager") {
     return held > 0
@@ -358,6 +402,13 @@ export function buildSettings(handlers) {
     setSetting("theme", event.target.value);
     handlers.applyTheme();
   };
+  // The panel following the scroll is what makes hover-to-inspect work without
+  // moving the mouse, but it also means a panel that never leaves the screen.
+  // Asked for as a choice rather than a default either way.
+  el("setStickyInspector").onchange = event => {
+    setSetting("stickyInspector", event.target.checked);
+    handlers.applyLayout();
+  };
   el("setQueenName").oninput = event => {
     setQueenName(event.target.value);
     handlers.refresh();
@@ -434,6 +485,11 @@ export function renderSettings() {
   renderAutomation();
   el("setExile").checked = !!game.settings.exileEnabled;
   el("setTheme").value = game.settings.theme || "dark";
+  const sticky = game.settings.stickyInspector !== false;
+  el("setStickyInspector").checked = sticky;
+  el("stickyInspectorNote").textContent = sticky
+    ? "It follows you down the page, so what you point at is always readable without scrolling. Press E to open it full size."
+    : "It stays put in the column. Scrolling away from it means scrolling back to read it — press E to open it full size instead.";
   if (document.activeElement !== el("setQueenName")) el("setQueenName").value = game.queenName || "";
   el("exileStatus").textContent = exileUnlocked()
     ? "Unlocked — exile controls appear on the Ants tab."

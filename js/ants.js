@@ -1,4 +1,5 @@
-import { challengeDebuff, challengeReward, masteryFood } from "./challenges.js";
+import { CHALLENGES, bestTrialLevel, challengeDebuff, challengeReward, masteryFood,
+  siegeActive, SIEGE_UNLOCK } from "./challenges.js";
 import {
   prestigeFoodMultiplier,
   prestigeBaseCap,
@@ -43,8 +44,61 @@ export const CASTES = {
     unlockAt: 256,
     layable: true,
     role: "Fights raids, and hunts between them for protein."
+  },
+  // The ranks above a soldier. A caste is never a strictly better version of
+  // another one, and these are no exception: every grade fights harder and
+  // hunts worse, because the head that wins a fight is the head that cannot
+  // carry food home. An army of nothing but guards starves the colony of the
+  // protein that trained it, which is the whole tension of the Units menu.
+  major: {
+    name: "Major",
+    unlockAt: 256,
+    layable: false,
+    role: "A soldier grown into her armour. Fights three times as hard, hunts half as well."
+  },
+  supermajor: {
+    name: "Supermajor",
+    unlockAt: 256,
+    layable: false,
+    role: "Head and mandibles out of all proportion. Formidable at the gate, near useless away from it."
+  },
+  guard: {
+    name: "Phragmotic Guard",
+    unlockAt: 256,
+    layable: false,
+    role: "Her head is a living door, shaped to plug the tunnel. She never leaves it, and never hunts."
   }
 };
+
+// Rank is a ladder, and the trade runs the whole way up it: power multiplies,
+// hunting falls to nothing. Promotion is free but slow -- veterans are made by
+// surviving raids -- or bought with protein at the risk of losing the ant.
+export const SOLDIER_RANKS = [
+  { id: "soldier", power: 1, hunt: 1 },
+  { id: "major", power: 3, hunt: 0.5, cost: 40, loss: 0.10 },
+  { id: "supermajor", power: 9, hunt: 0.15, cost: 200, loss: 0.20 },
+  { id: "guard", power: 25, hunt: 0, cost: 1200, loss: 0.35 }
+];
+
+export const RANK_IDS = SOLDIER_RANKS.map(r => r.id);
+
+export function rankAt(index) {
+  return SOLDIER_RANKS[index] || null;
+}
+
+export function rankOf(id) {
+  return SOLDIER_RANKS.find(r => r.id === id) || null;
+}
+
+// Every rank counts as a soldier everywhere it matters -- egg price, upgrade
+// gates, achievement tracks. Without this, promoting an ant would make the next
+// soldier egg cheaper and could re-lock a Combat upgrade behind a soldier count
+// the army had already passed.
+export function soldierCount(game) {
+  let total = 0;
+  for (const id of RANK_IDS) total += game.ants[id] || 0;
+  return total;
+}
 
 export const NANITIC_GENERATION = 4;
 export const EGG_TIME = 24;
@@ -101,7 +155,10 @@ const FOOD_PER_SECOND = {
   bigforager: 0,
   excavator: 0,
   nurse: 0,
-  soldier: 0
+  soldier: 0,
+  major: 0,
+  supermajor: 0,
+  guard: 0
 };
 
 export const CASTE_COSTS = {
@@ -114,72 +171,230 @@ export const CASTE_COSTS = {
 };
 
 
+// Upgrades are LINES with LEVELS, not 29 one-shot purchases. Most of the old
+// entries were the same upgrade at a bigger number -- six forager yields, four
+// excavator caps, four nurse slots -- so they are one line each now, and the
+// flavour name, cost and gate of every old entry survives as a level of it.
+//
+// Nothing about the balance moved: every level below carries the exact cost,
+// gate and magnitude of the one-shot upgrade it replaces, in the same order.
+// 12 lines, 29 defined levels, 21 colony and 8 combat -- the same totals the
+// achievement ladders are generated from.
+//
+// A line can be pushed PAST its defined levels, and that is what the trials
+// sell. Each trial gives back the thing it took, so Drought's cleared levels
+// raise the cap on the three lines that make food. Extended levels cost protein
+// as well as food, which is the sink protein never had.
+export const EXTENDED_FOOD_STEP = 6;
+export const EXTENDED_PROTEIN_BASE = 50000;
+export const EXTENDED_PROTEIN_STEP = 4;
+// An extended level is deliberately worth LESS than the defined one it repeats.
+// Measured with them at full strength: the colony line repeating x2 five times
+// is a x32 global multiplier on its own, food per second reached 1.56 trillion
+// and population 2.66M -- twelve times what the same colony reaches without
+// them, and past the top of every achievement ladder. Half an additive step and
+// a flat x1.15 multiplicative one make five cleared levels worth about x3.6
+// overall, which is a reward rather than a different game.
+export const EXTENDED_ADD_SCALE = 0.5;
+export const EXTENDED_MULT_STEP = 1.15;
+
 export const UPGRADES = [
-  { id: "nanitic_1", name: "Callow Cuticle", req: { caste: "nanitic", count: 1 }, cost: 30,
-    desc: "Thin-shelled nanitics forage twice as hard.", effect: { type: "casteFlat", caste: "nanitic", add: 0.9 } },
-  { id: "nanitic_2", name: "Hunger of the First", req: { caste: "nanitic", count: 2 }, cost: 120,
-    desc: "The first generation works itself to the bone.", effect: { type: "casteFlat", caste: "nanitic", add: 1.2 } },
-  { id: "nanitic_3", name: "Living Larder", req: { caste: "nanitic", count: 3 }, cost: 500,
-    desc: "Nanitics store food in their own crops. They fade half as fast.", effect: { type: "naniticVigour", add: 1 } },
-  { id: "nanitic_4", name: "Borrowed Time", req: { caste: "nanitic", count: 4 }, cost: 1200,
-    desc: "They will not live to see the colony they build, but they last longer trying.", effect: { type: "naniticVigour", add: 2 } },
+  { id: "nanitic_food", name: "The founding brood", branch: "colony",
+    effect: { type: "casteFlat", caste: "nanitic" }, mastery: "food",
+    levels: [
+      { name: "Callow Cuticle", cost: 30, req: { caste: "nanitic", count: 1 }, add: 0.9,
+        desc: "Thin-shelled nanitics forage twice as hard." },
+      { name: "Hunger of the First", cost: 120, req: { caste: "nanitic", count: 2 }, add: 1.2,
+        desc: "The first generation works itself to the bone." }
+    ] },
 
-  { id: "forager_1", name: "Scent Trails", req: { caste: "forager", count: 3 }, cost: 260,
-    desc: "Foragers mark the route home. Forager food +50%.", effect: { type: "casteFood", caste: "forager", add: 0.5 } },
-  { id: "forager_2", name: "Leaf Shears", req: { caste: "forager", count: 12 }, cost: 1500,
-    desc: "Sharper mandibles cut faster. Forager food +75%.", effect: { type: "casteFood", caste: "forager", add: 0.75 } },
-  { id: "forager_3", name: "Aphid Herding", req: { caste: "forager", count: 35 }, cost: 8000,
-    desc: "Milked aphids yield honeydew. Forager food +100%.", effect: { type: "casteFood", caste: "forager", add: 1 } },
-  { id: "forager_4", name: "Deep Middens", req: { caste: "forager", count: 90 }, cost: 25000,
-    desc: "Nothing edible is wasted. Forager food +150%.", effect: { type: "casteFood", caste: "forager", add: 1.5 } },
-  { id: "forager_5", name: "Trunk Trails", req: { caste: "forager", count: 150 }, cost: 70000,
-    desc: "Cleared highways speed every trip. Forager food +200%.", effect: { type: "casteFood", caste: "forager", add: 2 } },
-  { id: "forager_6", name: "Canopy Routes", req: { caste: "forager", count: 400 }, cost: 400000,
-    desc: "The colony harvests the whole tree. Forager food +300%.", effect: { type: "casteFood", caste: "forager", add: 3 } },
+  { id: "nanitic_vigour", name: "Borrowed time", branch: "colony",
+    effect: { type: "naniticVigour" },
+    levels: [
+      { name: "Living Larder", cost: 500, req: { caste: "nanitic", count: 3 }, add: 1,
+        desc: "Nanitics store food in their own crops. They fade half as fast." },
+      { name: "Borrowed Time", cost: 1200, req: { caste: "nanitic", count: 4 }, add: 2,
+        desc: "They will not live to see the colony they build, but they last longer trying." }
+    ] },
 
-  { id: "excavator_1", name: "Loose Soil", req: { caste: "excavator", count: 3 }, cost: 1200,
-    desc: "Easier digging. Each excavator holds 4 more ants.", effect: { type: "excavatorCap", add: 4 } },
-  { id: "excavator_2", name: "Vaulted Galleries", req: { caste: "excavator", count: 15 }, cost: 9000,
-    desc: "Arched roofs stop collapses. +6 cap per excavator.", effect: { type: "excavatorCap", add: 6 } },
-  { id: "excavator_3", name: "Deep Shafts", req: { caste: "excavator", count: 22 }, cost: 90000,
-    desc: "The nest reaches the water table. +12 cap per excavator.", effect: { type: "excavatorCap", add: 12 } },
-  { id: "excavator_4", name: "Cathedral Chambers", req: { caste: "excavator", count: 55 }, cost: 500000,
-    desc: "Halls big enough to lose a queen in. +24 cap per excavator.", effect: { type: "excavatorCap", add: 24 } },
+  { id: "forager", name: "Foraging", branch: "colony",
+    effect: { type: "casteFood", caste: "forager" }, mastery: "food",
+    levels: [
+      { name: "Scent Trails", cost: 260, req: { caste: "forager", count: 3 }, add: 0.5,
+        desc: "Foragers mark the route home. Forager food +50%." },
+      { name: "Leaf Shears", cost: 1500, req: { caste: "forager", count: 12 }, add: 0.75,
+        desc: "Sharper mandibles cut faster. Forager food +75%." },
+      { name: "Aphid Herding", cost: 8000, req: { caste: "forager", count: 35 }, add: 1,
+        desc: "Milked aphids yield honeydew. Forager food +100%." },
+      { name: "Deep Middens", cost: 25000, req: { caste: "forager", count: 90 }, add: 1.5,
+        desc: "Nothing edible is wasted. Forager food +150%." },
+      { name: "Trunk Trails", cost: 70000, req: { caste: "forager", count: 150 }, add: 2,
+        desc: "Cleared highways speed every trip. Forager food +200%." },
+      { name: "Canopy Routes", cost: 400000, req: { caste: "forager", count: 400 }, add: 3,
+        desc: "The colony harvests the whole tree. Forager food +300%." }
+    ] },
 
-  { id: "nurse_1", name: "Warm Brood Pile", req: { caste: "nurse", count: 3 }, cost: 15000,
-    desc: "Brood is carried up to the sun-warmed chambers near the surface. Each nurse tends more.", effect: { type: "nurseSlots", add: 0.05 } },
-  { id: "nurse_2", name: "Trophallaxis", req: { caste: "nurse", count: 12 }, cost: 50000,
-    desc: "Mouth-to-mouth feeding of the brood. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.08 } },
-  { id: "nurse_3", name: "Fungal Bedding", req: { caste: "nurse", count: 30 }, cost: 220000,
-    desc: "Antibiotic mulch keeps the brood clean. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.12 } },
-  { id: "nurse_4", name: "Brood Nurseries", req: { caste: "nurse", count: 70 }, cost: 1.5e6,
-    desc: "Dedicated chambers sorted by age. Each nurse tends more brood.", effect: { type: "nurseSlots", add: 0.15 } },
+  { id: "excavator", name: "Excavation", branch: "colony",
+    effect: { type: "excavatorCap" },
+    levels: [
+      { name: "Loose Soil", cost: 1200, req: { caste: "excavator", count: 3 }, add: 4,
+        desc: "Easier digging. Each excavator holds 4 more ants." },
+      { name: "Vaulted Galleries", cost: 9000, req: { caste: "excavator", count: 15 }, add: 6,
+        desc: "Arched roofs stop collapses. +6 cap per excavator." },
+      { name: "Deep Shafts", cost: 90000, req: { caste: "excavator", count: 22 }, add: 12,
+        desc: "The nest reaches the water table. +12 cap per excavator." },
+      { name: "Cathedral Chambers", cost: 500000, req: { caste: "excavator", count: 55 }, add: 24,
+        desc: "Halls big enough to lose a queen in. +24 cap per excavator." }
+    ] },
 
-  { id: "combat_1", name: "Alarm Pheromone", req: { caste: "population", count: 0 }, cost: 30000, branch: "combat", afterFirstRaid: true,
-    desc: "The whole nest answers an attack. Every forager fights at 1 strength.", effect: { type: "combatForager", add: 1 } },
-  { id: "combat_2", name: "Gallery Wardens", req: { caste: "excavator", count: 20 }, cost: 120000, branch: "combat", afterFirstRaid: true,
-    desc: "Diggers block the tunnels with their bodies. Every excavator fights at 10.", effect: { type: "combatExcavator", add: 10 } },
-  { id: "combat_3", name: "Brood Defenders", req: { caste: "nurse", count: 20 }, cost: 200000, branch: "combat", afterFirstRaid: true,
-    desc: "Nurses will not leave the brood. Every nurse fights at 2.", effect: { type: "combatNurse", add: 2 } },
+  { id: "nurse", name: "Nursing", branch: "colony",
+    effect: { type: "nurseSlots" },
+    levels: [
+      { name: "Warm Brood Pile", cost: 15000, req: { caste: "nurse", count: 3 }, add: 0.05,
+        desc: "Brood is carried up to the sun-warmed chambers near the surface. Each nurse tends more." },
+      { name: "Trophallaxis", cost: 50000, req: { caste: "nurse", count: 12 }, add: 0.08,
+        desc: "Mouth-to-mouth feeding of the brood. Each nurse tends more brood." },
+      { name: "Fungal Bedding", cost: 220000, req: { caste: "nurse", count: 30 }, add: 0.12,
+        desc: "Antibiotic mulch keeps the brood clean. Each nurse tends more brood." },
+      { name: "Brood Nurseries", cost: 1.5e6, req: { caste: "nurse", count: 70 }, add: 0.15,
+        desc: "Dedicated chambers sorted by age. Each nurse tends more brood." }
+    ] },
 
-  { id: "protein_1", name: "Sharpened Mandibles", req: { caste: "soldier", count: 3 }, cost: 25, currency: "protein", branch: "combat",
-    desc: "Honed jaws bite deeper. Soldiers fight 50% harder.", effect: { type: "soldierPower", add: 0.5 } },
-  { id: "protein_2", name: "Hunting Parties", req: { caste: "soldier", count: 10 }, cost: 80, currency: "protein", branch: "combat",
-    desc: "Kills are stripped to the shell. Raids yield 50% more protein.", effect: { type: "proteinYield", add: 0.5 } },
-  { id: "protein_3", name: "Chitin Plating", req: { caste: "soldier", count: 25 }, cost: 250, currency: "protein", branch: "combat",
-    desc: "Thickened armour. Soldier strength +100%.", effect: { type: "soldierPower", add: 1 } },
-  { id: "protein_4", name: "Butchery", req: { caste: "soldier", count: 50 }, cost: 700, currency: "protein", branch: "combat",
-    desc: "Nothing of the carcass is left. Raid protein +100%.", effect: { type: "proteinYield", add: 1 } },
-  { id: "protein_5", name: "Royal Larder", req: { caste: "soldier", count: 100 }, cost: 2000, currency: "protein", branch: "combat",
-    desc: "Stored meat feeds the brood. Three more eggs develop at once.", effect: { type: "broodSlots", add: 3 } },
+  { id: "colony", name: "Colony cohesion", branch: "colony",
+    effect: { type: "globalFood" }, mastery: "food",
+    levels: [
+      { name: "Colony Cohesion", cost: 12000, req: { caste: "population", count: 60 }, mult: 1.25,
+        desc: "A colony that acts as one body. All food +25%." },
+      { name: "Pheromone Network", cost: 150000, req: { caste: "population", count: 300 }, mult: 1.5,
+        desc: "Chemical memory spans the whole nest. All food +50%." },
+      { name: "Living Bridges", cost: 650000, req: { caste: "population", count: 580 }, mult: 2,
+        desc: "Ants become the infrastructure. All food +100%." }
+    ] },
 
-  { id: "colony_1", name: "Colony Cohesion", req: { caste: "population", count: 60 }, cost: 12000,
-    desc: "A colony that acts as one body. All food +25%.", effect: { type: "globalFood", mult: 1.25 } },
-  { id: "colony_2", name: "Pheromone Network", req: { caste: "population", count: 300 }, cost: 150000,
-    desc: "Chemical memory spans the whole nest. All food +50%.", effect: { type: "globalFood", mult: 1.5 } },
-  { id: "colony_3", name: "Living Bridges", req: { caste: "population", count: 580 }, cost: 650000,
-    desc: "Ants become the infrastructure. All food +100%.", effect: { type: "globalFood", mult: 2 } }
+  { id: "combat_forager", name: "Alarm Pheromone", branch: "combat", afterFirstRaid: true,
+    effect: { type: "combatForager" }, mastery: "soldier",
+    levels: [
+      { name: "Alarm Pheromone", cost: 30000, req: { caste: "population", count: 0 }, add: 1,
+        desc: "The whole nest answers an attack. Every forager fights at 1 strength." }
+    ] },
+
+  { id: "combat_excavator", name: "Gallery Wardens", branch: "combat", afterFirstRaid: true,
+    effect: { type: "combatExcavator" }, mastery: "soldier",
+    levels: [
+      { name: "Gallery Wardens", cost: 120000, req: { caste: "excavator", count: 20 }, add: 10,
+        desc: "Diggers block the tunnels with their bodies. Every excavator fights at 10." }
+    ] },
+
+  { id: "combat_nurse", name: "Brood Defenders", branch: "combat", afterFirstRaid: true,
+    effect: { type: "combatNurse" }, mastery: "soldier",
+    levels: [
+      { name: "Brood Defenders", cost: 200000, req: { caste: "nurse", count: 20 }, add: 2,
+        desc: "Nurses will not leave the brood. Every nurse fights at 2." }
+    ] },
+
+  { id: "soldier_power", name: "Soldiery", branch: "combat", currency: "protein",
+    effect: { type: "soldierPower" }, mastery: "soldier",
+    levels: [
+      { name: "Sharpened Mandibles", cost: 25, req: { caste: "soldier", count: 3 }, add: 0.5,
+        desc: "Honed jaws bite deeper. Soldiers fight 50% harder." },
+      { name: "Chitin Plating", cost: 250, req: { caste: "soldier", count: 25 }, add: 1,
+        desc: "Thickened armour. Soldier strength +100%." }
+    ] },
+
+  { id: "protein_yield", name: "Butchery", branch: "combat", currency: "protein",
+    effect: { type: "proteinYield" },
+    levels: [
+      { name: "Hunting Parties", cost: 80, req: { caste: "soldier", count: 10 }, add: 0.5,
+        desc: "Kills are stripped to the shell. Raids yield 50% more protein." },
+      { name: "Butchery", cost: 700, req: { caste: "soldier", count: 50 }, add: 1,
+        desc: "Nothing of the carcass is left. Raid protein +100%." }
+    ] },
+
+  { id: "brood_slots", name: "Royal Larder", branch: "combat", currency: "protein",
+    effect: { type: "broodSlots" },
+    levels: [
+      { name: "Royal Larder", cost: 2000, req: { caste: "soldier", count: 100 }, add: 3,
+        desc: "Stored meat feeds the brood. Three more eggs develop at once." }
+    ] }
 ];
+
+// every defined level across every line, which is what the achievement ladders
+// are generated from -- extended levels deliberately do not add tiers, because
+// a ladder built from a module constant cannot grow per save
+export const DEFINED_LEVELS = UPGRADES.reduce((n, u) => n + u.levels.length, 0);
+
+const UPGRADE_INDEX = {};
+for (const line of UPGRADES) UPGRADE_INDEX[line.id] = line;
+
+export function upgradeById(id) {
+  return UPGRADE_INDEX[id] || null;
+}
+
+export function upgradeLevel(game, line) {
+  const held = game.upgrades || {};
+  return held[line.id] || 0;
+}
+
+// How far a line can be pushed. Defined levels, plus what the trials have
+// given back: a trial pays into the thing it took, so Drought's cleared levels
+// raise the food lines and nothing else.
+export function upgradeMaxLevel(game, line) {
+  if (!line.mastery) return line.levels.length;
+  return line.levels.length + masteryLevels(game, line.mastery);
+}
+
+export function upgradeMaxed(game, line) {
+  return upgradeLevel(game, line) >= upgradeMaxLevel(game, line);
+}
+
+// what one level of a line is worth, defined or extended. An extended level
+// repeats the last defined step, so a line never stops being worth buying and
+// never suddenly jumps.
+export function levelEffect(line, level) {
+  const defined = line.levels[level - 1];
+  if (defined) return defined;
+  const last = line.levels[line.levels.length - 1];
+  const past = level - line.levels.length;
+  if (last.mult !== undefined) {
+    return { mult: EXTENDED_MULT_STEP,
+      desc: "The colony keeps refining what it already knows. All food x" +
+        EXTENDED_MULT_STEP + " again." };
+  }
+  return { add: last.add * EXTENDED_ADD_SCALE,
+    desc: "Another step past what the colony had learned, worth half the last one." };
+}
+
+export function levelCost(line, level) {
+  const defined = line.levels[level - 1];
+  if (defined) return { food: line.currency === "protein" ? 0 : defined.cost,
+                        protein: line.currency === "protein" ? defined.cost : 0 };
+  const last = line.levels[line.levels.length - 1];
+  const past = level - line.levels.length;
+  const base = line.currency === "protein" ? 0 : last.cost * Math.pow(EXTENDED_FOOD_STEP, past);
+  const proteinBase = line.currency === "protein"
+    ? last.cost * Math.pow(EXTENDED_FOOD_STEP, past)
+    : EXTENDED_PROTEIN_BASE * Math.pow(EXTENDED_PROTEIN_STEP, past - 1);
+  return { food: base, protein: proteinBase };
+}
+
+// the gate on a level: defined levels keep their own, extended levels inherit
+// the last one, so nothing new is gated on a caste count nobody reaches
+export function levelReq(line, level) {
+  const defined = line.levels[level - 1];
+  return (defined || line.levels[line.levels.length - 1]).req;
+}
+
+export function levelName(line, level) {
+  const defined = line.levels[level - 1];
+  return defined ? defined.name : line.name + " " + toRoman(level - line.levels.length);
+}
+
+function toRoman(n) {
+  const table = [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let out = "";
+  for (const [value, sign] of table) while (n >= value) { out += sign; n -= value; }
+  return out;
+}
 
 export function population(game) {
   let total = 0;
@@ -188,11 +403,36 @@ export function population(game) {
 }
 
 export function casteCount(game, key) {
-  return key === "population" ? population(game) : game.ants[key];
+  if (key === "population") return population(game);
+  if (key === "soldier") return soldierCount(game);
+  return game.ants[key];
 }
 
+// "Owned" now means every level a colony can currently reach is bought. It is
+// what the panel greys out and what the achievement tracks used to count; the
+// tracks count levels instead, so a merged line cannot take a tier back.
 export function upgradeOwned(game, upgrade) {
-  return game.upgrades.indexOf(upgrade.id) >= 0;
+  return upgradeMaxed(game, upgrade);
+}
+
+// total levels held, all lines or one branch -- the figure the upgrade
+// achievement ladders are generated against
+export function levelsOwned(game, branch) {
+  let total = 0;
+  for (const line of UPGRADES) {
+    if (branch && upgradeBranch(line) !== branch) continue;
+    total += upgradeLevel(game, line);
+  }
+  return total;
+}
+
+export function definedLevelsIn(branch) {
+  let total = 0;
+  for (const line of UPGRADES) {
+    if (branch && upgradeBranch(line) !== branch) continue;
+    total += line.levels.length;
+  }
+  return total;
 }
 
 export function upgradeBranch(upgrade) {
@@ -224,9 +464,19 @@ export function upgradeNeedsRaid(game, upgrade) {
   return !!upgrade.afterFirstRaid && (game.raidsWon || 0) + (game.raidsLost || 0) === 0;
 }
 
+// gated on the NEXT level's requirement, so a line opens one rung at a time
 export function upgradeUnlocked(game, upgrade) {
   if (upgradeNeedsRaid(game, upgrade)) return false;
-  return runPeakCount(game, upgrade.req.caste) >= upgrade.req.count;
+  const next = Math.min(upgradeLevel(game, upgrade) + 1, upgradeMaxLevel(game, upgrade));
+  const req = levelReq(upgrade, next);
+  return runPeakCount(game, req.caste) >= req.count;
+}
+
+// what buying the next level of this line costs, in both currencies
+export function nextLevelCost(game, line) {
+  const next = upgradeLevel(game, line) + 1;
+  if (next > upgradeMaxLevel(game, line)) return null;
+  return levelCost(line, next);
 }
 
 export function upgradeCurrency(upgrade) {
@@ -234,7 +484,7 @@ export function upgradeCurrency(upgrade) {
 }
 
 export function visibleUpgrades(game) {
-  return UPGRADES.filter(u => !upgradeOwned(game, u) && upgradeUnlocked(game, u));
+  return UPGRADES.filter(u => !upgradeMaxed(game, u) && upgradeUnlocked(game, u));
 }
 
 export function effectTotal(game, type, caste) {
@@ -250,25 +500,28 @@ export function globalUpgradeMultiplier(game) {
   return productEffect(game, "globalFood");
 }
 
+// Every level bought on every matching line. This is the one place the old
+// "is it owned" test became "how many levels", and everything that reads a rate
+// goes through here, so a line and its levels can never disagree with the game.
 function sumEffect(game, type, caste) {
   let total = 0;
-  for (const upgrade of UPGRADES) {
-    const effect = upgrade.effect;
+  for (const line of UPGRADES) {
+    const effect = line.effect;
     if (effect.type !== type) continue;
     if (caste && effect.caste !== caste) continue;
-    if (!upgradeOwned(game, upgrade)) continue;
-    total += effect.add;
+    const held = upgradeLevel(game, line);
+    for (let level = 1; level <= held; level++) total += levelEffect(line, level).add || 0;
   }
   return total;
 }
 
 function productEffect(game, type, caste) {
   let total = 1;
-  for (const upgrade of UPGRADES) {
-    if (upgrade.effect.type !== type) continue;
-    if (caste && upgrade.effect.caste !== caste) continue;
-    if (!upgradeOwned(game, upgrade)) continue;
-    total *= upgrade.effect.mult;
+  for (const line of UPGRADES) {
+    if (line.effect.type !== type) continue;
+    if (caste && line.effect.caste !== caste) continue;
+    const held = upgradeLevel(game, line);
+    for (let level = 1; level <= held; level++) total *= levelEffect(line, level).mult || 1;
   }
   return total;
 }
@@ -277,6 +530,17 @@ function productEffect(game, type, caste) {
 // the term when there is one to show
 export function casteHasMultiplier(casteId) {
   return UPGRADES.some(u => u.effect.type === "casteMult" && u.effect.caste === casteId);
+}
+
+// how many levels a trial has given back for one kind of thing. Drought pays
+// into food, so its cleared levels raise the food lines' cap and nothing else.
+function masteryLevels(game, type) {
+  let total = 0;
+  for (const challenge of CHALLENGES) {
+    if (!challenge.mastery || challenge.mastery.type !== type) continue;
+    total += bestTrialLevel(game, challenge.id);
+  }
+  return total;
 }
 
 export function achievementFoodBonus(game) {
@@ -427,7 +691,8 @@ export function broodCount(game, casteId) {
 }
 
 export function casteStock(game, casteId) {
-  return game.ants[casteId] + broodCount(game, casteId);
+  const held = casteId === "soldier" ? soldierCount(game) : game.ants[casteId];
+  return held + broodCount(game, casteId);
 }
 
 export function eggPrice(casteId, n) {
@@ -444,8 +709,16 @@ export function eggCost(game, casteId) {
   return { resource: "food", amount: eggPrice(caste, casteStock(game, caste) + 1) };
 }
 
+// Under siege the colony meets its first attacker at 16 ants, so it has to be
+// able to lay a soldier at 16 as well. Without this the trial is unwinnable by
+// construction: attacked from 16, unable to raise a defender until 256.
+export function casteUnlockAt(game, casteId) {
+  if (casteId === "soldier" && siegeActive(game)) return SIEGE_UNLOCK;
+  return CASTES[casteId].unlockAt;
+}
+
 export function isUnlocked(game, casteId) {
-  return runPeakCount(game, "population") >= CASTES[casteId].unlockAt;
+  return runPeakCount(game, "population") >= casteUnlockAt(game, casteId);
 }
 
 export function layableCastes() {

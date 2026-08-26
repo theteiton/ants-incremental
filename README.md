@@ -24,6 +24,7 @@ From there you choose what each egg becomes.
 | Excavator | Digs chambers, raising the population cap | 16 ants |
 | Nurse | Tends the brood, so more eggs develop at once | 64 ants |
 | Soldier | Fights raids, and hunts between them for protein | 256 ants |
+| Major / Supermajor / Guard | Trained soldier grades — each fights harder and hunts worse | Units menu |
 | Big Forager | A rare oversized variant — never laid on purpose | chance |
 
 Castes differ in kind, not degree — none is a strictly better version of another, and each one feeds a different constraint. Unlocks are gated by colony population, never by purchases.
@@ -50,7 +51,7 @@ Ignoring soldiers entirely is slow and bloody rather than fatal — a colony can
 
 ### Upgrades
 
-Twenty-nine one-time purchases across two branches, **Colony** and **Combat**, shown as sub-tabs. Every upgrade is listed at all times: locked ones say exactly what they still need, and available ones show what they will do to your *current* rates rather than a percentage that reads larger than it is.
+Twelve upgrade **lines** with levels across two branches, **Colony** and **Combat**, shown as sub-tabs — 29 defined levels, and lines that the trials can push past their defined top. Every upgrade is listed at all times: locked ones say exactly what they still need, and available ones show what they will do to your *current* rates rather than a percentage that reads larger than it is.
 
 Every rate in the game is built the same way — a base that upgrades add flat amounts to, multiplied by whatever scales the whole thing — and hovering an upgrade shows that formula with live numbers, naming the one factor it moves:
 
@@ -61,7 +62,7 @@ adds 0.50 to forager yield → 1.25 → 1.75
 
 ### Achievements
 
-Sixteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and every 5 tiers is an achievement level, up to 20. The bonuses **compound** rather than add — food `1.035^level`, hatch `1.02^level`, Royal Jelly `1.047^level` — so level 20 pays ×1.99 food, ×1.49 hatch speed and ×2.51 jelly, and the late levels are the ones worth chasing. Tracks read your peak values, so a bad raid never takes a tier back.
+Sixteen tracks that keep levelling rather than one-off badges — colony size, food, eggs, each caste, raids won, fighting strength, protein and upgrades. Every threshold passed is a tier, and a tier is worth its own depth — tier 1 pays 1 XP, tier 9 pays 9 — with each level costing more than the last, up to level 30. The bonuses **compound** rather than add — food `1.035^level`, hatch `1.02^level`, Royal Jelly `1.047^level` — so level 30 pays ×2.81 food, ×1.81 hatch speed and ×3.97 jelly, and the late levels are the ones worth chasing. Tracks read your peak values, so a bad raid never takes a tier back.
 
 Each track carries a ladder of pips, one per tier and filled for the ones you have earned, so you can see how far up every ladder you are without clicking. A track that has gained a tier since you last looked at it shows a dot, and the dot clears when you point at that track — so the tab tells you *which* achievement you just earned, not merely that you earned one.
 
@@ -101,9 +102,9 @@ Thirteen adaptations. Eight make the next colony stronger; four sell **automatio
 
 The last adaptation opens a tab. A **trial** founds a colony under conditions that should kill it — the lineage's automation comes with her, its strength does not, and everything earned on the Achievements tab still pays.
 
-**Drought** starves the colony to a fraction of its usual food, and asks for 600 ants anyway. Five levels, each harder than the last, roughly half an hour each. Clearing one pays twice: a small compounding buff from the trial, and a permanent doubling from its own achievement, **Deep Cisterns**. Both apply everywhere, inside trials as well as outside.
+**Drought** starves the colony to a fraction of its usual food and asks for 600 ants anyway. **Endless Siege** attacks from 16 ants every ninety seconds, asks you to win fifteen raids, and ends the run on a single defeat — clearing it once opens the **Units** menu, where soldiers are trained into Majors, Supermajors and Phragmotic Guards. Each trial asks for the thing it is about, and each pays back the thing it took: a compounding buff from the trial itself, plus a permanent doubling from its own achievement. Both apply everywhere, inside trials as well as outside.
 
-Five more are listed with what they would do. They are honest about not being built yet.
+Four more are listed with what they would do. They are honest about not being built yet.
 
 ## Running it locally
 
@@ -135,10 +136,10 @@ js/ui.js            tab shell, header, brood controls, frame loop
 
 ## Saving
 
-Progress is saved to `localStorage` under `ants_save_v6`, automatically every 10 seconds and when the tab closes. Time away is credited when you return, capped at 8 hours, and time spent in a background tab is credited the same way. Every older save version migrates rather than being wiped.
+Progress is saved to `localStorage` under `ants_save_v7`, automatically every 10 seconds and when the tab closes. Time away is credited when you return, capped at 8 hours, and time spent in a background tab is credited the same way. Every older save version migrates rather than being wiped.
 
 Only one tab writes the save. The most recently opened tab owns it and older ones stop writing, so a forgotten background tab can no longer bury real progress when it closes; the stale tab offers a button to take over.
 
 ## Not built yet
 
-Prestige layers beyond the first, and five of the six trials. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.
+Prestige layers beyond the first, and four of the six trials. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.

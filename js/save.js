@@ -1,8 +1,8 @@
 import { RAID_INTERVAL } from "./raids.js";
 
-export const SAVE_KEY = "ants_save_v6";
-export const LEGACY_SAVE_KEYS = ["ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 6;
+export const SAVE_KEY = "ants_save_v7";
+export const LEGACY_SAVE_KEYS = ["ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 7;
 export const LOCK_KEY = "ants_lock";
 
 // the tab the player most recently opened owns the save; older tabs go quiet
@@ -26,6 +26,22 @@ export function holdsSave() {
     return true;
   }
 }
+
+// which line each retired upgrade id became a level of
+const LEGACY_UPGRADE_LINES = {
+  nanitic_1: "nanitic_food", nanitic_2: "nanitic_food",
+  nanitic_3: "nanitic_vigour", nanitic_4: "nanitic_vigour",
+  forager_1: "forager", forager_2: "forager", forager_3: "forager",
+  forager_4: "forager", forager_5: "forager", forager_6: "forager",
+  excavator_1: "excavator", excavator_2: "excavator",
+  excavator_3: "excavator", excavator_4: "excavator",
+  nurse_1: "nurse", nurse_2: "nurse", nurse_3: "nurse", nurse_4: "nurse",
+  colony_1: "colony", colony_2: "colony", colony_3: "colony",
+  combat_1: "combat_forager", combat_2: "combat_excavator", combat_3: "combat_nurse",
+  protein_1: "soldier_power", protein_3: "soldier_power",
+  protein_2: "protein_yield", protein_4: "protein_yield",
+  protein_5: "brood_slots"
+};
 
 export function migrate(data) {
   if (data.version === 1) {
@@ -81,6 +97,24 @@ export function migrate(data) {
       peakStrength: data.peakStrength || 0
     };
     data.version = 6;
+  }
+  if (data.version === 6) {
+    // The 29 one-shot upgrades became 12 lines with levels. Every old id maps to
+    // a rung of its line, so a colony keeps exactly what it bought: owning
+    // forager_1 and forager_2 is Foraging at level 2. Ids are counted rather
+    // than positioned, because a save can hold a later rung without an earlier
+    // one only if the game once allowed it, and levels are cumulative anyway.
+    const owned = Array.isArray(data.upgrades) ? data.upgrades : [];
+    const levels = {};
+    for (const id of owned) {
+      const line = LEGACY_UPGRADE_LINES[id];
+      if (line) levels[line] = (levels[line] || 0) + 1;
+    }
+    data.upgrades = levels;
+    // peakUpgrades already counted one-shot upgrades, which is the same number
+    // as levels held -- 29 of them either way -- so it carries over untouched.
+    data.lossStreak = 0;
+    data.version = 7;
   }
   return data;
 }
@@ -157,7 +191,10 @@ export function applySave(game, fresh, data) {
   game.seen = { upgrades: seen.upgrades || 0, tracks: seen.tracks || null };
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
-  game.upgrades = Array.isArray(data.upgrades) ? data.upgrades : [];
+  // an array here is a save that predates lines; migrate() has already turned
+  // it into a level map, so anything still array-shaped is corrupt and drops
+  game.upgrades = data.upgrades && !Array.isArray(data.upgrades)
+    ? Object.assign({}, data.upgrades) : {};
   game.achievements = Array.isArray(data.achievements) ? data.achievements : [];
   game.protein = data.protein || 0;
   game.raidTimer = typeof data.raidTimer === "number" ? data.raidTimer : RAID_INTERVAL;
