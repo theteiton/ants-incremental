@@ -125,6 +125,7 @@ import {
   fmtTime,
   parseAmount,
   paintNote,
+  currentNote,
   shortAmount,
   renderAnts,
   renderInspector,
@@ -1649,7 +1650,7 @@ function openInspectModal() {
   if (!el("inspectTitle").textContent || el("inspectTitle").textContent === "Point at anything") return;
   el("inspectModalTitle").textContent = el("inspectTitle").textContent;
   el("inspectModalBody").textContent = el("inspectBody").textContent;
-  paintNote(el("inspectModalNote"), el("inspectNote").textContent);
+  paintNote(el("inspectModalNote"), currentNote());
   el("inspectModalNote").className = el("inspectNote").className;
   el("inspectModal").hidden = false;
 }

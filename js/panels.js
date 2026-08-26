@@ -135,7 +135,7 @@ function isHeading(line) {
 // pooled: the inspector redraws every frame, and rebuilding nodes under the
 // cursor is what broke clicking on the upgrade cards
 function paintNote(box, text) {
-  const lines = String(text || "").split("\n");
+  const lines = String(text || "").split("\n").filter(line => line.trim() !== "");
   while (box.children.length > lines.length) box.removeChild(box.lastChild);
   while (box.children.length < lines.length) {
     const line = document.createElement("span");
@@ -173,12 +173,23 @@ export function renderInspector() {
   el("inspectTitle").textContent = entry.title || "";
   el("inspectBody").textContent = typeof entry.body === "function" ? entry.body() : entry.body || "";
   const note = typeof entry.note === "function" ? entry.note() : entry.note || "";
+  lastNoteText = note;
   paintNote(el("inspectNote"), note);
   el("inspectNote").className = entry.warn ? "inspect-note warn" : "inspect-note";
   // tied to the inspector rather than the frame loop, so the hint appears the
   // instant something is pointed at
   const hint = el("inspectHint");
   if (hint) hint.hidden = false;
+}
+
+// The note as WRITTEN, not as rendered. paintNote splits it into one span per
+// line, so reading the container back with textContent returns every line run
+// together with nothing between them -- which is exactly how the full-size
+// view lost all of its line breaks.
+let lastNoteText = "";
+
+export function currentNote() {
+  return lastNoteText;
 }
 
 export { paintNote };

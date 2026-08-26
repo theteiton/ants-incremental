@@ -869,13 +869,17 @@ ul { list-style: none; margin: 0; padding: 0; }
 /* An inspector note used to be one flat colour, so what a trial COSTS you and
    what it PAYS you read identically. Each line is toned by the section it sits
    under instead. */
-.inspect-note { display: flex; flex-direction: column; }
+.inspect-note { display: flex; flex-direction: column; gap: 2px; }
 .note-line { display: block; white-space: pre-wrap; }
+/* Declared under .modal-box too: that selector is (0,2,0) and sits at the
+   bottom of this file, so a bare .inspect-note rule loses to it. */
+.modal-box .inspect-note { display: flex; flex-direction: column; gap: 3px; }
 .note-head {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 11px;
   letter-spacing: 0.08em;
-  opacity: 0.9;
+  text-transform: uppercase;
+  opacity: 0.75;
 }
 .note-line:first-child { margin-top: 0; }
 .note-plain { color: var(--dim); }
