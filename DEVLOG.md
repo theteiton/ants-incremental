@@ -44,7 +44,30 @@ five.
 **Achievement tiers are now worth their own depth** — tier 1 pays 1 XP, tier 9
 pays 9 — and each level costs more than the last. The cap fell out at two hours
 under flat scoring; level 30 now costs 930 of the 1,187 XP that exist. A level
-once reached is never taken back.
+once reached is never taken back, which is a high-water mark on the save rather
+than a property of the curve, so reshaping either is safe by construction.
+
+**The ladders were reshaped with it**, 142 tiers becoming 181. The old tops were
+set against a colony of 10,000 ants, and a finished player now clears fifteen of
+the seventeen tracks inside the first hour — only flights and royal jelly were
+left unfinished. Every change is an append above the old top rung: swept across
+every old and new threshold, zero values score fewer tiers than before, because
+shortening a ladder silently takes food and hatch bonuses off a live colony.
+
+**Each trial asks for the thing it is about.** Asking a combat trial to raise 600
+ants tested growth rather than the siege — you could clear it by outrunning the
+attacks. Drought still asks for a colony; Endless Siege asks you to hold the
+gate. The cards had been printing Drought's food penalty whatever trial they
+described, so a siege announced a food cut it never applied.
+
+**Interface.** The details panel can be unpinned in Settings, for players who did
+not want it following the page. Its notes are no longer one flat colour: each
+line is toned by the section it sits under, so what a thing costs you reads as a
+cost and what it pays reads as a gain — driven by the ALL-CAPS headings the notes
+already wrote, so it applies to upgrades and achievement tracks too, not only
+trials. What a trial pays now leads with the change itself, before and after with
+the running total, instead of listing two rewards and leaving you to multiply
+them. Combat became three sub-tabs — Overview, Units, Trade.
 
 Fixed on the way: the per-win monster growth compounded forever, so a winning
 colony met a threat no army could hold (192 straight losses, 152K ants down to
@@ -53,7 +76,9 @@ reprieve; entering a trial left the raid clock at six minutes, so the first sieg
 attack arrived six minutes late; and the stats bar reflowed between one row and
 two purely because `fmt()` changed character count. Protein finally has a sink,
 and food and protein trade in the rendering pit at a rate no round trip can
-exploit.
+exploit — and neither direction credits the lifetime *gathered* totals, because
+crediting them let a player cycle food through protein to farm the Food gathered
+ladder, losing food but banking tiers.
 
 ## 0.1.4.0 — 25 August 2026
 
