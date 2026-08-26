@@ -45,6 +45,21 @@ and level 33 costs 190. The old flat `n(n+1)` is barely a curve once the ladders
 are long: at 314 tiers it would have run the cap past 45 and the food bonus with
 it. The bonus is a stated ×1.0479 a level, ×5.14 at the highest reachable.
 
+**No ladder ends, and there is no level cap.** 13 of 23 tracks were dead by 24
+hours — a full bar paying nothing for the rest of the run. Past its stated rungs
+a ladder carries on at its own step, so there is always a next one and the
+readout is a tier count with no denominator. The level cap went with it: a level
+costs ×1.10 more than the last, so it throttles itself — level 40 needs about ten
+times today's colony, level 50 about a thousand times.
+
+What stops one number running away is a **softcap**: past the designed top, each
+rung sits 1.15× further from the last than the one before it. The growth-driven
+tracks mostly police themselves, since a step of growth-squared means every one
+earns half a tier an hour whatever its scale — but exiling ants and destroying
+eggs are free and repeatable, and could otherwise be farmed forever. With the
+softcap those extra rungs cost 10.8K exiles, then 77.6K, then 971K, then 6.2
+billion.
+
 **Six new tracks**, for the things nothing was watching: soldiers trained,
 Phragmotic Guards raised, the deepest single upgrade line, matriline age, ants
 exiled and eggs destroyed. The last four are player choices rather than growth,

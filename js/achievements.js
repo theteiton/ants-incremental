@@ -325,32 +325,70 @@ export function maxEarnableXp() {
 // re-derives itself whenever a ladder is extended instead of having to be
 // remembered and hand-edited. A hand-set 20 was reached in half an hour and
 // then paid nothing for the rest of the run, which is what this prevents.
-export const MAX_ACHIEVEMENT_LEVEL = (() => {
-  const ceiling = maxEarnableXp();
-  let level = 0;
-  while (xpForLevel(level + 1) <= ceiling) level++;
-  return level + 1;
-})();
+// There is no level cap. A level costs x1.10 more XP than the one before it, so
+// the ladder throttles itself: measured, level 40 needs about ten times today's
+// colony and level 50 about a thousand times. A cap was a number that had to be
+// remembered, and every value it ever held was reached and then sat at.
+export const MAX_ACHIEVEMENT_LEVEL = Infinity;
 
 registerAchievementCap(MAX_ACHIEVEMENT_LEVEL);
+
+// A ladder does not end. Its stated rungs are the designed part; past them it
+// carries on at its own step, so no track ever finishes and sits there with a
+// full bar paying nothing -- measured, 13 of 23 were dead by 24 hours.
+//
+// Past the top each rung is SOFTCAP_STEP further apart than the last, which is
+// what stops one number running away with the whole ladder. The growth-driven
+// tracks mostly police themselves -- a step of growth-squared means every one
+// of them earns half a tier an hour whatever its scale -- but the tracks a
+// player drives by hand do not: exiling ants and destroying eggs are free and
+// repeatable, and without a softcap they could be farmed for tiers forever. With
+// it, ten extra rungs cost about a million times the activity.
+export const SOFTCAP_STEP = 1.15;
+
+const stepCache = new Map();
+
+function trackStep(track) {
+  if (!stepCache.has(track.id)) {
+    const th = track.thresholds;
+    stepCache.set(track.id, th.length > 1
+      ? Math.pow(th[th.length - 1] / th[0], 1 / (th.length - 1)) : 2);
+  }
+  return stepCache.get(track.id);
+}
+
+// the value needed for a tier, defined or past the end
+export function thresholdAt(track, tier) {
+  const th = track.thresholds;
+  if (tier <= th.length) return th[tier - 1];
+  const past = tier - th.length;
+  // each extra rung is SOFTCAP_STEP further apart than the one before it
+  const stretch = Math.pow(SOFTCAP_STEP, (past * (past - 1)) / 2);
+  return th[th.length - 1] * Math.pow(trackStep(track), past) * stretch;
+}
 
 export function trackTier(game, track) {
   const value = track.value(game);
   let tier = 0;
-  while (tier < track.thresholds.length && value >= track.thresholds[tier]) tier++;
+  // guard is generous: the softcap makes tiers this deep unreachable in practice
+  while (tier < 400 && value >= thresholdAt(track, tier + 1)) tier++;
   return tier;
 }
 
+// how many rungs were actually designed, for the pip ladder
+export function definedRungs(track) {
+  return track.thresholds.length;
+}
+
+// there is always a next one
 export function trackNext(game, track) {
-  const tier = trackTier(game, track);
-  return tier < track.thresholds.length ? track.thresholds[tier] : null;
+  return thresholdAt(track, trackTier(game, track) + 1);
 }
 
 export function trackProgress(game, track) {
-  const next = trackNext(game, track);
-  if (next === null) return 1;
   const tier = trackTier(game, track);
-  const floor = tier > 0 ? track.thresholds[tier - 1] : 0;
+  const next = thresholdAt(track, tier + 1);
+  const floor = tier > 0 ? thresholdAt(track, tier) : 0;
   return Math.max(0, Math.min(1, (track.value(game) - floor) / (next - floor)));
 }
 
@@ -390,7 +428,7 @@ export function seedSeenTracks(game) {
 
 export function achievementLevelFor(xp) {
   let level = 0;
-  while (level < MAX_ACHIEVEMENT_LEVEL && xpForLevel(level + 1) <= xp) level++;
+  while (level < 400 && xpForLevel(level + 1) <= xp) level++;
   return level;
 }
 
@@ -412,27 +450,27 @@ const BONUS_BOXES = [
     desc: "Every achievement level feeds the whole colony better.",
     value: game => "×" + fmt(achievementFoodBonus(game)) + " food",
     formula: game => "×" + ACHIEVEMENT_FOOD_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_FOOD_RATE)) +
-      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
+      " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
-    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+    note: game => "Level " + game.achievementLevel +
       ". Every level is the same step up, and every level costs more XP than the one " +
       "before it. It multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
     formula: game => "×" + ACHIEVEMENT_JELLY_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_JELLY_RATE)) +
-      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
+      " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
     value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
-    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+    note: game => "Level " + game.achievementLevel +
       ". Every level is the same step up, and each costs more than the last. " +
       "It multiplies what every nuptial flight pays." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
     formula: game => "×" + ACHIEVEMENT_HATCH_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_HATCH_RATE)) +
-      " at level " + MAX_ACHIEVEMENT_LEVEL + ", you are at " +
+      " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
-    note: game => "Level " + game.achievementLevel + " of " + MAX_ACHIEVEMENT_LEVEL +
+    note: game => "Level " + game.achievementLevel +
       ". Every level is the same step up, and each costs more than the last. " +
       "Incubation is 24s divided by this." }
 ];
@@ -548,10 +586,14 @@ function buildTracks(game) {
           ? "No tiers yet."
           : tier + (tier === 1 ? " tier: " : " tiers: ") + listed + ".";
         const worth = " This track is worth " + fmt(trackXp(game, track)) + " XP so far.";
-        if (next === null) return done + " Every tier on this track is earned." + worth;
+        const beyond = tier - definedRungs(track);
+        const past = beyond > 0
+          ? " You are " + beyond + " past the designed ladder, where each rung sits " +
+            "further from the last than the one before it."
+          : "";
         return done + " Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
           " — you have " + fmt(track.value(game)) + ", and it would pay " +
-          fmt(tierXp(tier + 1)) + " XP." + worth;
+          fmt(tierXp(tier + 1)) + " XP." + worth + past;
       }
     });
     const clearDot = () => markTrackSeen(game, track);
@@ -575,17 +617,17 @@ export function renderAchievements(game) {
     const tier = trackTier(game, track);
     const next = trackNext(game, track);
     const fresh = trackIsNew(game, track);
-    ui.row.classList.toggle("maxed", next === null);
+    ui.row.classList.toggle("maxed", tier > definedRungs(track));
     ui.row.classList.toggle("fresh", fresh);
     ui.dot.hidden = !fresh;
     for (let i = 0; i < ui.pips.children.length; i++) {
       ui.pips.children[i].className = i < tier ? "earned" : "";
     }
-    ui.tier.textContent = "tier " + tier + " / " + track.thresholds.length;
+    const beyond = tier - definedRungs(track);
+    ui.tier.textContent = "tier " + tier + (beyond > 0 ? " (+" + beyond + " past the ladder)" : "");
     ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
-    ui.next.textContent = next === null
-      ? "Every tier earned."
-      : "Next at " + fmt(next) + " " + track.unit + " (you have " + fmt(track.value(game)) + ")";
+    ui.next.textContent = "Next at " + fmt(next) + " " + track.unit +
+      " (you have " + fmt(track.value(game)) + ")";
   });
 
   BONUS_BOXES.concat(TRIAL_BOXES, UNLOCK_BOXES).forEach(entry => {
@@ -599,15 +641,13 @@ export function renderAchievements(game) {
   const tiers = totalTiers(game);
   const xp = totalXp(game);
   const level = game.achievementLevel;
-  const capped = level >= MAX_ACHIEVEMENT_LEVEL;
-  el("achievementLevel").textContent = "Level " + level + (capped ? " (max)" : "");
-  el("achievementPoints").textContent = capped
-    ? tiers + " tiers across " + ACHIEVEMENT_TRACKS.length + " tracks — " + fmt(xp) + " XP"
-    : tiers + " tiers, " + fmt(xp) + " XP — " +
-      fmt(Math.max(0, xpForLevel(level + 1) - xp)) + " to level " + (level + 1) +
-      " (a deeper tier is worth more)";
+  el("achievementLevel").textContent = "Level " + level;
+  el("achievementPoints").textContent =
+    tiers + " tiers, " + fmt(xp) + " XP — " +
+    fmt(Math.max(0, xpForLevel(level + 1) - xp)) + " to level " + (level + 1) +
+    " (each level costs more than the last)";
   const floor = xpForLevel(level);
   const span = xpForLevel(level + 1) - floor;
-  const progress = capped ? 1 : Math.max(0, Math.min(1, (xp - floor) / span));
+  const progress = Math.max(0, Math.min(1, (xp - floor) / span));
   el("achievementBar").style.width = (progress * 100).toFixed(1) + "%";
 }
