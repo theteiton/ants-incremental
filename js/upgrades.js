@@ -34,7 +34,17 @@ import {
   upgradeCurrency,
   upgradeNeedsRaid,
   upgradeOwned,
-  upgradeUnlocked
+  upgradeUnlocked,
+  upgradeLevel,
+  upgradeMaxLevel,
+  upgradeMaxed,
+  levelEffect,
+  levelCost,
+  levelReq,
+  levelName,
+  nextLevelCost,
+  levelsOwned,
+  DEFINED_LEVELS
 } from "./ants.js";
 import {
   combatPerSoldier,
@@ -43,6 +53,8 @@ import {
   MONSTER_BASE,
   MONSTER_EXPONENT,
   MONSTER_GROWTH,
+  MONSTER_GROWTH_CAP,
+  monsterWinGrowth,
   MONSTER_REFERENCE,
   foodPerProtein,
   monsterPower,
@@ -70,7 +82,7 @@ const el = id => document.getElementById(id);
 export function upgradeLockText(game, upgrade) {
   const parts = [];
   if (upgradeNeedsRaid(game, upgrade)) parts.push("survive your first raid");
-  const req = upgrade.req;
+  const req = levelReq(upgrade, Math.min(upgradeLevel(game, upgrade) + 1, upgradeMaxLevel(game, upgrade)));
   const have = runPeakCount(game, req.caste);
   if (req.count > 0 && have < req.count) {
     const label = req.caste === "population" ? "ants" : CASTES[req.caste].name.toLowerCase() + "s";
@@ -87,6 +99,44 @@ const upgradeCards = {};
 // amounts to, multiplied by whatever scales the whole thing. These read that
 // shape back out with live numbers, and name the one factor an upgrade moves.
 const f = fmtFactor;
+
+// The probe is "this colony with one more level of that line". Everything that
+// shows a before-and-after reads it, so a preview can never disagree with what
+// buying actually does.
+function probeWith(line) {
+  const levels = Object.assign({}, game.upgrades);
+  levels[line.id] = upgradeLevel(game, line) + 1;
+  return Object.assign({}, game, { upgrades: levels });
+}
+
+function nextLevelOf(line) {
+  return Math.min(upgradeLevel(game, line) + 1, upgradeMaxLevel(game, line));
+}
+
+// what the next level of this line adds or multiplies
+function nextEffect(line) {
+  return levelEffect(line, nextLevelOf(line));
+}
+
+// A level can cost food and protein at once past the defined rungs, so cost is
+// a pair and every place that shows or compares one has to say both.
+export function costText(game, line) {
+  const cost = nextLevelCost(game, line);
+  if (!cost) return "";
+  const bits = [];
+  if (cost.food > 0) bits.push(fmt(cost.food) + " food");
+  if (cost.protein > 0) {
+    const worth = foodPerProtein(game);
+    bits.push(fmt(cost.protein) + " protein" +
+      (worth > 0 && cost.food <= 0 ? " (≈ " + fmt(cost.protein * worth) + " food)" : ""));
+  }
+  return bits.join(" + ");
+}
+
+export function canAfford(game, line) {
+  const cost = nextLevelCost(game, line);
+  return !!cost && game.food >= cost.food && game.protein >= cost.protein;
+}
 
 const fmtTimeShort = seconds => seconds >= 60
   ? Math.round(seconds / 60) + "m"
@@ -114,15 +164,28 @@ function ownedRows(list, ownedTest, match, format) {
   return list.filter(u => match(u) && ownedTest(u)).map(u => row(u.name, format(u)));
 }
 
+// one row per LEVEL bought, named by that level, so the panel still says which
+// upgrade each part of the number came from
+function levelRows(game, match, format) {
+  const rows = [];
+  for (const line of UPGRADES) {
+    if (!match(line)) continue;
+    const held = upgradeLevel(game, line);
+    for (let level = 1; level <= held; level++) {
+      rows.push(row(levelName(line, level), format(levelEffect(line, level), line)));
+    }
+  }
+  return rows;
+}
+
 function upgradeMultRows(game) {
-  return ownedRows(UPGRADES, u => upgradeOwned(game, u),
-    u => u.effect.type === "globalFood", u => "×" + f(u.effect.mult));
+  return levelRows(game, u => u.effect.type === "globalFood", e => "×" + f(e.mult));
 }
 
 function casteYieldRows(game, caste) {
-  return ownedRows(UPGRADES, u => upgradeOwned(game, u),
+  return levelRows(game,
     u => (u.effect.type === "casteFlat" || u.effect.type === "casteFood") && u.effect.caste === caste,
-    u => "+" + f(u.effect.type === "casteFlat" ? u.effect.add : baseFood(caste) * u.effect.add));
+    (e, line) => "+" + f(line.effect.type === "casteFlat" ? e.add : baseFood(caste) * e.add));
 }
 
 function lineageFoodRows(game) {
@@ -252,7 +315,8 @@ function monsterFormula(game) {
   return formula(fmt(monsterPower(game)), [
     row("base, nest of " + MONSTER_REFERENCE, fmt(MONSTER_BASE)),
     row("× nest size", "×" + f(Math.pow(reach / MONSTER_REFERENCE, MONSTER_EXPONENT))),
-    row("× your wins", "×" + f(1 + MONSTER_GROWTH * (game.raidsWon || 0))),
+    row("× your wins", "×" + f(monsterWinGrowth(game)) +
+      ((game.raidsWon || 0) > MONSTER_GROWTH_CAP ? " (capped)" : "")),
     ramp < 1 && row("× ramp", "×" + f(ramp))
   ]);
 }
@@ -300,10 +364,11 @@ export function formulaSummary(game) {
 function formulaLines(upgrade, probe) {
   const effect = upgrade.effect;
   const type = effect.type;
+  const step = nextEffect(upgrade);
 
   if (type === "casteFood" || type === "casteFlat") {
     const caste = effect.caste;
-    const added = type === "casteFlat" ? effect.add : baseFood(caste) * effect.add;
+    const added = type === "casteFlat" ? step.add : baseFood(caste) * step.add;
     return [
       formulaText(foodFormula(game, caste)),
       "adds " + f(added) + " to " + casteName(caste) + " yield → " +
@@ -328,7 +393,7 @@ function formulaLines(upgrade, probe) {
   if (type === "excavatorCap") {
     return [
       formulaText(capFormula(game)),
-      "adds " + f(effect.add) + " to per excavator — " +
+      "adds " + f(step.add) + " to per excavator — " +
         f(CAP_PER_EXCAVATOR + effectTotal(game, "excavatorCap")) + " → " +
         f(CAP_PER_EXCAVATOR + effectTotal(probe, "excavatorCap"))
     ];
@@ -344,14 +409,14 @@ function formulaLines(upgrade, probe) {
   if (type === "nurseSlots") {
     return [
       formulaText(broodFormula(game)),
-      "adds " + f(effect.add) + " to per nurse — " + f(slotsPerNurse(game)) +
+      "adds " + f(step.add) + " to per nurse — " + f(slotsPerNurse(game)) +
         " → " + f(slotsPerNurse(probe))
     ];
   }
   if (type === "broodSlots") {
     return [
       formulaText(broodFormula(game)),
-      "adds " + f(effect.add) + " to the base — " +
+      "adds " + f(step.add) + " to the base — " +
         (BASE_BROOD_SLOTS + effectTotal(game, "broodSlots")) + " → " +
         (BASE_BROOD_SLOTS + effectTotal(probe, "broodSlots"))
     ];
@@ -368,7 +433,7 @@ function formulaLines(upgrade, probe) {
       : type === "combatExcavator" ? "excavator" : "nurse";
     return [
       formulaText(armsFormula(game, caste, type)),
-      "adds " + f(effect.add) + " to " + casteName(caste) + " strength — " +
+      "adds " + f(step.add) + " to " + casteName(caste) + " strength — " +
         f(effectTotal(game, type)) + " → " + f(effectTotal(probe, type))
     ];
   }
@@ -383,7 +448,7 @@ function formulaLines(upgrade, probe) {
 }
 
 function previewUpgrade(upgrade) {
-  const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
+  const probe = probeWith(upgrade);
   const type = upgrade.effect.type;
   if (type === "excavatorCap") {
     return "Cap " + fmt(populationCap(game)) + " to " + fmt(populationCap(probe));
@@ -421,16 +486,24 @@ function previewUpgrade(upgrade) {
 
 // a protein cost only compares to a food cost through what the colony earns,
 // so sorting by price converts protein into its food equivalent first
+// A level can cost both currencies now, so the comparable price is the food
+// plus the protein converted at what the colony currently earns.
 export function comparableCost(game, upgrade) {
-  if (upgradeCurrency(upgrade) !== "protein") return upgrade.cost;
+  const cost = nextLevelCost(game, upgrade);
+  if (!cost) return Infinity;
   const rate = foodPerProtein(game);
-  return rate > 0 ? upgrade.cost * rate : upgrade.cost * 10000;
+  return cost.food + cost.protein * (rate > 0 ? rate : 10000);
 }
 
 export function proteinInFood(game, upgrade) {
-  if (upgradeCurrency(upgrade) !== "protein") return 0;
+  const cost = nextLevelCost(game, upgrade);
+  if (!cost || cost.protein <= 0) return 0;
   const rate = foodPerProtein(game);
-  return rate > 0 ? upgrade.cost * rate : 0;
+  return rate > 0 ? cost.protein * rate : 0;
+}
+
+function reqCount(line) {
+  return levelReq(line, nextLevelOf(line)).count;
 }
 
 const SORTS = {
@@ -439,8 +512,8 @@ const SORTS = {
   "name-desc": (a, b) => b.name.localeCompare(a.name),
   "cost": (a, b) => comparableCost(game, a) - comparableCost(game, b),
   "cost-desc": (a, b) => comparableCost(game, b) - comparableCost(game, a),
-  "req": (a, b) => a.req.count - b.req.count || a.name.localeCompare(b.name),
-  "req-desc": (a, b) => b.req.count - a.req.count || a.name.localeCompare(b.name)
+  "req": (a, b) => reqCount(a) - reqCount(b) || a.name.localeCompare(b.name),
+  "req-desc": (a, b) => reqCount(b) - reqCount(a) || a.name.localeCompare(b.name)
 };
 
 function sortedUpgrades() {
@@ -471,33 +544,43 @@ export function buildUpgrades(onChange) {
     const card = document.createElement("button");
     card.className = "upgrade";
     card.innerHTML =
-      '<span class="upgrade-head"><b></b><span class="upgrade-cost"></span></span>' +
+      '<span class="upgrade-head"><b></b><span class="upgrade-level"></span>' +
+      '<span class="upgrade-cost"></span></span>' +
       '<span class="upgrade-desc"></span>' +
       '<span class="upgrade-effect"></span>' +
       '<span class="upgrade-formula"></span>' +
       '<span class="upgrade-lock"></span>';
-    card.querySelector("b").textContent = upgrade.name;
-    card.querySelector(".upgrade-desc").textContent = upgrade.desc;
     card.onclick = () => {
       if (buyUpgrade(upgrade.id)) (onChange || onColonyChange)();
     };
     watch(card, {
       title: upgrade.name,
-      body: upgrade.desc,
+      body: upgrade.desc || "",
       note: () => {
-        if (upgradeOwned(game, upgrade)) return "Already bought.";
+        const held = upgradeLevel(game, upgrade);
+        const max = upgradeMaxLevel(game, upgrade);
+        const head = upgrade.name + " — level " + held + " of " + max + ".";
+        if (upgradeMaxed(game, upgrade)) {
+          return head + (upgrade.mastery
+            ? " Every level you have unlocked is bought. Clearing another level of the trial that pays in " +
+              upgrade.mastery + " raises this cap."
+            : " Fully bought.");
+        }
+        const next = nextLevelOf(upgrade);
+        const lines = [head, "", "NEXT — " + levelName(upgrade, next),
+          levelEffect(upgrade, next).desc || "One more step of the same."];
         const locked = upgradeLockText(game, upgrade);
-        if (locked) return locked;
-        const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
-        const worth = proteinInFood(game, upgrade);
-        return ["Costs " + fmt(upgrade.cost) + " " + upgradeCurrency(upgrade) +
-          (worth > 0 ? " — about " + fmt(worth) + " food at what the colony earns now." : ".")]
-          .concat(formulaLines(upgrade, probe), previewUpgrade(upgrade)).join("\n");
+        if (locked) { lines.push("", locked); return lines.join("\n"); }
+        lines.push("", "Costs " + costText(game, upgrade) + ".");
+        return lines.concat(formulaLines(upgrade, probeWith(upgrade)), previewUpgrade(upgrade)).join("\n");
       },
       warn: false
     });
     upgradeCards[upgrade.id] = {
       card,
+      name: card.querySelector("b"),
+      level: card.querySelector(".upgrade-level"),
+      desc: card.querySelector(".upgrade-desc"),
       cost: card.querySelector(".upgrade-cost"),
       effect: card.querySelector(".upgrade-effect"),
       formula: card.querySelector(".upgrade-formula"),
@@ -522,6 +605,7 @@ export function buildUpgrades(onChange) {
 export function renderUpgrades() {
   let owned = 0;
   let locked = 0;
+  const levelsHeld = levelsOwned(game, null);
   // Ordered by CSS, not by moving the nodes. appendChild on a card already in
   // the list detaches it first, and a button detached between mousedown and
   // mouseup never receives the click -- buying an upgrade needed an
@@ -545,24 +629,30 @@ export function renderUpgrades() {
       (filter !== "all" && branch !== filter);
     ui.card.classList.toggle("owned", isOwned);
     ui.card.classList.toggle("locked", !isOpen);
-    const currency = upgradeCurrency(upgrade);
-    ui.card.disabled = isOwned || !isOpen || game[currency] < upgrade.cost;
-    const worth = proteinInFood(game, upgrade);
-    ui.cost.textContent = isOwned
-      ? "owned"
-      : fmt(upgrade.cost) + " " + currency +
-        (worth > 0 ? " (≈ " + fmt(worth) + " food)" : "");
-    ui.cost.classList.toggle("affordable", !isOwned && isOpen && game[currency] >= upgrade.cost);
+    const held = upgradeLevel(game, upgrade);
+    const max = upgradeMaxLevel(game, upgrade);
+    const affordable = canAfford(game, upgrade);
+    ui.card.disabled = isOwned || !isOpen || !affordable;
+
+    ui.name.textContent = upgrade.name;
+    ui.level.textContent = "Lv " + held + " / " + max;
+    ui.desc.textContent = isOwned
+      ? levelName(upgrade, held) + " — " + (levelEffect(upgrade, held).desc || "")
+      : levelName(upgrade, nextLevelOf(upgrade)) + " — " +
+        (levelEffect(upgrade, nextLevelOf(upgrade)).desc || "");
+
+    ui.cost.textContent = isOwned ? "fully bought" : costText(game, upgrade);
+    ui.cost.classList.toggle("affordable", !isOwned && isOpen && affordable);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
-    ui.lock.textContent = isOwned ? "" : upgradeLockText(game, upgrade);
+    ui.lock.textContent = isOwned
+      ? (upgrade.mastery
+          ? "Clear another level of the trial that pays in " + upgrade.mastery + " to raise this cap."
+          : "")
+      : upgradeLockText(game, upgrade);
     ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
-    if (isOwned || !isOpen) {
-      ui.formula.textContent = "";
-    } else {
-      const probe = Object.assign({}, game, { upgrades: game.upgrades.concat([upgrade.id]) });
-      ui.formula.textContent = (formulaLines(upgrade, probe)[1] || "");
-    }
+    ui.formula.textContent = isOwned || !isOpen
+      ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || "");
   });
   // An empty grid with nothing said reads as a broken tab. It is usually
   // "Hide owned" doing exactly what it promises, and at 29 of 29 it hides
@@ -576,8 +666,10 @@ export function renderUpgrades() {
     if (game.settings.hideOwned && owned > 0) reasons.push("Hide owned");
     if (game.settings.hideLocked && locked > 0) reasons.push("Hide locked");
     if (owned === UPGRADES.length) {
-      note.textContent = "Every adaptation is bought — all " + UPGRADES.length +
-        " of them. Untick Hide owned to look back over what the colony has.";
+      note.textContent = "Every adaptation the colony can reach is bought — " +
+        levelsHeld + " levels across all " + UPGRADES.length +
+        " lines. Clearing more of a trial raises the lines it pays into. " +
+        "Untick Hide owned to look back over what the colony has.";
     } else if (reasons.length) {
       note.textContent = "Nothing to show here: " + reasons.join(" and ") +
         (filter === "all" ? "" : " and the " + filter + " filter") +
@@ -586,7 +678,8 @@ export function renderUpgrades() {
       note.textContent = "No " + filter + " adaptations to show.";
     }
   }
-  el("upgradeTally").textContent = owned + " / " + UPGRADES.length + " bought";
+  el("upgradeTally").textContent = levelsHeld + " levels across " +
+    owned + " / " + UPGRADES.length + " lines";
   el("upgradeLocked").textContent = locked > 0 ? locked + " still locked" : "all unlocked";
   el("upgradeSort").value = game.settings.upgradeSort || "default";
   el("hideLocked").checked = !!game.settings.hideLocked;
@@ -601,8 +694,8 @@ export function renderUpgrades() {
 export function affordableUpgrades() {
   let ready = 0;
   for (const upgrade of UPGRADES) {
-    if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) continue;
-    if (game[upgradeCurrency(upgrade)] >= upgrade.cost) ready++;
+    if (upgradeMaxed(game, upgrade) || !upgradeUnlocked(game, upgrade)) continue;
+    if (canAfford(game, upgrade)) ready++;
   }
   return ready;
 }

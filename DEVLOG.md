@@ -13,6 +13,48 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.5.0 — 26 August 2026
+
+**Soldiers get ranks, upgrades get levels, and the second trial opens.**
+
+The 29 one-time upgrades became **12 lines with 29 levels** — most of them were
+always the same upgrade at a bigger number. Every level keeps the exact cost,
+gate and magnitude of the entry it replaces, so the balance did not move. A line
+can be pushed past its defined levels, and that is what the trials now sell:
+Drought raises the three food lines, Endless Siege the four combat ones, and
+extended levels cost protein as well as food. Save v7 migrates every old id to
+its rung. The three upgrade achievement tracks count **levels** rather than
+lines, or merging would have dropped their tops from 29 to 12 and silently taken
+tiers — and achievement levels — off every live save.
+
+**Soldiers now have four grades**, and every grade fights harder and hunts
+worse: Soldier, Major, Supermajor, and the Phragmotic Guard whose head is a
+living door. Surviving a raid promotes 3% of the rank and file into Majors for
+free; everything above that is bought with protein in the new **Units** menu and
+kills 10–35% of the batch. A won raid now costs soldiers too, scaled by how
+close it was.
+
+**Endless Siege** is the second playable trial: attacks from 16 ants every ninety
+seconds, win 15, and one defeat ends the run. It unlocks the Units menu — the
+trial that demands soldiers is the one that teaches the colony to make better
+ones. Measured at `SIEGE_BASE` 120: 30% soldiers clears level 1, 45% clears
+levels 1–4, 60% clears all five, and 45% with ranks trained hard also clears all
+five.
+
+**Achievement tiers are now worth their own depth** — tier 1 pays 1 XP, tier 9
+pays 9 — and each level costs more than the last. The cap fell out at two hours
+under flat scoring; level 30 now costs 930 of the 1,187 XP that exist. A level
+once reached is never taken back.
+
+Fixed on the way: the per-win monster growth compounded forever, so a winning
+colony met a threat no army could hold (192 straight losses, 152K ants down to
+41K); hiding needed the last soldier dead, so a colony losing every raid got no
+reprieve; entering a trial left the raid clock at six minutes, so the first siege
+attack arrived six minutes late; and the stats bar reflowed between one row and
+two purely because `fmt()` changed character count. Protein finally has a sink,
+and food and protein trade in the rendering pit at a rate no round trip can
+exploit.
+
 ## 0.1.4.0 — 25 August 2026
 
 **Five-level trials, and a UI that fits on a screen.**

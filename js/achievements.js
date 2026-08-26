@@ -1,6 +1,6 @@
 import { ACHIEVEMENT_FOOD_PER_LEVEL, ACHIEVEMENT_HATCH_PER_LEVEL, ACHIEVEMENT_JELLY_PER_LEVEL,
   achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
-  population, UPGRADES, upgradeBranch } from "./ants.js";
+  population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn } from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
 import {
   CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
@@ -11,8 +11,47 @@ import { fmt, watch } from "./panels.js";
 
 const el = id => document.getElementById(id);
 
+// A tier is not worth the same as every other tier. The first rung of a track
+// is a formality and the last is a grind, so a tier is worth its own depth:
+// tier 1 pays 1, tier 2 pays 2, tier 9 pays 9. And a level costs more than the
+// one before it, so the ladder does not flatten out at the top.
+//
+// Measured against the seventeen tracks: 181 tiers exist and they are worth
+// 1,187 XP in total. Under the old flat scoring -- one point a tier, five
+// points a level -- the cap fell out at 150 of 181 tiers and a finished player
+// hit it in about two hours. Level 30 now costs 930 XP, which is 78% of every
+// rung in the game, and the deep rungs are where most of that lives.
 export const POINTS_PER_LEVEL = 5;
-export const MAX_ACHIEVEMENT_LEVEL = 20;
+export const XP_LEVEL_STEP = 2;
+
+// what the i-th tier of any track is worth (1-based)
+export function tierXp(index) {
+  return index;
+}
+
+// a track with n tiers earned is worth 1+2+...+n
+export function trackXp(game, track) {
+  const tier = trackTier(game, track);
+  return (tier * (tier + 1)) / 2;
+}
+
+export function totalXp(game) {
+  let total = 0;
+  for (const track of ACHIEVEMENT_TRACKS) total += trackXp(game, track);
+  return total;
+}
+
+// cumulative XP needed to have reached a level
+export function xpForLevel(level) {
+  return (XP_LEVEL_STEP * level * (level + 1)) / 2;
+}
+// Raised from 20, because a finished player reached the old cap in half an hour
+// and every tier past it paid nothing. Measured on a colony with the whole
+// lineage and Drought mastered: 181 tiers exist, 170 are reachable inside one
+// 24h colony and about 180 across a lifetime, and 150 of them -- level 30 --
+// lands at roughly two hours. The slack is the point: no single rung is
+// load-bearing, which is what made the old cap unreachable.
+export const MAX_ACHIEVEMENT_LEVEL = 30;
 
 const DECADES = (from, to) => {
   const out = [];
@@ -42,60 +81,67 @@ function peakOf(game, caste) {
 // reads the most upgrades ever held, not the live count — a nuptial flight
 // clears game.upgrades, and without this the tracks lose tiers and the
 // achievement level drops, which no other track can do
+// Counts LEVELS, not lines. Merging 29 one-shot upgrades into 12 lines would
+// otherwise have dropped these ladders' tops from 29 to 12 and taken tiers --
+// and achievement levels with them -- off every save that had passed them.
 function ownedIn(game, branch) {
-  let owned = 0;
-  for (const id of game.upgrades) {
-    const upgrade = UPGRADE_INDEX[id];
-    if (!upgrade) continue;
-    if (!branch || (upgrade.branch || "colony") === branch) owned++;
-  }
+  const owned = levelsOwned(game, branch || null);
   const peaks = game.peakUpgrades || {};
   return Math.max(owned, peaks[branch || "all"] || 0);
 }
 
-const UPGRADE_INDEX = {};
-const BRANCH_TOTALS = { all: UPGRADES.length, colony: 0, combat: 0 };
-for (const upgrade of UPGRADES) {
-  UPGRADE_INDEX[upgrade.id] = upgrade;
-  BRANCH_TOTALS[upgradeBranch(upgrade)]++;
-}
+// Defined levels, so the ladders stay at 29 / 21 / 8 exactly as before. Levels
+// a trial unlocks past those deliberately add no tiers: these ladders are built
+// once from a module constant and cannot grow per save.
+const BRANCH_TOTALS = {
+  all: definedLevelsIn(null),
+  colony: definedLevelsIn("colony"),
+  combat: definedLevelsIn("combat")
+};
 
-// Every ladder ends on a number a colony actually reaches. They used to run to
-// 1e12 ants and 1e24 food, so eleven of the sixteen tracks could never be
-// finished and the level cap of 20 was unreachable -- measured at 92 tiers and
-// level 18 after fourteen hours and six flights. The tops are now set against a
-// colony of roughly 10,000 ants, and the rungs are dense where players actually
-// stand rather than spread across decades nobody sees.
+// Every ladder ends on a number a colony actually reaches, and the tops are set
+// against what a *finished* colony reaches -- whole lineage, Drought mastered --
+// because that colony exists now. Measured at 8 hours it holds 122K ants, 104K
+// foragers, 9.8K soldiers, 1.05M fighting strength and 9.7M protein, so the old
+// tops of 10K ants and 100K strength were all cleared inside the first hour and
+// fifteen of the seventeen tracks finished before the player had done anything.
+//
+// Every change here is an APPEND above the old top rung. Rungs are never
+// removed, reordered or lowered: tiers pay food and hatch bonuses, so shortening
+// a ladder silently takes an achievement level off a save that already passed it.
 export const ACHIEVEMENT_TRACKS = [
   { id: "population", name: "Colony size", unit: "ants",
     desc: "The largest colony you have raised.",
     value: g => Math.max(g.peakPopulation || 0, population(g)),
-    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000] },
+    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000,
+      15000, 25000, 40000, 65000, 100000] },
 
   { id: "food", name: "Food gathered", unit: "food",
     desc: "Every crumb the colony has ever brought home.",
     value: g => g.stats.foodEarned,
-    thresholds: DECADES(2, 12) },
+    thresholds: DECADES(2, 14) },
 
   { id: "eggs", name: "Eggs hatched", unit: "eggs",
     desc: "Workers raised from egg to adult.",
     value: g => g.stats.eggsHatched,
-    thresholds: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000] },
+    thresholds: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000,
+      50000, 100000, 200000] },
 
   { id: "forager", name: "Foragers", unit: "foragers",
     desc: "The most foragers the colony has held at once.",
     value: g => peakOf(g, "forager"),
-    thresholds: [5, 25, 50, 100, 250, 500, 1000, 2000, 4000, 6000, 8000] },
+    thresholds: [5, 25, 50, 100, 250, 500, 1000, 2000, 4000, 6000, 8000,
+      15000, 30000, 50000, 80000] },
 
   { id: "excavator", name: "Excavators", unit: "excavators",
     desc: "The most diggers the colony has held at once.",
     value: g => peakOf(g, "excavator"),
-    thresholds: [3, 10, 25, 50, 75, 100, 150, 200] },
+    thresholds: [3, 10, 25, 50, 75, 100, 150, 200, 400, 750, 1500, 2500] },
 
   { id: "nurse", name: "Nurses", unit: "nurses",
     desc: "The most nurses the colony has held at once.",
     value: g => peakOf(g, "nurse"),
-    thresholds: [3, 10, 25, 50, 100, 200, 350, 500] },
+    thresholds: [3, 10, 25, 50, 100, 200, 350, 500, 1000, 2000, 4000, 6000] },
 
   // the k-th big forager needs round(3 x 3.5^k) forager hatches since the last,
   // so twelve is about 4,600 hatches and twenty is about 690,000. The old ladder
@@ -103,27 +149,30 @@ export const ACHIEVEMENT_TRACKS = [
   { id: "bigforager", name: "Big Foragers", unit: "big foragers",
     desc: "Oversized foragers that hatched by chance.",
     value: g => peakOf(g, "bigforager"),
-    thresholds: [1, 2, 3, 5, 8, 12] },
+    thresholds: [1, 2, 3, 5, 8, 12, 14, 16, 18] },
 
   { id: "soldier", name: "Soldiers", unit: "soldiers",
     desc: "The standing army at its largest.",
     value: g => peakOf(g, "soldier"),
-    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 750, 1000] },
+    thresholds: [1, 5, 10, 25, 50, 100, 250, 500, 750, 1000,
+      2000, 4000, 7000, 10000] },
 
   { id: "raids", name: "Raids won", unit: "raids",
     desc: "Attackers killed at the nest gate.",
     value: g => Math.max(g.raidsWon || 0, (g.stats && g.stats.raidsWonTotal) || 0),
-    thresholds: [1, 3, 5, 10, 20, 35, 50, 75, 100] },
+    thresholds: [1, 3, 5, 10, 20, 35, 50, 75, 100, 150, 250, 400] },
 
   { id: "strength", name: "Fighting strength", unit: "strength",
     desc: "The most fighting strength the colony has fielded.",
     value: g => g.peakStrength || 0,
-    thresholds: [25, 100, 500, 1000, 2500, 10000, 25000, 50000, 100000] },
+    thresholds: [25, 100, 500, 1000, 2500, 10000, 25000, 50000, 100000,
+      250000, 500000, 1e6, 2e6] },
 
   { id: "protein", name: "Protein gathered", unit: "protein",
     desc: "Everything the soldiers have dragged home.",
     value: g => g.stats.proteinEarned || 0,
-    thresholds: [10, 50, 100, 250, 1000, 5000, 25000, 100000, 250000] },
+    thresholds: [10, 50, 100, 250, 1000, 5000, 25000, 100000, 250000,
+      1e6, 5e6, 2e7] },
 
   { id: "upgrades", name: "Upgrades bought", unit: "upgrades",
     desc: "Every adaptation the colony has paid for.",
@@ -213,12 +262,14 @@ export function seedSeenTracks(game) {
   game.seen.tracks = seen;
 }
 
-export function achievementLevelFor(points) {
-  return Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
+export function achievementLevelFor(xp) {
+  let level = 0;
+  while (level < MAX_ACHIEVEMENT_LEVEL && xpForLevel(level + 1) <= xp) level++;
+  return level;
 }
 
 export function levelPoints(level) {
-  return POINTS_PER_LEVEL * level;
+  return xpForLevel(level);
 }
 
 const trackRows = {};
@@ -365,9 +416,11 @@ function buildTracks(game) {
         const done = tier === 0
           ? "No tiers yet."
           : tier + (tier === 1 ? " tier: " : " tiers: ") + listed + ".";
-        if (next === null) return done + " Every tier on this track is earned.";
+        const worth = " This track is worth " + fmt(trackXp(game, track)) + " XP so far.";
+        if (next === null) return done + " Every tier on this track is earned." + worth;
         return done + " Tier " + (tier + 1) + " at " + fmt(next) + " " + track.unit +
-          " — you have " + fmt(track.value(game)) + ".";
+          " — you have " + fmt(track.value(game)) + ", and it would pay " +
+          fmt(tierXp(tier + 1)) + " XP." + worth;
       }
     });
     const clearDot = () => markTrackSeen(game, track);
@@ -412,13 +465,18 @@ export function renderAchievements(game) {
     if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked(game));
   });
 
-  const points = totalTiers(game);
-  const level = Math.min(MAX_ACHIEVEMENT_LEVEL, Math.floor(points / POINTS_PER_LEVEL));
+  const tiers = totalTiers(game);
+  const xp = totalXp(game);
+  const level = game.achievementLevel;
   const capped = level >= MAX_ACHIEVEMENT_LEVEL;
   el("achievementLevel").textContent = "Level " + level + (capped ? " (max)" : "");
   el("achievementPoints").textContent = capped
-    ? points + " tiers earned across " + ACHIEVEMENT_TRACKS.length + " tracks"
-    : points + " tiers earned — " + Math.max(0, levelPoints(level + 1) - points) + " to the next level";
-  const progress = capped ? 1 : (points - levelPoints(level)) / POINTS_PER_LEVEL;
-  el("achievementBar").style.width = Math.min(100, progress * 100).toFixed(1) + "%";
+    ? tiers + " tiers across " + ACHIEVEMENT_TRACKS.length + " tracks — " + fmt(xp) + " XP"
+    : tiers + " tiers, " + fmt(xp) + " XP — " +
+      fmt(Math.max(0, xpForLevel(level + 1) - xp)) + " to level " + (level + 1) +
+      " (a deeper tier is worth more)";
+  const floor = xpForLevel(level);
+  const span = xpForLevel(level + 1) - floor;
+  const progress = capped ? 1 : Math.max(0, Math.min(1, (xp - floor) / span));
+  el("achievementBar").style.width = (progress * 100).toFixed(1) + "%";
 }

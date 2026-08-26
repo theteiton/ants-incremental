@@ -87,7 +87,19 @@ h1 {
 .readout-group:first-child { padding-left: 0; }
 .readout-group + .readout-group { border-left: 1px solid var(--line); }
 .readout { display: flex; flex-direction: column; line-height: 1.2; }
-.readout b { font-size: 18px; }
+/* The bar must not reflow as the numbers change. Measured across 155 viewport
+   widths from 360 to 1900px: the four groups swung between 1,264px and 1,450px
+   of intrinsic width purely because fmt() changes character count -- "999" to
+   "1.00K" -- and the row count flipped at 36 of those widths. That is the bar
+   jumping between one line and two while you play, which is what it looked
+   like. Reserving what each value can ever need makes the wrap depend on the
+   viewport alone: measured at 0 of 155 afterwards, with all four value sets
+   producing identical group widths. In ch, not px, so it follows the font size.
+   tabular-nums stops the digits jittering inside that reserved box. */
+.readout b { font-size: 18px; font-variant-numeric: tabular-nums; min-width: 7ch; }
+#readoutPopulation b { min-width: 13ch; }   /* "132K / 148K" */
+#readoutRaidIn b { min-width: 14ch; }       /* "gone to ground" */
+#readoutColonyAge b, #readoutMatriline b { min-width: 9ch; }  /* "100h 30m" */
 .readout i {
   font-style: normal;
   font-size: 11px;
@@ -116,6 +128,17 @@ main { max-width: 860px; margin: 0 auto; padding: 20px; }
     overflow-y: auto;
     z-index: 8;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+  /* Switched off in Settings. margin-top has to go back to 0 with it: the
+     status column is stretched to the full row height, so an auto margin would
+     drop the panel to the bottom of that column, a long way under the brood it
+     is meant to sit beneath. */
+  :root[data-inspector="static"] .inspector {
+    position: static;
+    margin-top: 0;
+    max-height: none;
+    overflow-y: visible;
+    box-shadow: none;
   }
   .columns {
     display: grid;
@@ -320,6 +343,8 @@ button.danger { background: var(--danger); color: #fff; }
 .subtabs button.active { color: var(--text); border-color: var(--accent); }
 
 .raid-hunt { font-size: 14px; margin: 10px 0 0; color: var(--good); }
+.exchange-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.exchange-row input { width: 110px; }
 .raid-notice {
   font-size: 14px;
   margin: 10px 0 0;
@@ -806,3 +831,56 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 [hidden] { display: none !important; }
 
+
+.upgrade-level {
+  font-size: 11px;
+  color: var(--accent-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+  padding-right: 8px;
+}
+
+.rank-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.rank-row {
+  display: grid;
+  grid-template-columns: 45px 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.rank-row:first-child { border-top: none; }
+.rank-row.locked { opacity: 0.45; }
+.rank-name { display: block; font-weight: 600; font-size: 14px; }
+.rank-role { display: block; font-size: 12px; color: var(--dim); }
+.rank-stat { display: block; font-size: 12px; color: var(--good); }
+.rank-count { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.rank-train { min-width: 132px; }
+.rank-train button { width: 100%; font-size: 12px; padding: 6px 8px; }
+.rank-train .dim { display: block; font-size: 11px; margin-top: 3px; text-align: center; }
+.train-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+.train-row input { width: 90px; }
+
+.challenge.failed { border-color: var(--danger); border-left-color: var(--danger); }
+.modal-box .challenge-running.failed,
+.challenge-running.failed { border-left-color: var(--danger); color: var(--danger); }
+
+/* An inspector note used to be one flat colour, so what a trial COSTS you and
+   what it PAYS you read identically. Each line is toned by the section it sits
+   under instead. */
+.inspect-note { display: flex; flex-direction: column; }
+.note-line { display: block; white-space: pre-wrap; }
+.note-head {
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+.note-line:first-child { margin-top: 0; }
+.note-plain { color: var(--dim); }
+.note-cost { color: var(--danger); }
+.note-keep { color: var(--dim); }
+.note-goal { color: var(--accent-soft); }
+.note-reward { color: var(--good); }
+.inspect-note.warn .note-plain { color: var(--accent); }

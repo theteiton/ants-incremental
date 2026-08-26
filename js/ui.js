@@ -3,6 +3,10 @@ import {
   CASTES,
   EGG_TIME,
   emergingCaste,
+  SOLDIER_RANKS,
+  RANK_IDS,
+  rankOf,
+  soldierCount,
   incubationTime,
   naniticLifespan,
   nextEggCaste,
@@ -22,10 +26,24 @@ import {
   WING_FOOD,
   WING_STRIP_TIME
 } from "./ants.js";
-import { combatPerCaste, combatPower, hunting, huntRate, inHiding, monsterPower, proteinPerSecond, raidsSeen, raidsUnlocked, RAID_WARNING } from "./raids.js";
+import { combatPerCaste, combatPower, hunting, huntRate, inHiding, HIDING_LOSS_STREAK,
+  monsterPower, proteinPerSecond, raidsSeen, raidsUnlocked, RAID_WARNING,
+  combatPerRank, huntingSoldiers, VETERAN_SHARE, WIN_LOSS_SHARE } from "./raids.js";
 import {
   affordableEggs,
+  affordableProtein,
   autoCaste,
+  trainSoldiers,
+  trainCost,
+  trainLossChance,
+  trainableCount,
+  buyProtein,
+  sellProtein,
+  exchangeReady,
+  proteinSaleValue,
+  proteinPurchaseCost,
+  foodPerProtein,
+  EXCHANGE_RETURN,
   foodReserve,
   automationOn,
   automationUnlocked,
@@ -64,7 +82,18 @@ import {
   CHALLENGE_REWARD_STEP,
   bestTrialLevel,
   masteryFood,
+  masterySoldier,
   CHALLENGE_TARGET,
+  challengeTarget,
+  targetKind,
+  challengeCount,
+  challengeFailed,
+  challengeFailKind,
+  siegeThreatScale,
+  siegeThreatScaleAt,
+  SIEGE_UNLOCK,
+  SIEGE_INTERVAL,
+  SIEGE_LOSS_CAP,
   TRIAL_GIVES_UP,
   TRIAL_KEEPS,
   activeChallenge,
@@ -95,6 +124,7 @@ import {
   fmt,
   fmtTime,
   parseAmount,
+  paintNote,
   shortAmount,
   renderAnts,
   renderInspector,
@@ -115,7 +145,7 @@ import {
   renderAchievements,
   seedSeenTracks
 } from "./achievements.js";
-import { drawSprite } from "./sprites.js";
+import { drawSprite, spriteFor } from "./sprites.js";
 
 const el = id => document.getElementById(id);
 const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "challenges", "settings"];
@@ -158,6 +188,13 @@ function pendingCaste() {
 
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", game.settings.theme || "dark");
+}
+
+// Whether the inspector follows the scroll. Same pattern as the theme: one
+// attribute on the root, and the CSS decides what it means.
+function applyLayout() {
+  document.documentElement.setAttribute("data-inspector",
+    game.settings.stickyInspector === false ? "static" : "sticky");
 }
 
 function renderQueen() {
@@ -398,7 +435,8 @@ function renderCombatBar() {
   if (!active) return;
   el("valFighters").textContent = fmt(defence);
   el("valThreat").textContent = fmt(threat);
-  el("valRaidIn").textContent = hidden ? "gone to ground" : fmtTime(left);
+  el("valRaidIn").textContent = challengeFailed(game) ? "trial lost"
+    : hidden ? "gone to ground" : fmtTime(left);
   el("readoutFighters").classList.toggle("losing", defence < threat);
   el("readoutRaidIn").classList.toggle("imminent", soon);
 }
@@ -436,10 +474,215 @@ function renderFighters() {
   }
 }
 
+function exchangeAmount() {
+  const n = parseAmount(el("exchangeAmount").value);
+  return isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function renderExchange() {
+  const panel = el("exchangePanel");
+  panel.hidden = !exchangeReady(game);
+  if (panel.hidden) return;
+  const rate = foodPerProtein(game);
+  el("exchangeRate").textContent =
+    "One protein is worth " + fmt(rate) + " food at what the colony earns right now. " +
+    "The pit keeps a cut both ways — you get " + Math.round(EXCHANGE_RETURN * 100) +
+    "% of that trading either direction, so there is nothing to be made going round in a circle.";
+  const n = exchangeAmount();
+  const canSell = n > 0 && n <= Math.floor(game.protein);
+  const cost = n > 0 ? proteinPurchaseCost(game, n) : 0;
+  const canBuy = n > 0 && cost <= game.food;
+  el("btnSellProtein").disabled = !canSell;
+  el("btnBuyProtein").disabled = !canBuy;
+  el("exchangePreview").textContent = n <= 0
+    ? "Type how much protein to trade."
+    : fmt(n) + " protein sells for " + fmt(proteinSaleValue(game, n)) + " food" +
+      (canSell ? "" : " (you have " + fmt(game.protein) + ")") +
+      " · buying " + fmt(n) + " costs " + fmt(cost) + " food" +
+      (canBuy ? "" : " (you can afford " + fmt(affordableProtein()) + ")");
+}
+
+// Combat became three things -- the fight, the army, and the pit -- so it takes
+// the same sub-tab shape Upgrades, Achievements and Settings already use rather
+// than growing into one long column.
+const COMBAT_TABS = [
+  { id: "overview", name: "Overview" },
+  { id: "units", name: "Units" },
+  { id: "trade", name: "Trade" }
+];
+let combatTab = "overview";
+
+function selectCombatTab(name) {
+  combatTab = name;
+  COMBAT_TABS.forEach(tab => {
+    el("combatPanel-" + tab.id).hidden = tab.id !== name;
+  });
+  for (const button of el("combatTabs").children) {
+    button.classList.toggle("active", button.dataset.tab === name);
+  }
+  render();
+}
+
+function buildCombatTabs() {
+  COMBAT_TABS.forEach(tab => {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.dataset.tab = tab.id;
+    button.onclick = () => selectCombatTab(tab.id);
+    el("combatTabs").appendChild(button);
+  });
+  selectCombatTab("overview");
+}
+
+// The Units menu is bought with a trial, not with a resource: Endless Siege
+// demands soldiers, so surviving it is what teaches the colony to make better
+// ones. Until then the menu says so plainly rather than being hidden.
+function unitsUnlocked() {
+  return bestTrialLevel(game, "siege") > 0;
+}
+
+const rankRows = {};
+
+function buildRanks() {
+  const list = el("rankList");
+  SOLDIER_RANKS.forEach((rank, index) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+
+    const art = document.createElement("div");
+    art.className = "caste-art";
+    art.appendChild(spriteFor(rank.id, 3));
+
+    const body = document.createElement("div");
+    body.innerHTML = '<span class="rank-name"></span><span class="rank-role"></span>' +
+      '<span class="rank-stat"></span>';
+
+    const count = document.createElement("div");
+    count.className = "rank-count";
+
+    const train = document.createElement("div");
+    train.className = "rank-train";
+    const button = document.createElement("button");
+    const note = document.createElement("span");
+    note.className = "dim";
+    train.append(button, note);
+    // the promotion this row offers is INTO the next rank, so the last row has none
+    button.onclick = () => {
+      const result = trainSoldiers(index, trainAmount());
+      if (result) lastTraining = Object.assign({ rank: SOLDIER_RANKS[index + 1].id }, result);
+      render();
+    };
+
+    row.append(art, body, count, train);
+    watch(row, {
+      title: CASTES[rank.id].name,
+      body: CASTES[rank.id].role,
+      note: () => rankNote(rank, index)
+    });
+    rankRows[rank.id] = { row, button, note,
+      name: body.querySelector(".rank-name"),
+      role: body.querySelector(".rank-role"),
+      stat: body.querySelector(".rank-stat"),
+      count };
+    list.appendChild(row);
+  });
+}
+
+function rankNote(rank, index) {
+  const held = game.ants[rank.id] || 0;
+  const lines = [fmt(held) + " in the colony, " + fmt(combatPerRank(game, rank.id)) +
+    " strength each — " + fmt(held * combatPerRank(game, rank.id)) + " in total."];
+  lines.push(rank.hunt > 0
+    ? "Hunts at " + fmt(rank.hunt * 100) + "% of a plain soldier's rate."
+    : "Never hunts. She holds the tunnel and nothing else.");
+  const next = SOLDIER_RANKS[index + 1];
+  if (!next) {
+    lines.push("", "The highest grade there is. Nothing promotes out of here.");
+    return lines.join("\n");
+  }
+  lines.push("", "TRAINING INTO " + CASTES[next.id].name.toUpperCase(),
+    "  · " + fmt(next.cost) + " protein each",
+    "  · " + Math.round(next.loss * 100) + "% of them do not survive it",
+    "  · " + fmt(next.power) + "× a plain soldier at the gate, hunting at " +
+      (next.hunt > 0 ? fmt(next.hunt * 100) + "%" : "nothing"),
+    "  · you can afford to train " + fmt(trainableCount(index)) + " right now");
+  return lines.join("\n");
+}
+
+function trainAmount() {
+  const n = parseAmount(el("trainAmount").value);
+  return isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+let lastTraining = null;
+
+function renderUnits() {
+  const open = unitsUnlocked();
+  el("unitsLocked").hidden = open;
+  el("unitsBody").hidden = !open;
+  if (!open) {
+    el("unitsLocked").textContent =
+      "Locked. The colony has never had to make a better soldier, so it does not know how. " +
+      "Clear one level of Endless Siege on the Trials tab and this opens — the trial that " +
+      "demands soldiers is the one that teaches them.";
+    return;
+  }
+  el("unitsIntro").textContent =
+    "Every grade fights harder and hunts worse. An army of nothing but guards fields enormous " +
+    "strength and brings home no protein at all, which is the protein that trained it. " +
+    "Surviving a raid promotes " + Math.round(VETERAN_SHARE * 100) + "% of the rank and file into " +
+    "Majors on its own; everything above that is bought here, and paid for in ants.";
+
+  const n = trainAmount();
+  SOLDIER_RANKS.forEach((rank, index) => {
+    const ui = rankRows[rank.id];
+    const held = game.ants[rank.id] || 0;
+    const next = SOLDIER_RANKS[index + 1];
+    ui.name.textContent = CASTES[rank.id].name;
+    ui.role.textContent = CASTES[rank.id].role;
+    ui.stat.textContent = fmt(combatPerRank(game, rank.id)) + " each" +
+      (rank.hunt > 0 ? " · hunts at " + fmt(rank.hunt * 100) + "%" : " · never hunts");
+    ui.count.textContent = fmt(held);
+    ui.row.classList.toggle("locked", held <= 0);
+
+    ui.button.hidden = !next;
+    ui.note.hidden = !next;
+    if (!next) return;
+    const can = Math.min(n, trainableCount(index));
+    ui.button.disabled = can <= 0;
+    ui.button.textContent = "Train " + fmt(can) + " → " + CASTES[next.id].name;
+    ui.note.textContent = fmt(next.cost) + " protein each · " +
+      Math.round(next.loss * 100) + "% die";
+  });
+
+  const record = [];
+  if (lastTraining) {
+    record.push("Last training: " + fmt(lastTraining.trained) + " became " +
+      CASTES[lastTraining.rank].name + "s" +
+      (lastTraining.lost > 0 ? ", " + fmt(lastTraining.lost) + " did not survive it" : ", none lost") +
+      " — " + fmt(lastTraining.spent) + " protein.");
+  }
+  record.push(fmt(game.stats.trained || 0) + " promoted in this matriline, " +
+    fmt(game.stats.trainingDeaths || 0) + " lost to it.");
+  el("trainRecord").textContent = record.join(" ");
+  el("trainNote").textContent = "Protein banked: " + fmt(game.protein) +
+    ". Hunting brings home " + fmt(huntRate(game)) + "/s from " +
+    fmt(huntingSoldiers(game)) + " effective hunters of " + fmt(soldierCount(game)) + " bodies.";
+}
+
 function renderRaid() {
   const active = raidsUnlocked(game);
   el("tabButton-combat").hidden = !active;
   if (!active || activeTab !== "combat") return;
+  renderUnits();
+  renderExchange();
+  el("tradeLocked").hidden = !el("exchangePanel").hidden;
+  if (!el("tradeLocked").hidden) {
+    el("tradeLocked").textContent =
+      "The rendering pit opens once the colony is hunting and raiding — it prices protein " +
+      "against what the colony earns right now, and with nothing coming in there is no price.";
+  }
+  if (combatTab !== "overview") return;
 
   el("combatTally").textContent = fmt(game.raidsWon || 0) +
     ((game.raidsWon || 0) === 1 ? " raid won" : " raids won");
@@ -457,8 +700,18 @@ function renderRaid() {
   const soon = !hidden && left <= RAID_WARNING;
   el("tab-combat").classList.toggle("imminent", soon);
   el("tab-combat").classList.toggle("hiding", hidden);
-  el("raidCountdown").textContent = hidden
-    ? "The nest is shut. With no soldiers left the colony has gone to ground — nothing is coming while it stays that way."
+  // a lost trial is not waiting for anything; the timer is frozen, so saying
+  // "next attack in 1m 30s" for ever would be a straight lie
+  const lostRun = challengeFailed(game);
+  const beaten = hidden && game.ants.soldier > 0;
+  el("raidCountdown").textContent = lostRun
+    ? "The siege is over. The line broke and the trial is lost — nothing more is coming. " +
+      "Give it up on the Trials tab to found a fresh colony."
+    : hidden
+    ? beaten
+      ? "The nest is shut. After " + HIDING_LOSS_STREAK +
+        " straight defeats the colony has gone to ground — nothing is coming while it stays that way."
+      : "The nest is shut. With no soldiers left the colony has gone to ground — nothing is coming while it stays that way."
     : soon
       ? "Something is coming — " + Math.ceil(left) + "s"
       : "Next attack in " + fmtTime(left) + ".";
@@ -470,7 +723,7 @@ function renderRaid() {
     : "Your soldiers are back at the nest for the fight.";
 
   const notice = el("raidNotice");
-  const armed = game.upgrades.indexOf("combat_1") >= 0;
+  const armed = (game.upgrades && game.upgrades.combat_forager || 0) > 0;
   notice.hidden = raidsSeen(game) === 0 || armed;
   if (!notice.hidden) {
     notice.textContent =
@@ -479,10 +732,18 @@ function renderRaid() {
       "Soldiers hunt between attacks and come home when one is close.";
   }
 
-  if (hidden) {
+  if (lostRun) {
     el("raidReport").textContent =
-      "Foraging is half what it was — the workers keep to cover and will not range far. " +
-      "Lay a soldier and the colony opens up again; the next attack is a full six minutes away.";
+      "The colony still stands, but the trial does not. Nothing it does now counts towards it.";
+    return;
+  }
+  if (hidden) {
+    el("raidReport").textContent = beaten
+      ? "Foraging is half what it was — the workers keep to cover and will not range far. " +
+        "Raise an army that can hold " + fmt(threat) + " and the nest opens again; " +
+        "you field " + fmt(defence) + " now."
+      : "Foraging is half what it was — the workers keep to cover and will not range far. " +
+        "Lay a soldier and the colony opens up again; the next attack is a full six minutes away.";
     return;
   }
 
@@ -494,9 +755,15 @@ function renderRaid() {
     return;
   }
   if (last.won) {
+    const fallen = Object.keys(last.dead || {})
+      .map(c => fmt(last.dead[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
+    const risen = Object.keys(last.promoted || {})
+      .map(c => fmt(last.promoted[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
     el("raidReport").textContent =
       "The last attacker was killed and stripped: +" + fmt(last.protein) +
-      " protein, +" + fmt(last.food) + " food.";
+      " protein, +" + fmt(last.food) + " food." +
+      (fallen ? " It cost " + fallen + "." : " Nothing was lost holding it.") +
+      (risen ? " " + risen + " came out of it promoted." : "");
   } else {
     const toll = Object.keys(last.dead).map(c => fmt(last.dead[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
     el("raidReport").textContent =
@@ -707,6 +974,30 @@ const challengeCards = {};
 
 const pct = value => fmt(value * 100) + "%";
 
+// What a trial actually does, in its own terms. Every card and hover used to
+// print Drought's food multiplier whatever trial it was describing, so Endless
+// Siege -- which does not touch food at all -- announced a 25% food penalty.
+function challengeDebuffText(challenge, level) {
+  if ((challenge.kind || "food") === "siege") {
+    const scale = siegeThreatScaleAt(level);
+    return "Attacks from " + fmt(SIEGE_UNLOCK) + " ants, one every " + SIEGE_INTERVAL +
+      " seconds, at ×" + fmt(scale) + " strength on this attempt. A defeat costs " +
+      pct(SIEGE_LOSS_CAP) + " of the colony instead of the usual fifth, and the nest " +
+      "cannot go to ground.";
+  }
+  return "All food production × " + pct(challengeDebuffAt(level)) + " on the next attempt — against " +
+    "× " + fmt(challengeReward(game) * masteryFood(game)) + " you already hold, so about × " +
+    pct(challengeDebuffAt(level) * challengeReward(game) * masteryFood(game)) +
+    " of a normal colony.";
+}
+
+// the one-line version for the running note at the top of the tab
+function challengeRunningText(challenge, level) {
+  return (challenge.kind || "food") === "siege"
+    ? "attackers at ×" + fmt(siegeThreatScaleAt(level)) + " strength"
+    : "food at × " + pct(challengeDebuff(game));
+}
+
 // The cards used to say "cut hard" and leave it there. Every figure a trial
 // changes is now stated as a number, and the hover lists what is taken, what is
 // kept, what clears it and what clearing pays -- players could not tell that
@@ -733,40 +1024,52 @@ function trialDetail(challenge) {
     (level === 1 ? " level so far." : " levels so far."));
   lines.push("");
   lines.push("WHILE IT RUNS");
-  lines.push("  · All food production × " + pct(challengeDebuffAt(level)));
+  lines.push("  · " + challengeDebuffText(challenge, level));
+  if ((challenge.kind || "food") === "siege") {
+    lines.push("  · Soldiers unlock at " + fmt(SIEGE_UNLOCK) +
+      " ants too, or nothing could be raised in time.");
+  }
+  const failRule = challengeFailKind(challenge);
+  if (failRule) lines.push("  · " + failRule.rule);
   TRIAL_GIVES_UP.forEach(line => lines.push("  · " + line));
   lines.push("");
   lines.push("WHAT COMES WITH YOU");
   TRIAL_KEEPS.forEach(line => lines.push("  · " + line));
   lines.push("");
   lines.push("TO CLEAR IT");
-  lines.push("  · Raise " + fmt(CHALLENGE_TARGET) + " ants in one colony" +
-    (mine ? " — you have " + fmt(population(game)) : ""));
-  lines.push("");
-  lines.push("WHAT CLEARING PAYS");
-  lines.push("  · The trial pays × " + CHALLENGE_REWARD_STEP + " food per level cleared.");
-  lines.push("    You hold × " + fmt(challengeReward(game)) + " from " +
-    challengeLevelsTotal(game) + " levels across all trials.");
-  const m = challenge.mastery;
-  if (m) {
-    const level = bestTrialLevel(game, challenge.id);
-    lines.push("  · " + m.name + ", its own achievement, pays × " + m.step + " " + m.type +
-      " per level reached.");
-    lines.push("    You hold × " + fmt(Math.pow(m.step, level)) + " from level " + level +
-      ". This one is the big half.");
-  }
-  lines.push("    Both apply everywhere, inside trials as well as outside.");
+  const target = challengeTarget(challenge);
+  const kind = targetKind(challenge);
+  lines.push("  · " + kind.verb + " " + fmt(target.amount) + " " + kind.noun + " " + kind.of +
+    (mine ? " — you have " + fmt(challengeCount()) : ""));
   lines.push("");
   lines.push("IF YOU CLEAR IT");
-  if (challenge.mastery) {
-    const m2 = challenge.mastery;
-    lines.push("  · " + m2.name + " would rise to × " +
-      fmt(Math.pow(m2.step, Math.max(bestTrialLevel(game, challenge.id), level + 1))) +
-      " " + m2.type + ".");
+  const m = challenge.mastery;
+  if (m) {
+    const now = Math.pow(m.step, bestTrialLevel(game, challenge.id));
+    const then = Math.pow(m.step, Math.max(bestTrialLevel(game, challenge.id), level + 1));
+    lines.push("  · " + m.name + " goes from × " + fmt(now) + " to × " + fmt(then) +
+      " " + m.type + " — × " + m.step + " for every level, kept for good.");
   }
+  const rewardNow = challengeReward(game);
+  const rewardThen = rewardNow * CHALLENGE_REWARD_STEP;
+  lines.push("  · The trials bonus goes from × " + fmt(rewardNow) + " to × " + fmt(rewardThen) +
+    " food — × " + CHALLENGE_REWARD_STEP + " for every level cleared in any trial.");
+  if (m && m.type === "food") {
+    lines.push("  · Food in every colony: × " + fmt(rewardNow * masteryFood(game)) +
+      " now, × " + fmt(rewardThen * Math.pow(m.step,
+        Math.max(bestTrialLevel(game, challenge.id), level + 1))) + " after.");
+  } else if (m) {
+    lines.push("  · You would hold × " + fmt(rewardThen * masteryFood(game)) + " food and × " +
+      fmt(Math.pow(m.step, Math.max(bestTrialLevel(game, challenge.id), level + 1))) +
+      " " + m.type + ", in every colony.");
+  }
+  lines.push("  · All of it applies everywhere, inside trials as well as outside.");
   lines.push(level + 1 >= CHALLENGE_MAX_LEVEL
-    ? "  · That is the last level. The trial would be mastered."
-    : "  · Attempt " + (level + 2) + " would run at × " + pct(challengeDebuffAt(level + 1)) + " food.");
+    ? "  · That is the last level — the trial would be mastered."
+    : "  · Attempt " + (level + 2) + " would then run at " +
+      ((challenge.kind || "food") === "siege"
+        ? "× " + fmt(siegeThreatScaleAt(level + 1)) + " attacker strength."
+        : "× " + pct(challengeDebuffAt(level + 1)) + " food."));
   return lines.join("\n");
 }
 
@@ -830,10 +1133,12 @@ function renderChallenges() {
   const levels = challengeLevelsTotal(game);
   const met = challengeMet();
   el("challengeTally").textContent = levels + (levels === 1 ? " level cleared" : " levels cleared");
+  const soldierMastery = masterySoldier(game);
   el("challengeReward").textContent = levels > 0
     ? "× " + fmt(challengeReward(game) * masteryFood(game)) + " food in every colony — × " +
       fmt(challengeReward(game)) + " from levels cleared, × " + fmt(masteryFood(game)) +
-      " from Deep Cisterns"
+      " from Deep Cisterns" +
+      (soldierMastery > 1 ? " — and × " + fmt(soldierMastery) + " soldier strength from Hardened Line" : "")
     : "no reward held yet";
   el("challengeIntro").textContent = running ? "" :
     "A trial founds a brand new colony under conditions that should kill it. The Royal Lineage's " +
@@ -846,14 +1151,21 @@ function renderChallenges() {
   const note = el("challengeRunning");
   note.hidden = !running;
   if (running) {
-    note.textContent = met
-      ? running.name + " is met — " + fmt(population(game)) + " ants standing, " +
-        fmt(CHALLENGE_TARGET) + " needed. Claim it to bank the level and found a fresh colony."
+    const rk = targetKind(running);
+    const rt = challengeTarget(running);
+    const lost = challengeFailed(game);
+    const lostRule = challengeFailKind(running);
+    note.textContent = lost
+      ? running.name + " — " + lostRule.lost
+      : met
+      ? running.name + " is met — " + fmt(challengeCount()) + " of " + fmt(rt.amount) + " " +
+        rk.noun + ". Claim it to bank the level and found a fresh colony."
       : running.name + ", attempt " + (challengeLevel(game, running.id) + 1) +
-        " — food at × " + pct(challengeDebuff(game)) + ", " +
-        fmt(population(game)) + " of " + fmt(CHALLENGE_TARGET) + " ants raised. " +
+        " — " + challengeRunningText(running, challengeLevel(game, running.id)) + ", " +
+        fmt(challengeCount()) + " of " + fmt(rt.amount) + " " + rk.noun + ". " +
         "Abandoning founds a fresh colony and pays nothing.";
-    note.classList.toggle("met", met);
+    note.classList.toggle("met", met && !challengeFailed(game));
+    note.classList.toggle("failed", challengeFailed(game));
   }
 
   CHALLENGES.forEach(challenge => {
@@ -862,6 +1174,7 @@ function renderChallenges() {
     const mine = !!running && running.id === challenge.id;
     ui.card.classList.toggle("locked", !challenge.open);
     ui.card.classList.toggle("running", mine);
+    ui.card.classList.toggle("failed", mine && challengeFailed(game));
     const mastered = challengeMastered(game, challenge.id);
     ui.card.classList.toggle("mastered", mastered);
     ui.level.textContent = !challenge.open ? "not playable yet"
@@ -870,13 +1183,12 @@ function renderChallenges() {
       : "0 of " + CHALLENGE_MAX_LEVEL + " cleared";
     ui.rule.textContent = !challenge.open ? challenge.plan
       : mastered ? "Every level survived. Nothing here is left to prove."
-      : "All food production × " + pct(challengeDebuffAt(level)) + " on the next attempt — against " +
-        "× " + fmt(challengeReward(game) * masteryFood(game)) + " you already hold, so about × " +
-        pct(challengeDebuffAt(level) * challengeReward(game) * masteryFood(game)) +
-        " of a normal colony.";
+      : challengeDebuffText(challenge, level);
+    const tKind = targetKind(challenge);
+    const tAmount = challengeTarget(challenge).amount;
     ui.target.textContent = challenge.open && !mastered
-      ? "Clear it by raising " + fmt(CHALLENGE_TARGET) + " ants." +
-        (mine ? " You have " + fmt(population(game)) + "." : "")
+      ? "Clear it by " + tKind.gerund + " " + fmt(tAmount) + " " + tKind.noun + "." +
+        (mine ? " You have " + fmt(challengeCount()) + "." : "")
       : "";
     ui.reward.textContent = challenge.open && !mastered
       ? "Each level pays × " + CHALLENGE_REWARD_STEP + " food, and " + challenge.mastery.name +
@@ -885,10 +1197,13 @@ function renderChallenges() {
     ui.button.hidden = !challenge.open || mastered;
     ui.button.disabled = !challenge.open || mastered || (!!running && !mine);
     ui.button.classList.toggle("danger", mine && !met);
+    const lostRun = mine && challengeFailed(game);
     ui.button.textContent = mine
       ? (met ? "Claim the trial"
-             : ui.button.dataset.armed === "yes" ? "Really abandon it?" : "Abandon")
-      : (ui.button.dataset.armed === "yes" ? "Found a colony here?" : "Enter");
+             : ui.button.dataset.armed === "yes"
+               ? (lostRun ? "Really give it up?" : "Really abandon it?")
+               : (lostRun ? "Give it up" : "Abandon"))
+      : (ui.button.dataset.armed === "yes" ? "Establish a colony here?" : "Enter");
   });
 }
 
@@ -1152,6 +1467,11 @@ function openBroodDialog() {
   el("broodModal").hidden = false;
 }
 
+el("trainAmount").oninput = () => render();
+el("btnSellProtein").onclick = () => { sellProtein(exchangeAmount()); render(); };
+el("btnBuyProtein").onclick = () => { buyProtein(exchangeAmount()); render(); };
+el("exchangeAmount").oninput = () => render();
+
 el("btnBroodDetails").onclick = openBroodDialog;
 el("broodClose").onclick = () => { el("broodModal").hidden = true; };
 el("broodScope").onchange = event => {
@@ -1329,8 +1649,8 @@ function openInspectModal() {
   if (!el("inspectTitle").textContent || el("inspectTitle").textContent === "Point at anything") return;
   el("inspectModalTitle").textContent = el("inspectTitle").textContent;
   el("inspectModalBody").textContent = el("inspectBody").textContent;
-  el("inspectModalNote").textContent = el("inspectNote").textContent;
-  el("inspectModalNote").className = el("inspectNote").className.replace("inspect-note", "inspect-note");
+  paintNote(el("inspectModalNote"), el("inspectNote").textContent);
+  el("inspectModalNote").className = el("inspectNote").className;
   el("inspectModal").hidden = false;
 }
 
@@ -1356,11 +1676,17 @@ buildUpgrades(render);
 buildAchievements(game);
 buildPrestige(render);
 buildChallenges();
+buildCombatTabs();
+buildRanks();
 buildSettingsTabs();
 buildSettings({
   refresh: render,
   applyTheme: () => {
     applyTheme();
+    render();
+  },
+  applyLayout: () => {
+    applyLayout();
     render();
   },
   exportSave: () => openSaveDialog("export"),
@@ -1389,6 +1715,7 @@ drawSprite(el("queenSprite"), "queen", 4);
 load();
 claimSave();
 applyTheme();
+applyLayout();
 markSeen("upgrades", affordableUpgrades());
 seedSeenTracks(game);
 selectTab("ants");

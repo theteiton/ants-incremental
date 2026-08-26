@@ -18,7 +18,7 @@
       <div class="readout" id="readoutProteinRate" hidden><b id="valProteinRate">0/s</b><i>protein per second</i></div>
     </div>
     <div class="readout-group">
-      <div class="readout"><b id="valPop">0 / 0</b><i>population</i></div>
+      <div class="readout" id="readoutPopulation"><b id="valPop">0 / 0</b><i>population</i></div>
       <div class="readout"><b id="valEggs">0</b><i>eggs incubating</i></div>
     </div>
     <div class="readout-group" id="combatGroup" hidden>
@@ -28,7 +28,7 @@
     </div>
     <div class="readout-group">
       <div class="readout" id="readoutRoyalJelly" hidden><b id="valRoyalJelly">0</b><i>royal jelly</i></div>
-      <div class="readout"><b id="valTime">0s</b><i>colony age</i></div>
+      <div class="readout" id="readoutColonyAge"><b id="valTime">0s</b><i>colony age</i></div>
       <div class="readout" id="readoutMatriline" hidden><b id="valMatriline">0s</b><i>matriline</i></div>
     </div>
   </div>
@@ -138,17 +138,52 @@
       <span class="tally" id="combatTally">0 raids won</span>
       <span class="dim" id="combatRecord"></span>
     </div>
-    <p id="raidCountdown"></p>
-    <div class="raid-scales">
-      <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
-      <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+    <div class="subtabs" id="combatTabs"></div>
+
+    <div id="combatPanel-overview">
+      <p id="raidCountdown"></p>
+      <div class="raid-scales">
+        <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
+        <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+      </div>
+      <p class="raid-report" id="raidReport"></p>
+      <p class="raid-hunt" id="raidHunt" hidden></p>
+      <p class="raid-notice" id="raidNotice" hidden></p>
+      <h2>Who fights</h2>
+      <ul id="combatList"></ul>
+      <p class="dim" id="combatNone" hidden></p>
     </div>
-    <p class="raid-report" id="raidReport"></p>
-    <p class="raid-hunt" id="raidHunt" hidden></p>
-    <p class="raid-notice" id="raidNotice" hidden></p>
-    <h2>Who fights</h2>
-    <ul id="combatList"></ul>
-    <p class="dim" id="combatNone" hidden></p>
+
+    <div id="combatPanel-units" hidden>
+      <p class="dim" id="unitsLocked" hidden></p>
+      <div id="unitsBody" hidden>
+        <p class="dim" id="unitsIntro"></p>
+        <div class="rank-list" id="rankList"></div>
+        <div class="train-row">
+          <label class="field inline">Train
+            <input type="text" id="trainAmount" value="10" spellcheck="false" title="Accepts 10, 1k, 25k">
+          </label>
+          <span class="dim" id="trainNote"></span>
+        </div>
+        <p class="dim" id="trainRecord"></p>
+      </div>
+    </div>
+
+    <div id="combatPanel-trade" hidden>
+      <section id="exchangePanel" hidden>
+        <h2>The rendering pit</h2>
+        <p class="dim" id="exchangeRate"></p>
+        <div class="exchange-row">
+          <label class="field inline">Trade
+            <input type="text" id="exchangeAmount" value="100" spellcheck="false" title="Accepts 100, 25k, 1.5M, 1e10">
+          </label>
+          <button id="btnSellProtein">Protein → food</button>
+          <button id="btnBuyProtein">Food → protein</button>
+        </div>
+        <p class="dim" id="exchangePreview"></p>
+      </section>
+      <p class="dim" id="tradeLocked" hidden></p>
+    </div>
   </section>
 
   <section class="panel tab" id="tab-achievements" hidden>
@@ -211,6 +246,8 @@
       </label>
 
       <h2>Appearance</h2>
+      <label class="toggle row-toggle"><input type="checkbox" id="setStickyInspector"> Keep the details panel on screen while scrolling</label>
+      <p class="dim" id="stickyInspectorNote"></p>
       <label class="field">Theme
         <select id="setTheme">
           <option value="dark">Dark</option>

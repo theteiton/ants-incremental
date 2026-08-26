@@ -9,10 +9,18 @@ import {
   bigForagerThreshold,
   broodCapacity,
   upgradeCurrency,
+  upgradeLevel,
+  upgradeMaxed,
+  upgradeMaxLevel,
+  levelsOwned,
+  nextLevelCost,
   eggPrice,
   casteStock,
   NANITIC_HATCH_SPEED,
   naniticLifespan,
+  SOLDIER_RANKS,
+  RANK_IDS,
+  soldierCount,
   RALLY_COOLDOWN,
   RALLY_DURATION,
   foodPerSecond,
@@ -33,21 +41,32 @@ import {
   EGG_PROTEIN_COST,
   FED_EGG_SPEED,
   RAID_INTERVAL,
+  raidInterval,
   raidCountdown as countdownFor,
   raidImminent as imminentFor,
   raidsUnlocked,
   inHiding,
+  raidsHalted,
+  clearLossStreak,
   combatPower,
+  exchangeReady,
+  proteinSaleValue,
+  proteinPurchaseCost,
   huntRate,
   resolveRaid as resolveRaidFor
 } from "./raids.js";
-import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers } from "./achievements.js";
+import { achievementLevelFor, levelPoints as levelPointsFor, totalTiers, totalXp,
+  xpForLevel } from "./achievements.js";
 import {
   activeChallenge,
   challengeActive,
   challengeById,
   challengeMastered,
   challengesUnlocked,
+  challengeFailed,
+  challengeTarget,
+  challengeTargetMet,
+  challengeProgress,
   CHALLENGE_TARGET
 } from "./challenges.js";
 import {
@@ -72,8 +91,12 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
+export { challengeTarget, targetKind, challengeProgress, TARGET_KINDS,
+  challengeFailed, challengeFailKind, FAIL_KINDS } from "./challenges.js";
 export { CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP, CHALLENGE_TARGET,
   TRIAL_GIVES_UP, TRIAL_KEEPS, bestTrialLevel, challengeMastered, masteryFood, masteryOf,
+  masterySoldier, siegeActive, siegeThreatScale, siegeThreatScaleAt,
+  SIEGE_UNLOCK, SIEGE_INTERVAL, SIEGE_REFERENCE, SIEGE_BASE, SIEGE_LOSS_CAP,
   trialLevelsEver, trialsWithMastery,
   activeChallenge, challengeActive, challengeById, challengeDebuff, challengeDebuffAt,
   challengeLevel, challengeLevelsTotal, challengeReward,
@@ -99,20 +122,28 @@ function blankGame() {
     reserves: 0,
     food: 0,
     eggs: [],
-    ants: { nanitic: 0, forager: 0, bigforager: 0, excavator: 0, nurse: 0, soldier: 0 },
+    ants: { nanitic: 0, forager: 0, bigforager: 0, excavator: 0, nurse: 0, soldier: 0,
+      major: 0, supermajor: 0, guard: 0 },
     bigForagers: [],
     foragersSinceBig: 0,
     protein: 0,
     raidTimer: RAID_INTERVAL,
     raidsWon: 0,
     raidsLost: 0,
+    lossStreak: 0,
     lastRaid: null,
     emerged: 0,
     nextCaste: "forager",
-    upgrades: [],
+    upgrades: {},
     achievements: [],
     achievementPoints: 0,
+    achievementXp: 0,
     achievementLevel: 0,
+    // A level, once reached, is never taken back. Tiers pay food and hatch
+    // bonuses, so a change to the ladders or to the XP curve must never cost a
+    // live colony what it had already earned -- this is the guarantee, and it
+    // makes any future reshaping safe by construction.
+    peakAchievementLevel: 0,
     peakPopulation: 0,
     peakCastes: {},
     peakStrength: 0,
@@ -128,6 +159,7 @@ function blankGame() {
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
       autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
+      stickyInspector: true,
       broodScope: "waiting", broodDirection: "back",
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
     seen: { upgrades: 0, tracks: null },
@@ -136,7 +168,8 @@ function blankGame() {
     best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
-      raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {} },
+      raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
+      trained: 0, trainingDeaths: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -238,7 +271,7 @@ function runAutomation() {
     // every unlocked adaptation it can afford, not only ones owned before.
     // This runs ahead of laying on purpose: upgrades get first claim on the
     // food, or laying spends the colony down below their price every tick.
-    for (const upgrade of UPGRADES) buyUpgrade(upgrade.id);
+    for (const upgrade of UPGRADES) buyUpgradeLevels(upgrade.id);
   }
   if (!automationOn("autoLay")) return;
   const caste = autoCaste();
@@ -348,6 +381,41 @@ export function pendingByCaste() {
   return out;
 }
 
+export { EXCHANGE_RETURN, exchangeReady, proteinSaleValue, proteinPurchaseCost,
+  foodPerProtein } from "./raids.js";
+
+// The colony renders what it has killed down into something the brood can eat,
+// or feeds food to the hunters to bring more back. Both directions lose a cut.
+//
+// Neither counts toward stats.foodEarned or stats.proteinEarned: those are
+// lifetime "gathered" totals feeding the achievement ladders, and traded
+// resources were not gathered. Crediting them let a player cycle food through
+// protein and back to farm the Food gathered track -- losing 36% of the food
+// each pass but banking 64% of it as newly earned, which is a tier for nothing.
+export function sellProtein(amount) {
+  const n = Math.min(Math.floor(amount), Math.floor(game.protein));
+  if (!(n > 0) || !exchangeReady(game)) return 0;
+  const food = proteinSaleValue(game, n);
+  game.protein -= n;
+  game.food += food;
+  return n;
+}
+
+export function buyProtein(amount) {
+  const n = Math.floor(amount);
+  if (!(n > 0) || !exchangeReady(game)) return 0;
+  const cost = proteinPurchaseCost(game, n);
+  if (!(cost <= game.food)) return 0;
+  game.food -= cost;
+  game.protein += n;
+  return n;
+}
+
+export function affordableProtein() {
+  if (!exchangeReady(game)) return 0;
+  return Math.floor(game.food / proteinPurchaseCost(game, 1));
+}
+
 export function proteinUnlocked() {
   return game.protein > 0 || game.raidsWon > 0 || game.raidsLost > 0;
 }
@@ -381,6 +449,43 @@ export function exile(casteId, count) {
   game.ants[casteId] -= allowed;
   game.stats.exiled += allowed;
   return allowed;
+}
+
+// Training a soldier into the next grade. It is bought with protein and it can
+// kill her: the colony force-feeds an adult past what her moult was built for,
+// and not all of them survive it. Rolled per ant so a small batch is a real
+// gamble rather than a rounded average.
+export function trainCost(index) {
+  const rank = SOLDIER_RANKS[index + 1];
+  return rank ? rank.cost : 0;
+}
+
+export function trainLossChance(index) {
+  const rank = SOLDIER_RANKS[index + 1];
+  return rank ? rank.loss : 0;
+}
+
+export function trainableCount(index) {
+  const from = SOLDIER_RANKS[index];
+  const to = SOLDIER_RANKS[index + 1];
+  if (!from || !to) return 0;
+  return Math.min(game.ants[from.id] || 0, Math.floor(game.protein / to.cost));
+}
+
+export function trainSoldiers(index, count) {
+  const from = SOLDIER_RANKS[index];
+  const to = SOLDIER_RANKS[index + 1];
+  if (!from || !to) return null;
+  const n = Math.min(Math.floor(count), trainableCount(index));
+  if (!(n > 0)) return null;
+  game.protein -= n * to.cost;
+  game.ants[from.id] -= n;
+  let lost = 0;
+  for (let i = 0; i < n; i++) if (Math.random() < to.loss) lost++;
+  game.ants[to.id] = (game.ants[to.id] || 0) + (n - lost);
+  game.stats.trainingDeaths = (game.stats.trainingDeaths || 0) + lost;
+  game.stats.trained = (game.stats.trained || 0) + (n - lost);
+  return { trained: n - lost, lost, spent: n * to.cost };
 }
 
 export function setQueenName(name) {
@@ -451,7 +556,9 @@ function refoundColony(extra) {
     prestige: game.prestige,
     achievements: game.achievements,
     achievementPoints: game.achievementPoints,
+    achievementXp: game.achievementXp,
     achievementLevel: game.achievementLevel,
+    peakAchievementLevel: game.peakAchievementLevel,
     peakPopulation: game.peakPopulation,
     peakCastes: game.peakCastes,
     peakStrength: game.peakStrength,
@@ -485,7 +592,12 @@ export function abandonChallenge() {
 // a colony that dissolved itself the moment it hit 600 would be a nasty
 // surprise in the middle of a run
 export function challengeMet() {
-  return challengeActive(game) && population(game) >= CHALLENGE_TARGET;
+  return challengeTargetMet(game, population(game));
+}
+
+// how far along this trial's own measure the colony is
+export function challengeCount() {
+  return challengeProgress(game, population(game));
 }
 
 export function completeChallenge() {
@@ -512,30 +624,40 @@ export function buyPrestigeUpgrade(id) {
   return true;
 }
 
+// Levels, not lines. The three upgrade achievement tracks read these, and
+// counting lines would have dropped their tops from 29 to 12 -- taking tiers,
+// and with them achievement levels, off every save that already passed them.
 function recordUpgradePeaks(game) {
   const peaks = game.peakUpgrades || (game.peakUpgrades = { all: 0, colony: 0, combat: 0 });
-  let colony = 0;
-  let combat = 0;
-  for (const id of game.upgrades) {
-    const upgrade = UPGRADES.find(u => u.id === id);
-    if (!upgrade) continue;
-    if (upgradeBranch(upgrade) === "combat") combat++;
-    else colony++;
-  }
+  const colony = levelsOwned(game, "colony");
+  const combat = levelsOwned(game, "combat");
   peaks.all = Math.max(peaks.all || 0, colony + combat);
   peaks.colony = Math.max(peaks.colony || 0, colony);
   peaks.combat = Math.max(peaks.combat || 0, combat);
 }
 
+// Buys ONE level. An extended level can cost food and protein at once, so the
+// cost is a pair rather than an amount in a single currency.
 export function buyUpgrade(id) {
-  const upgrade = UPGRADES.find(u => u.id === id);
-  if (!upgrade) return false;
-  if (upgradeOwned(game, upgrade) || !upgradeUnlocked(game, upgrade)) return false;
-  const currency = upgradeCurrency(upgrade);
-  if (game[currency] < upgrade.cost) return false;
-  game[currency] -= upgrade.cost;
-  game.upgrades.push(upgrade.id);
+  const line = UPGRADES.find(u => u.id === id);
+  if (!line) return false;
+  if (upgradeMaxed(game, line) || !upgradeUnlocked(game, line)) return false;
+  const cost = nextLevelCost(game, line);
+  if (!cost) return false;
+  if (game.food < cost.food || game.protein < cost.protein) return false;
+  game.food -= cost.food;
+  game.protein -= cost.protein;
+  game.upgrades = Object.assign({}, game.upgrades);
+  game.upgrades[line.id] = upgradeLevel(game, line) + 1;
   return true;
+}
+
+// buys every level it can still reach and afford, which is what Nest Memory
+// needs now that a line has more than one rung
+export function buyUpgradeLevels(id) {
+  let bought = 0;
+  while (buyUpgrade(id)) bought++;
+  return bought;
 }
 
 export function levelPoints(level) {
@@ -548,9 +670,17 @@ export function checkAchievements() {
   return game.achievementPoints - before;
 }
 
+export { totalXp, xpForLevel } from "./achievements.js";
+
 function recountAchievements() {
   game.achievementPoints = totalTiers(game);
-  game.achievementLevel = achievementLevelFor(game.achievementPoints);
+  game.achievementXp = totalXp(game);
+  const earned = achievementLevelFor(game.achievementXp);
+  // seeded from the saved level as well, so a colony that reached a level under
+  // the old flat scoring keeps it without needing a migration
+  game.peakAchievementLevel = Math.max(
+    game.peakAchievementLevel || 0, game.achievementLevel || 0, earned);
+  game.achievementLevel = game.peakAchievementLevel;
 }
 
 function rollBigForager() {
@@ -623,6 +753,11 @@ export function tick(dt) {
     if (game.ants[id] > (game.peakCastes[id] || 0)) game.peakCastes[id] = game.ants[id];
     if (game.ants[id] > (run.peakCastes[id] || 0)) run.peakCastes[id] = game.ants[id];
   }
+  // Every rank counts as a soldier. Recording only the base rank would let a
+  // promotion look like a loss, re-locking Combat upgrades gated on soldiers.
+  const soldiers = soldierCount(game);
+  if (soldiers > (game.peakCastes.soldier || 0)) game.peakCastes.soldier = soldiers;
+  if (soldiers > (run.peakCastes.soldier || 0)) run.peakCastes.soldier = soldiers;
   const strength = combatPower(game);
   if (strength > (game.peakStrength || 0)) game.peakStrength = strength;
   if (strength > (run.peakStrength || 0)) run.peakStrength = strength;
@@ -631,19 +766,31 @@ export function tick(dt) {
   best.population = Math.max(best.population || 0, pop);
   if (!best.timeTo1000 && pop >= 1000) best.timeTo1000 = game.runTime;
 
+  clearLossStreak(game);
   game.hiding = inHiding(game);
-  if (raidsUnlocked(game)) {
+  // The interval belongs to the trial, and a colony can be holding a longer
+  // one: entering a trial refounds the colony, which starts the clock at the
+  // ordinary six minutes, and a save can predate the trial entirely. Without
+  // this the first attack of a ninety-second siege arrived six minutes late --
+  // only the raids after it used the trial's clock.
+  const interval = raidInterval(game);
+  if (game.raidTimer > interval) game.raidTimer = interval;
+  if (raidsHalted(game)) {
+    // the trial is lost; the attacks stop and the colony waits to be abandoned
+    game.raidTimer = raidInterval(game);
+  } else if (raidsUnlocked(game)) {
     const hunted = huntRate(game) * dt;
     game.protein += hunted;
     game.stats.proteinEarned += hunted;
     if (game.hiding) {
       // nothing finds the nest while it is shut; the next attack waits for an army
-      game.raidTimer = RAID_INTERVAL;
+      game.raidTimer = raidInterval(game);
     } else {
       game.raidTimer -= dt;
-      while (game.raidTimer <= 0) {
+      let guard = 0;
+      while (game.raidTimer <= 0 && guard++ < 512) {
         resolveRaidFor(game);
-        game.raidTimer += RAID_INTERVAL;
+        game.raidTimer += raidInterval(game);
       }
     }
   }
