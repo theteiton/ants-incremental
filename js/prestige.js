@@ -47,7 +47,7 @@ export const PRESTIGE_UPGRADES = [
 ];
 
 export const AUTOMATIONS = [
-  { key: "autoShed", name: "Shed her wings", note: "She sheds the moment she lands." },
+  { key: "autoShed", name: "Shed and strip her wings", note: "She sheds on landing, and strips each wing for food without being asked." },
   { key: "autoBuy", name: "Buy adaptations", note: "Buys any it can reach and afford, before laying." },
   { key: "autoLay", name: "Keep the brood full", note: "Lays into every free slot.", inBrood: true },
   { key: "autoRatio", name: "Hold the caste balance", note: "Chooses the caste, and digs when the nest is full." }

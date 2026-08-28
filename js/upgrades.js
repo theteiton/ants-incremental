@@ -23,6 +23,7 @@ import {
   runPeakCount,
   naniticHalflife,
   naniticVigour,
+  slotsPerNanitic,
   populationCap,
   rallyActive,
   RALLY_MULT,
@@ -281,7 +282,7 @@ function broodFormula(game) {
     row("+ per nurse", f(slotsPerNurse(game))),
     row("× nurses", fmt(game.ants.nurse)),
     game.ants.nanitic > 0 && row("+ founders", fmt(game.ants.nanitic) +
-      " × " + f(NANITIC_BROOD_SLOTS))
+      " × " + f(slotsPerNanitic(game)))
   ]);
 }
 
@@ -398,12 +399,11 @@ function formulaLines(upgrade, probe) {
         f(CAP_PER_EXCAVATOR + effectTotal(probe, "excavatorCap"))
     ];
   }
-  if (type === "naniticVigour") {
+  if (type === "naniticSlots") {
     return [
-      formulaText(foodFormula(game, "nanitic")),
-      "the founders fade half as fast every " + fmtTimeShort(NANITIC_HALFLIFE) +
-        " — halves in " + fmtTimeShort(naniticHalflife(game)) +
-        " → " + fmtTimeShort(naniticHalflife(probe))
+      formulaText(broodFormula(game)),
+      "adds " + f(step.add) + " to what each founder tends — " +
+        f(slotsPerNanitic(game)) + " → " + f(slotsPerNanitic(probe))
     ];
   }
   if (type === "nurseSlots") {
@@ -462,10 +462,9 @@ function previewUpgrade(upgrade) {
     return "Raid protein " + fmt(raidRewards(game, power).protein) +
       " to " + fmt(raidRewards(probe, power).protein);
   }
-  if (type === "naniticVigour") {
+  if (type === "naniticSlots") {
     if (game.ants.nanitic === 0) return "The founders are already gone.";
-    return "Founders halve in " + fmtTimeShort(naniticHalflife(game)) +
-      " to " + fmtTimeShort(naniticHalflife(probe));
+    return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
   }
   if (type === "broodSlots" || type === "nurseSlots") {
     if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";

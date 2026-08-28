@@ -69,7 +69,9 @@
     <p id="eggCost"></p>
     <div class="lay-buttons">
       <button id="btnLay">Lay an egg</button>
-      <button id="btnLay10">Lay ×10</button>
+      <label class="lay-amount"><input type="text" id="layAmount" value="10"
+        spellcheck="false" title="How many to lay. Accepts 10, 250, 1k, 25k"></label>
+      <button id="btnLayBatch">Lay ×10</button>
       <button id="btnLayMax">Lay max</button>
     </div>
     <div id="casteChoice"></div>
@@ -78,8 +80,8 @@
     <label class="toggle row-toggle" id="autoLayRow" hidden>
       <input type="checkbox" id="autoLay"> <span id="autoLayLabel">Lay eggs automatically</span>
     </label>
-    <label class="field inline brood-field" id="foodReserveRow" hidden>Keep
-      <input type="text" id="foodReserve" value="0" spellcheck="false" title="Accepts 25000, 25k, 1.5M, 1e10"> food banked, unspent by laying
+    <label class="field inline brood-field" id="foodReserveRow" hidden><span>Keep</span>
+      <input type="text" id="foodReserve" value="0" spellcheck="false" title="Accepts 25000, 25k, 1.5M, 1e10"><span>food unspent by laying</span>
     </label>
     <label class="toggle row-toggle" id="feedBroodRow" hidden>
       <input type="checkbox" id="feedBrood"> <span id="feedBroodLabel">Feed the brood protein</span>
@@ -103,6 +105,7 @@
     <button id="tabButton-achievements">Achievements<span class="badge" id="badge-achievements" hidden></span></button>
     <button id="tabButton-prestige" hidden>Nuptial<span class="badge" id="badge-prestige" hidden></span></button>
     <button id="tabButton-challenges" hidden>Trials</button>
+    <button id="tabButton-library" hidden>Library<span class="badge" id="badge-library" hidden></span></button>
     <button id="tabButton-settings">Settings</button>
   </nav>
 
@@ -144,7 +147,14 @@
       <p id="raidCountdown"></p>
       <div class="raid-scales">
         <div><span class="dim">Your fighters</span><b id="raidDefence">0</b></div>
-        <div><span class="dim">Next attacker</span><b id="raidThreat">0</b></div>
+        <div><span class="dim" id="raidMonsterName">Next attacker</span><b id="raidThreat">0</b></div>
+      </div>
+      <p class="monster-note" id="raidMonsterNote" hidden></p>
+      <div class="raid-difficulty" id="raidDifficultyRow" hidden>
+        <label class="field inline">How hard
+          <select id="setRaidDifficulty"></select>
+        </label>
+        <span class="dim" id="raidDifficultyNote"></span>
       </div>
       <p class="raid-report" id="raidReport"></p>
       <p class="raid-hunt" id="raidHunt" hidden></p>
@@ -232,6 +242,23 @@
     <div id="challengeList"></div>
   </section>
 
+  <section class="panel tab" id="tab-library" hidden>
+    <div class="subtabs" id="libraryTabs"></div>
+
+    <div id="libraryPanel-terms">
+      <div class="panel-head">
+        <span class="tally" id="libraryTally"></span>
+        <span class="dim" id="libraryHint"></span>
+      </div>
+      <div id="libraryList"></div>
+    </div>
+
+    <div id="libraryPanel-updates" hidden>
+      <p class="dim" id="updatesIntro"></p>
+      <div id="updatesList"></div>
+    </div>
+  </section>
+
   <section class="panel tab" id="tab-settings" hidden>
     <div class="subtabs" id="settingsTabs"></div>
 
@@ -246,6 +273,12 @@
       </label>
 
       <h2>Appearance</h2>
+      <label class="field">Large numbers
+        <select id="setNotation">
+          <option value="suffix">Suffixes — 1.44T, 9.30Sx</option>
+          <option value="scientific">Scientific — 1.44e12, 9.30e21</option>
+        </select>
+      </label>
       <label class="toggle row-toggle"><input type="checkbox" id="setStickyInspector"> Keep the details panel on screen while scrolling</label>
       <p class="dim" id="stickyInspectorNote"></p>
       <label class="field">Theme

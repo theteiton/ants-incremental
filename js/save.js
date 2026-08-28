@@ -188,7 +188,9 @@ export function applySave(game, fresh, data) {
   game.stats = Object.assign(fresh.stats, data.stats);
   game.settings = Object.assign(fresh.settings, data.settings);
   const seen = data.seen || {};
-  game.seen = { upgrades: seen.upgrades || 0, tracks: seen.tracks || null };
+  game.seen = { upgrades: seen.upgrades || 0, tracks: seen.tracks || null,
+    library: seen.library || 0, updates: seen.updates || "" };
+  game.library = Object.assign({}, data.library || {});
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   // an array here is a save that predates lines; migrate() has already turned
@@ -201,6 +203,7 @@ export function applySave(game, fresh, data) {
   game.foragersSinceBig = data.foragersSinceBig || 0;
   game.rallyTime = data.rallyTime || 0;
   game.rallyCooldown = data.rallyCooldown || 0;
+  game.monster = data.monster || null;
   game.challenge = data.challenge || null;
   game.challenges = Object.assign({}, data.challenges || {});
   game.wings = data.wings || 0;
@@ -213,11 +216,12 @@ export function applySave(game, fresh, data) {
   game.run = savedRun && typeof savedRun === "object"
     ? { peakPopulation: savedRun.peakPopulation || 0,
         peakCastes: Object.assign({}, savedRun.peakCastes || {}),
-        peakStrength: savedRun.peakStrength || 0 }
+        peakStrength: savedRun.peakStrength || 0,
+        foodEarned: savedRun.foodEarned || 0 }
     // a save written before the split earned its gates already; keep them
     : { peakPopulation: data.peakPopulation || 0,
         peakCastes: Object.assign({}, data.peakCastes || {}),
-        peakStrength: data.peakStrength || 0 };
+        peakStrength: data.peakStrength || 0, foodEarned: 0 };
   const savedPrestige = data.prestige || {};
   game.prestige = {
     royalJelly: savedPrestige.royalJelly || 0,

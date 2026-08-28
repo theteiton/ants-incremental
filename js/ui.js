@@ -29,7 +29,9 @@ import {
 } from "./ants.js";
 import { combatPerCaste, combatPower, hunting, huntRate, inHiding, HIDING_LOSS_STREAK,
   monsterPower, proteinPerSecond, raidsSeen, raidsUnlocked, RAID_WARNING,
-  combatPerRank, huntingSoldiers, VETERAN_SHARE, WIN_LOSS_SHARE } from "./raids.js";
+  combatPerRank, huntingSoldiers, VETERAN_SHARE, WIN_LOSS_SHARE,
+  currentMonster, monsterById, RAID_DIFFICULTIES, raidDifficulty,
+  raidDifficultyUnlocked } from "./raids.js";
 import {
   affordableEggs,
   affordableProtein,
@@ -85,6 +87,12 @@ import {
   masteryFood,
   masterySoldier,
   CHALLENGE_TARGET,
+  BARREN_SCALE,
+  SEALED_SCALE,
+  STERILE_ALLOWANCE,
+  CALLOW_CROWDING,
+  CALLOW_SCALE,
+  callowCrowding,
   challengeTarget,
   targetKind,
   challengeCount,
@@ -148,9 +156,11 @@ import {
   seedSeenTracks
 } from "./achievements.js";
 import { drawSprite, spriteFor } from "./sprites.js";
+import { LIBRARY, LIBRARY_GROUPS, entryState, libraryCounts, libraryUnlocked,
+  libraryUnread, UPDATES, latestVersion, updatesUnread } from "./library.js";
 
 const el = id => document.getElementById(id);
-const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "challenges", "settings"];
+const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "challenges", "library", "settings"];
 let activeTab = "ants";
 const casteButtons = {};
 
@@ -184,6 +194,10 @@ function buildCasteChoice() {
   });
 }
 
+function layAmount() {
+  return Math.max(1, Math.floor(game.settings.layAmount || 10));
+}
+
 function pendingCaste() {
   return nextEggCaste(game);
 }
@@ -215,10 +229,14 @@ function renderQueen() {
       "Her wing muscles are being metabolised into eggs. The first " + NANITIC_GENERATION +
       " workers will emerge as undersized nanitics whatever caste is chosen — nothing else will feed this brood.";
   } else if (game.ants.nanitic > 0) {
-    const left = Math.max(0, naniticLifespan(game) - (game.runTime || 0));
+    const span = naniticLifespan(game);
+    const left = Math.max(0, span - (game.runTime || 0));
     el("queenText").textContent =
       "The first workers have emerged. Her reserves no longer matter; the colony feeds her now. " +
-      "The founding nanitics die of old age in " + fmtTime(left) + ".";
+      (isFinite(span)
+        // Long Burning: cleared once, the founders never age out again
+        ? "The founding nanitics die of old age in " + fmtTime(left) + "."
+        : "The founding nanitics will not die of old age — this line has burned before.");
   } else if (game.naniticsDied) {
     el("queenText").textContent =
       "The founding nanitics have died of old age. The colony they raised carries on without them.";
@@ -324,8 +342,14 @@ function renderBrood() {
   const ready = canLay();
   el("btnLay").disabled = !ready;
   el("btnLay").textContent = "Lay an egg (" + CASTES[emerging].name + ")";
-  el("btnLay10").disabled = !ready;
-  el("btnLay10").textContent = "Lay ×" + Math.min(10, Math.max(1, broodSlots()));
+  // the batch button lays whatever the field says, so a player laying hundreds
+  // is not clicking a fixed x10 over and over
+  const batch = layAmount();
+  el("btnLayBatch").disabled = !ready || batch <= 0;
+  el("btnLayBatch").textContent = "Lay ×" + fmt(batch);
+  if (document.activeElement !== el("layAmount")) {
+    el("layAmount").value = shortAmount(batch);
+  }
   el("btnLayMax").disabled = !ready;
   el("btnLayMax").textContent = "Lay max (" + fmt(affordableEggs()) + ")";
 
@@ -672,12 +696,154 @@ function renderUnits() {
     fmt(huntingSoldiers(game)) + " effective hunters of " + fmt(soldierCount(game)) + " bodies.";
 }
 
+// The library is written once and updated in place, like every other list that
+// redraws each frame -- rebuilding nodes under the cursor is what broke clicking
+// on the upgrade cards.
+const libraryRows = {};
+
+function buildLibrary() {
+  const list = el("libraryList");
+  LIBRARY_GROUPS.forEach(group => {
+    const section = document.createElement("section");
+    section.className = "library-group";
+    const head = document.createElement("h2");
+    head.textContent = group.name;
+    section.appendChild(head);
+    LIBRARY.filter(entry => entry.group === group.id).forEach(entry => {
+      const row = document.createElement("div");
+      row.className = "library-entry";
+      row.innerHTML = '<b></b><span class="library-text"></span>' +
+        '<span class="library-more" hidden></span>';
+      row.querySelector("b").textContent = entry.term;
+      watch(row, { title: entry.term, body: entry.short,
+        note: () => entryState(game, entry) >= 2
+          ? entry.full
+          : "The colony knows of this but has not done it yet. Do it once and it is written up in full." });
+      libraryRows[entry.id] = { row, section,
+        text: row.querySelector(".library-text"),
+        more: row.querySelector(".library-more") };
+      section.appendChild(row);
+    });
+    list.appendChild(section);
+  });
+}
+
+// Library holds two things you read rather than press: what the words mean, and
+// what has changed since you were last here.
+const LIBRARY_TABS = [
+  { id: "terms", name: "Terms" },
+  { id: "updates", name: "What changed" }
+];
+let libraryTab = "terms";
+
+function selectLibraryTab(name) {
+  libraryTab = name;
+  LIBRARY_TABS.forEach(tab => {
+    el("libraryPanel-" + tab.id).hidden = tab.id !== name;
+  });
+  for (const button of el("libraryTabs").children) {
+    button.classList.toggle("active", button.dataset.tab === name);
+  }
+  if (name === "updates") markSeen("updates", latestVersion());
+  render();
+}
+
+function buildLibraryTabs() {
+  LIBRARY_TABS.forEach(tab => {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.dataset.tab = tab.id;
+    button.onclick = () => selectLibraryTab(tab.id);
+    el("libraryTabs").appendChild(button);
+  });
+  selectLibraryTab("terms");
+}
+
+function buildUpdates() {
+  const list = el("updatesList");
+  UPDATES.forEach((entry, index) => {
+    const box = document.createElement("section");
+    box.className = "update" + (index === 0 ? " newest" : "");
+    const head = document.createElement("div");
+    head.className = "update-head";
+    head.innerHTML = '<b></b><span class="update-version"></span>';
+    head.querySelector("b").textContent = entry.name;
+    head.querySelector(".update-version").textContent = entry.version;
+    box.appendChild(head);
+    const changes = document.createElement("ul");
+    changes.className = "update-changes";
+    entry.changes.forEach(line => {
+      const item = document.createElement("li");
+      item.textContent = line;
+      changes.appendChild(item);
+    });
+    box.appendChild(changes);
+    list.appendChild(box);
+  });
+}
+
+function renderUpdates() {
+  el("updatesIntro").textContent =
+    "What has changed, newest first. The colony you are running is on " +
+    latestVersion() + ".";
+}
+
+function renderLibrary() {
+  const counts = libraryCounts(game);
+  el("libraryTally").textContent = counts.known + " of " + counts.total + " entries";
+  el("libraryHint").textContent = counts.expanded + " written up in full" +
+    (counts.known > counts.expanded
+      ? " — the rest fill in as the colony does them" : "");
+  LIBRARY_GROUPS.forEach(group => {
+    let shown = 0;
+    LIBRARY.filter(e => e.group === group.id).forEach(entry => {
+      const ui = libraryRows[entry.id];
+      const at = entryState(game, entry);
+      ui.row.hidden = at < 1;
+      if (at >= 1) shown++;
+      ui.row.classList.toggle("full", at >= 2);
+      ui.text.textContent = entry.short;
+      ui.more.hidden = at < 2;
+      if (at >= 2) ui.more.textContent = entry.full;
+    });
+    const any = LIBRARY.find(e => e.group === group.id);
+    if (any) libraryRows[any.id].section.hidden = shown === 0;
+  });
+  markSeen("library", counts.known);
+}
+
+// Opt-in difficulty rather than a nerf: what clearing a trial pays is earned,
+// so the ceiling comes off by choice instead of the reward coming down.
+function buildRaidDifficulty() {
+  const select = el("setRaidDifficulty");
+  RAID_DIFFICULTIES.forEach(level => {
+    const option = document.createElement("option");
+    option.value = level.id;
+    option.textContent = level.name;
+    select.appendChild(option);
+  });
+  select.onchange = event => {
+    setSetting("raidDifficulty", event.target.value);
+    render();
+  };
+}
+
+function renderRaidDifficulty() {
+  const row = el("raidDifficultyRow");
+  row.hidden = !raidDifficultyUnlocked(game);
+  if (row.hidden) return;
+  const level = raidDifficulty(game);
+  el("setRaidDifficulty").value = level.id;
+  el("raidDifficultyNote").textContent = level.note;
+}
+
 function renderRaid() {
   const active = raidsUnlocked(game);
   el("tabButton-combat").hidden = !active;
   if (!active || activeTab !== "combat") return;
   renderUnits();
   renderExchange();
+  renderRaidDifficulty();
   el("tradeLocked").hidden = !el("exchangePanel").hidden;
   if (!el("tradeLocked").hidden) {
     el("tradeLocked").textContent =
@@ -698,6 +864,12 @@ function renderRaid() {
   el("raidDefence").textContent = fmt(defence);
   el("raidThreat").textContent = fmt(threat);
   el("raidDefence").classList.toggle("losing", defence < threat);
+
+  // the nest used to be attacked by a number
+  const coming = currentMonster(game);
+  el("raidMonsterName").textContent = hidden ? "Next attacker" : coming.name;
+  el("raidMonsterNote").hidden = hidden;
+  el("raidMonsterNote").textContent = coming.note;
 
   const soon = !hidden && left <= RAID_WARNING;
   el("tab-combat").classList.toggle("imminent", soon);
@@ -761,15 +933,17 @@ function renderRaid() {
       .map(c => fmt(last.dead[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
     const risen = Object.keys(last.promoted || {})
       .map(c => fmt(last.promoted[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
+    const killed = last.monster ? "The " + monsterById(last.monster).name : "The last attacker";
     el("raidReport").textContent =
-      "The last attacker was killed and stripped: +" + fmt(last.protein) +
+      killed + " was killed and stripped: +" + fmt(last.protein) +
       " protein, +" + fmt(last.food) + " food." +
       (fallen ? " It cost " + fallen + "." : " Nothing was lost holding it.") +
       (risen ? " " + risen + " came out of it promoted." : "");
   } else {
     const toll = Object.keys(last.dead).map(c => fmt(last.dead[c]) + " " + CASTES[c].name.toLowerCase()).join(", ");
+    const broke = last.monster ? "The " + monsterById(last.monster).name : "The last attacker";
     el("raidReport").textContent =
-      "The last attacker broke through. Lost " + (toll || "nothing") +
+      broke + " broke through. Lost " + (toll || "nothing") +
       ". Salvaged " + fmt(last.protein) + " protein.";
   }
 }
@@ -871,6 +1045,10 @@ function renderBadges() {
   el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
   el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
   el("badge-prestige").hidden = activeTab === "prestige" || prestige <= 0;
+  // the dot covers both halves of the tab: new words to read, or a new release
+  const unread = libraryUnread(game) + (updatesUnread(game) ? 1 : 0);
+  el("badge-library").hidden = activeTab === "library" || unread <= 0;
+  if (unread > 0) el("badge-library").textContent = "";
 }
 
 const prestigeCards = {};
@@ -982,9 +1160,11 @@ function listNames(names) {
 }
 
 // the half of a trial's reward the cards never mentioned: another rung on every
-// upgrade line that trial pays into
+// upgrade line that trial pays into -- or, where a trial pays in something that
+// is not an upgrade at all, that thing instead
 function masteryLineText(type) {
   const raised = linesWithMastery(type);
+  if (type === "nanitic") return "the founders stop dying of old age from the first level";
   if (!raised.length) return "nothing else";
   return raised.length === 1
     ? "the max level of " + raised[0].name + " rises by one"
@@ -995,7 +1175,36 @@ function masteryLineText(type) {
 // print Drought's food multiplier whatever trial it was describing, so Endless
 // Siege -- which does not touch food at all -- announced a 25% food penalty.
 function challengeDebuffText(challenge, level) {
-  if ((challenge.kind || "food") === "siege") {
+  const kind = challenge.kind || "food";
+  if (kind === "barren") {
+    // at the first attempt the chambers run at full speed, and saying "x 100%"
+    // reads as a debuff that is not there
+    const speed = Math.pow(BARREN_SCALE, Math.min(level, CHALLENGE_MAX_LEVEL - 1));
+    return "Nurses add no brood slots at all" +
+      (speed < 1 ? ", and every egg develops at × " + pct(speed) + " speed on this attempt" : "") +
+      ". Growth is bound by time rather than by food, which is the opposite of " +
+      "every other trial.";
+  }
+  if (kind === "sealed") {
+    return "Excavators raise no population cap whatever. The nest holds " +
+      fmt(Math.max(1, Math.floor(30 * Math.pow(SEALED_SCALE, Math.min(level, CHALLENGE_MAX_LEVEL - 1))))) +
+      " ants on this attempt and will not widen \u2014 so it is asked for a rate, not a headcount.";
+  }
+  if (kind === "sterile") {
+    const allowed = STERILE_ALLOWANCE[Math.min(level, STERILE_ALLOWANCE.length - 1)];
+    return allowed > 0
+      ? "The colony may hold only " + allowed + " bought adaptation levels at once on this attempt. " +
+        "Caste balance and instinct, and very little else."
+      : "No bought adaptation takes hold at all on this attempt. Caste balance and instinct, and nothing else.";
+  }
+  if (kind === "callow") {
+    const weight = CALLOW_CROWDING * Math.pow(CALLOW_SCALE, Math.min(level, CHALLENGE_MAX_LEVEL - 1));
+    return "Every egg hatches as a founder whatever caste you chose, and nothing dies of old age " +
+      "— but each founder shortens the half-life of every other one by " + pct(weight) +
+      " on this attempt. More of them means less from each, and past a point less in total, " +
+      "so the trial is finding where that point is.";
+  }
+  if (kind === "siege") {
     const scale = siegeThreatScaleAt(level);
     return "Attacks from " + fmt(SIEGE_UNLOCK) + " ants, one every " + SIEGE_INTERVAL +
       " seconds, at ×" + fmt(scale) + " strength on this attempt. A defeat costs " +
@@ -1010,9 +1219,18 @@ function challengeDebuffText(challenge, level) {
 
 // the one-line version for the running note at the top of the tab
 function challengeRunningText(challenge, level) {
-  return (challenge.kind || "food") === "siege"
-    ? "attackers at ×" + fmt(siegeThreatScaleAt(level)) + " strength"
-    : "food at × " + pct(challengeDebuff(game));
+  const kind = challenge.kind || "food";
+  if (kind === "siege") return "attackers at ×" + fmt(siegeThreatScaleAt(level)) + " strength";
+  if (kind === "barren") return "the brood at ×" +
+    pct(Math.pow(BARREN_SCALE, Math.min(level, CHALLENGE_MAX_LEVEL - 1))) + " speed";
+  if (kind === "sealed") return "the nest sealed at " + fmt(populationCap(game)) + " ants";
+  if (kind === "sterile") {
+    const allowed = STERILE_ALLOWANCE[Math.min(level, STERILE_ALLOWANCE.length - 1)];
+    return allowed > 0 ? allowed + " adaptation levels allowed" : "no adaptations allowed";
+  }
+  if (kind === "callow") return "founders fading " +
+    fmt(callowCrowding(game, game.ants.nanitic)) + "x faster for the crowd";
+  return "food at × " + pct(challengeDebuff(game));
 }
 
 // The cards used to say "cut hard" and leave it there. Every figure a trial
@@ -1294,6 +1512,7 @@ function render() {
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
   el("tabButton-challenges").hidden = !challengesUnlocked(game);
+  el("tabButton-library").hidden = !libraryUnlocked(game);
   el("takeover").hidden = holdsSave();
   renderAway();
   renderBadges();
@@ -1310,6 +1529,9 @@ function render() {
   else if (activeTab === "combat") renderFighters();
   else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "challenges") renderChallenges();
+  else if (activeTab === "library") {
+    if (libraryTab === "terms") renderLibrary(); else renderUpdates();
+  }
   else if (activeTab === "settings") {
     renderSettings();
     if (settingsTab === "formulas") renderFormulas();
@@ -1611,8 +1833,15 @@ el("btnLay").onclick = () => {
   layEggs(1);
   render();
 };
-el("btnLay10").onclick = () => {
-  layEggs(10);
+el("btnLayBatch").onclick = () => {
+  layEggs(layAmount());
+  render();
+};
+el("layAmount").oninput = event => {
+  const amount = parseAmount(event.target.value);
+  // a half-typed "1." is left alone rather than snapped to zero under the cursor
+  if (!isFinite(amount)) return;
+  setSetting("layAmount", Math.max(1, Math.floor(amount)));
   render();
 };
 el("btnLayMax").onclick = () => {
@@ -1641,7 +1870,11 @@ function buildReadoutHelp() {
     ["valFighters", "Fighters", "What the colony can field.",
       () => "Soldiers fight from birth. Every other caste needs the Combat adaptations first. The Combat tab breaks it down by caste."],
     ["valThreat", "Next attacker", "How strong the next monster is.",
-      () => "It scales with the largest this colony has been and grows five per cent with every raid you win."],
+      () => {
+        const m = currentMonster(game);
+        return m.name + ". " + m.note +
+          "\n\nStrength scales with the largest this colony has been, and grows with every raid you win.";
+      }],
     ["valRaidIn", "Attack in", "Time until the next monster arrives.",
       () => "Soldiers hunt while it is far off and come home in the last thirty seconds. With no soldiers at all the colony goes to ground and nothing comes."],
     ["valRoyalJelly", "Royal Jelly", "What a nuptial flight pays.",
@@ -1702,6 +1935,10 @@ buildUpgrades(render);
 buildAchievements(game);
 buildPrestige(render);
 buildChallenges();
+buildRaidDifficulty();
+buildLibrary();
+buildUpdates();
+buildLibraryTabs();
 buildCombatTabs();
 buildRanks();
 buildSettingsTabs();

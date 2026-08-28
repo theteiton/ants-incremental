@@ -888,3 +888,88 @@ ul { list-style: none; margin: 0; padding: 0; }
 .note-goal { color: var(--accent-soft); }
 .note-reward { color: var(--good); }
 .inspect-note.warn .note-plain { color: var(--accent); }
+
+/* The food-reserve row wrapped its words into three lines with 300px of empty
+   column beside it. The cause was not the wording: `.field` carries a
+   max-width of 260px, meant for the narrow labelled inputs in Settings, and it
+   was squeezing a row that had 561px to work with. This one row opts out, and
+   each phrase is its own item so any wrapping breaks between phrases rather
+   than mid-sentence. */
+.brood-field { flex-wrap: wrap; row-gap: 4px; max-width: none; }
+.brood-field > span { white-space: nowrap; }
+.lay-amount { display: flex; align-items: center; }
+.lay-amount input {
+  width: 74px;
+  padding: 6px 8px;
+  font-size: 13px;
+  text-align: right;
+}
+
+/* The library. Entries appear as the colony meets them and expand once it has
+   done them, so the page grows rather than sitting there full of things the
+   player has never seen. */
+.library-group { margin-bottom: 20px; }
+.library-group h2 { margin-bottom: 8px; }
+.library-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.library-entry:first-of-type { border-top: none; }
+.library-entry b { font-size: 14px; color: var(--accent-soft); }
+.library-entry .library-text { font-size: 13px; color: var(--text); }
+.library-entry .library-more {
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.55;
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+  margin-top: 3px;
+}
+.library-entry.full b::after {
+  content: "·";
+  color: var(--good);
+  margin-left: 6px;
+}
+
+/* What changed. Newest first, and the newest one is marked so a returning
+   player can see at a glance where to start reading. */
+.update {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--panel2);
+}
+.update.newest { border-left-color: var(--accent); }
+.update-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.update-head b { font-size: 14px; }
+.update-version {
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.update-changes { margin: 8px 0 0; padding-left: 18px; list-style: disc; }
+.update-changes li {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.55;
+  margin-bottom: 5px;
+}
+.update-changes li::marker { color: var(--accent-soft); }
+
+.monster-note {
+  font-size: 12px;
+  color: var(--dim);
+  font-style: italic;
+  line-height: 1.5;
+  margin: -6px 0 14px;
+  max-width: 60ch;
+}
+
+.raid-difficulty { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 14px; }
+.raid-difficulty .dim { max-width: 62ch; line-height: 1.5; }

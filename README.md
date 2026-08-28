@@ -79,7 +79,7 @@ Measured under strong simulated play, so a human runs slower:
 
 ## Interface
 
-Seven tabs — Ants, Upgrades, Combat, Achievements, Nuptial, Trials, Settings. On a wide screen it is two columns: everything you watch and press on the left (queen, brood, inspector), the tab you are reading on the right. Eggs can be laid from any tab.
+Eight tabs — Ants, Upgrades, Combat, Achievements, Nuptial, Trials, Library, Settings. On a wide screen it is two columns: everything you watch and press on the left (queen, brood, inspector), the tab you are reading on the right. Eggs can be laid from any tab.
 
 A **stats bar** across the top carries four ruled groups — resources, colony, combat, lineage — and every readout explains itself when you point at it.
 
@@ -104,7 +104,7 @@ The last adaptation opens a tab. A **trial** founds a colony under conditions th
 
 **Drought** starves the colony to a fraction of its usual food and asks for 600 ants anyway. **Endless Siege** attacks from 16 ants every ninety seconds, asks you to win fifteen raids, and ends the run on a single defeat — clearing it once opens the **Units** menu, where soldiers are trained into Majors, Supermajors and Phragmotic Guards. Each trial asks for the thing it is about, and each pays back the thing it took: a compounding buff from the trial itself, plus a permanent doubling from its own achievement. Both apply everywhere, inside trials as well as outside.
 
-Four more are listed with what they would do. They are honest about not being built yet.
+All six are playable now: Sealed Nest seals the cap, Barren Brood freezes the chambers, Sterile denies you adaptations, and the Nanitic Line makes every daughter a founder who burns out the faster the more of them there are.
 
 ## Running it locally
 
@@ -130,6 +130,7 @@ js/achievements.js  achievement tracks, tiers, levels
 js/challenges.js    the trials: debuff and reward curves, what each one does
 js/upgrades.js      upgrade panel, formulas, effect previews
 js/panels.js        shared formatting, the inspector, ants and settings panels
+js/library.js       the lexicon and the player-facing changelog
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
 ```
@@ -142,4 +143,4 @@ Only one tab writes the save. The most recently opened tab owns it and older one
 
 ## Not built yet
 
-Prestige layers beyond the first, and four of the six trials. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.
+Prestige layers beyond the first. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.

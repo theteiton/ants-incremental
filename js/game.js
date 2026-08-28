@@ -9,6 +9,9 @@ import {
   bigForagerThreshold,
   broodCapacity,
   upgradeCurrency,
+  affordableBatch,
+  eggBatchCost,
+  RESERVE_EGG_COST,
   upgradeLevel,
   upgradeMaxed,
   upgradeMaxLevel,
@@ -69,6 +72,7 @@ import {
   challengeProgress,
   CHALLENGE_TARGET
 } from "./challenges.js";
+import { discoverLibrary } from "./library.js";
 import {
   automationUnlocked,
   PRESTIGE_UNLOCK,
@@ -92,7 +96,12 @@ import {
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
 export { challengeTarget, targetKind, challengeProgress, TARGET_KINDS,
-  challengeFailed, challengeFailKind, FAIL_KINDS } from "./challenges.js";
+  challengeFailed, challengeFailKind, FAIL_KINDS,
+  callowActive, callowCrowding, masteryNanitic,
+  CALLOW_CROWDING, CALLOW_SCALE, CALLOW_TARGET_FOOD,
+  BARREN_SCALE, SEALED_SCALE, STERILE_ALLOWANCE, SEALED_TARGET_RATE,
+  barrenActive, sealedActive, sterileActive,
+  masteryBrood, masteryCap, masteryUpgradeStrength, masteryUpgradeLevels } from "./challenges.js";
 export { CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP, CHALLENGE_TARGET,
   TRIAL_GIVES_UP, TRIAL_KEEPS, bestTrialLevel, challengeMastered, masteryFood, masteryOf,
   masterySoldier, siegeActive, siegeThreatScale, siegeThreatScaleAt,
@@ -132,6 +141,7 @@ function blankGame() {
     raidsLost: 0,
     lossStreak: 0,
     lastRaid: null,
+    monster: null,
     emerged: 0,
     nextCaste: "forager",
     upgrades: {},
@@ -160,11 +170,13 @@ function blankGame() {
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
       autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
       stickyInspector: true,
-      broodScope: "waiting", broodDirection: "back",
+      broodScope: "waiting", broodDirection: "back", layAmount: 10,
+      notation: "suffix", raidDifficulty: "sheltered",
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
-    seen: { upgrades: 0, tracks: null },
+    seen: { upgrades: 0, tracks: null, library: 0, updates: "" },
+    library: {},
     runTime: 0,
-    run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0 },
+    run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0, foodEarned: 0 },
     best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
@@ -316,41 +328,53 @@ export function canLay(casteId) {
   return game[cost.resource] >= cost.amount;
 }
 
-export function layEgg(casteId) {
-  const caste = casteId || game.nextCaste;
-  if (!canLay(caste)) return false;
-  const cost = eggCost(game, caste);
-  game[cost.resource] -= cost.amount;
+// Lays one egg against a stock the caller already knows. The price depends only
+// on how many of that caste exist, so a caller adding a run of them can count
+// upwards itself instead of asking the brood to recount.
+function layOne(caste, stock) {
+  const resource = game.emerged === 0 ? "reserves" : "food";
+  const amount = game.emerged === 0
+    ? RESERVE_EGG_COST : eggPrice(caste, stock + 1);
+  if (game[resource] < amount) return false;
+  game[resource] -= amount;
   const fed = game.settings.feedBrood !== false && game.protein >= EGG_PROTEIN_COST;
   if (fed) game.protein -= EGG_PROTEIN_COST;
   game.eggs.push({ caste, progress: 0, fed });
   return true;
 }
 
+export function layEgg(casteId) {
+  const caste = casteId || game.nextCaste;
+  if (!canLay(caste)) return false;
+  return layOne(caste, casteStock(game, caste));
+}
+
+// Stock and chamber space only change because THIS loop is adding eggs, so both
+// are counted locally. Calling layEgg() per egg re-walked the whole brood twice
+// every time, which made laying quadratic: 60,000 eggs took 5.2 seconds and
+// 187,000 froze the tab outright.
 export function layEggs(count, casteId) {
+  const caste = casteId || game.nextCaste;
+  if (!game.wingsShed) return 0;
+  let space = broodSlots(caste);
+  let stock = casteStock(game, caste);
   let laid = 0;
-  while (laid < count && layEgg(casteId)) laid++;
+  while (laid < count && space > 0 && layOne(caste, stock)) {
+    stock++;
+    space--;
+    laid++;
+  }
   return laid;
 }
 
-export function affordableEggs() {
-  const slots = broodSlots();
+export function affordableEggs(casteId) {
+  const caste = casteId || game.nextCaste;
+  const slots = broodSlots(caste);
   if (slots <= 0) return 0;
-  const first = eggCost(game);
-  if (first.resource === "reserves") {
-    return Math.min(slots, Math.floor(game.reserves / first.amount));
+  if (game.emerged === 0) {
+    return Math.min(slots, Math.floor(game.reserves / RESERVE_EGG_COST));
   }
-  let budget = game.food;
-  let stock = casteStock(game, game.nextCaste);
-  let count = 0;
-  while (count < slots) {
-    const price = eggPrice(game.nextCaste, stock + 1);
-    if (price > budget) break;
-    budget -= price;
-    stock++;
-    count++;
-  }
-  return count;
+  return affordableBatch(caste, casteStock(game, caste), game.food, slots);
 }
 
 // The brood is strict FIFO, so a misclick of "lay max" can bury a caste you
@@ -567,6 +591,7 @@ function refoundColony(extra) {
     stats: game.stats,
     settings: game.settings,
     seen: game.seen,
+    library: game.library,
     queenName: game.queenName,
     challenges: game.challenges
   };
@@ -591,13 +616,19 @@ export function abandonChallenge() {
 // the target is met but the level is not banked until the player says so --
 // a colony that dissolved itself the moment it hit 600 would be a nasty
 // surprise in the middle of a run
+// every figure a trial might be measured against, gathered in one place
+function challengeValues() {
+  return { population: population(game), foodRate: foodPerSecond(game),
+    runFood: (game.run && game.run.foodEarned) || 0 };
+}
+
 export function challengeMet() {
-  return challengeTargetMet(game, population(game));
+  return challengeTargetMet(game, challengeValues());
 }
 
 // how far along this trial's own measure the colony is
 export function challengeCount() {
-  return challengeProgress(game, population(game));
+  return challengeProgress(game, challengeValues());
 }
 
 export function completeChallenge() {
@@ -702,6 +733,9 @@ export function tick(dt) {
   const earned = (foodPerSecond(game) - wingRate) * dt + wingRate * wingSeconds;
   game.food += earned;
   game.stats.foodEarned += earned;
+  // what THIS colony has gathered, which resets with it -- a trial that is
+  // about sustaining output cannot be measured on a lifetime total
+  if (game.run) game.run.foodEarned = (game.run.foodEarned || 0) + earned;
   game.stats.playtime += dt;
   game.runTime = (game.runTime || 0) + dt;
 
@@ -717,13 +751,20 @@ export function tick(dt) {
   }
 
   if (!game.wingsShed && autoShedOn()) shedWings();
+  // ...and strips them too. A player reported the instinct as broken because
+  // she shed on landing and then sat there with four wings to click by hand --
+  // two different acts, both called "wings", one automated. Four clicks on a
+  // ten-second timer is a chore rather than a decision once you have flown
+  // before, which is exactly what the flight is meant to sell.
+  if (autoShedOn() && stripReady()) stripWing();
   runAutomation();
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);
-  for (let i = game.eggs.length - 1; i >= 0; i--) {
+  // only the tended slots develop, so only they are walked -- scanning a
+  // 187,000-egg queue every tick to skip all but the first 1,600 was wasted work
+  for (let i = Math.min(tended, game.eggs.length) - 1; i >= 0; i--) {
     const egg = game.eggs[i];
-    if (i >= tended) continue;
     const founding = emergingCaste(game, egg, i) === "nanitic";
     egg.progress += rate * dt * (egg.fed ? FED_EGG_SPEED : 1) *
       (founding ? NANITIC_HATCH_SPEED : 1);
@@ -800,6 +841,7 @@ export function tick(dt) {
 
   if (!isUnlocked(game, game.nextCaste)) game.nextCaste = "forager";
   checkAchievements();
+  discoverLibrary(game);
 }
 
 

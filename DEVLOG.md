@@ -13,6 +13,49 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.7.0 — 27 August 2026
+
+**Every trial playable, a library, and a brood that does not freeze the tab.**
+
+**Sealed Nest, Barren Brood, Sterile and the Nanitic Line** join Drought and the
+Endless Siege, so all six are built. Each takes one thing away and pays it back:
+cap, brood, the strength of every adaptation, and what a founder is worth. Sealed
+Nest asks for a food rate rather than a headcount, because a colony that cannot
+grow cannot be asked to grow.
+
+The **Nanitic Line** was listed as blocked on per-ant ageing. It was not: a decay
+that rises with the count needs no such thing. Two corrections made it work —
+crowding had to bite on what a founder gathers rather than only on how fast she
+fades, or the ×2 mastery beat it and the last level came in easier than the
+first; and it had to ask for food *gathered* rather than a rate, because a rate
+is met in the first minute by a handful of ants and the optimum there is few
+ants. **Long Burning** stops the founders dying of old age from its first clear,
+and every level after makes a founder better at everything she does. The upgrade
+line that used to sell them time now sells them brood chambers, since the trial
+hands the lifespan over for nothing.
+
+**How hard raids are is now a choice.** A mastered colony outguns the next
+attacker by 348×, so rather than cut what a trial pays, the growth cap comes off
+by choice: Sheltered, Unchecked, Hunted, Relentless — 348× / 198× / 7.5× / 4.6×,
+unlocked by clearing the siege once.
+
+**Twenty-one named attackers**, phorid fly to elder wyrm, drawn three-deep from
+the band their strength falls in. The nest was previously attacked by a number.
+
+**A Library tab**, because a playtester at 187,000 ants said he understood less
+than half of what the game told him. 32 entries that appear as the colony meets
+them and fill out once it has done them, plus a player-facing changelog beside
+them.
+
+**Laying a big batch froze the tab, and it was two bugs.** The "Lay max" label
+recomputed its count every frame one egg at a time, and laying re-counted the
+whole brood twice per egg. 60,000 eggs went from 5,236ms to 8ms.
+
+Also: the shed instinct strips the wings as well, a batch lays whatever number
+you type, numbers run to 10^63 with scientific notation offered in Settings, and
+a ladder's top can no longer move — opening three trials shifted the trials
+ladder's fifth rung and took a tier from anyone standing on it.
+
 ## 0.1.6.0 — 26 August 2026
 
 **The achievement rework.**

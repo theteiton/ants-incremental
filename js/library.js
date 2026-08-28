@@ -1,0 +1,382 @@
+import { CASTES, isUnlocked, peakCasteCount, population, runPeakCount,
+  UPGRADES, upgradeLevel, levelsOwned } from "./ants.js";
+import { raidsUnlocked, raidsSeen } from "./raids.js";
+import { challengesUnlocked, challengeLevelsTotal, bestTrialLevel } from "./challenges.js";
+import { prestigeUpgradeOwned, PRESTIGE_UPGRADES } from "./prestige.js";
+
+// The colony's own record of what the words mean. Raised because a playtester
+// who had reached 187,000 ants said he understood "less than half" of what the
+// game was telling him -- not because the explanations were missing, but
+// because they lived in hover text he had no reason to point at.
+//
+// An entry has two states. It becomes KNOWN when the thing it describes is
+// available to the colony, and it EXPANDS once the colony has actually done it:
+// a short definition arrives in time to be useful, and the fuller one arrives
+// once you have something to attach it to. Nothing undiscovered is listed at
+// all, so the library is a record of this colony rather than a spoiler for the
+// next one.
+
+export const LIBRARY_GROUPS = [
+  { id: "castes", name: "The castes" },
+  { id: "colony", name: "Running a colony" },
+  { id: "combat", name: "Combat" },
+  { id: "upgrades", name: "Adaptations" },
+  { id: "prestige", name: "The lineage" },
+  { id: "trials", name: "The trials" }
+];
+
+const held = (game, caste) => peakCasteCount(game, caste) > 0;
+
+export const LIBRARY = [
+  // ------------------------------------------------------------- castes
+  { id: "queen", group: "castes", term: "Queen",
+    known: () => true,
+    short: "The one ant every colony is built from. She lands already mated, sheds her wings, and never flies again.",
+    done: game => game.wingsShed,
+    full: "Everything the colony becomes comes out of her. There is exactly one, always — and when she takes the nuptial flight it is her daughter who founds the next nest, which is why the line of them is called a matriline." },
+
+  { id: "nanitic", group: "castes", term: "Nanitic",
+    known: () => true,
+    short: "The founding generation. Undersized, fed on the queen's dissolved flight muscle, and not built to last.",
+    done: game => held(game, "nanitic"),
+    full: "They work at six times a forager's rate and halve every twenty minutes as the muscle runs out, so the opening is a race to raise a real workforce before the founders are spent. They also hatch at double speed and each one tends a brood chamber. A founding generation really does work itself to death on borrowed reserves — that part is not a balance quirk, it is what happens." },
+
+  { id: "forager", group: "castes", term: "Forager",
+    known: () => true,
+    short: "Gathers food, which is what everything else is bought with.",
+    done: game => held(game, "forager"),
+    full: "The backbone of the colony and the caste every other one exists to support. Rallying drives them onto the trails for triple food, and the Combat adaptations can arm them at one strength each when the nest is attacked." },
+
+  { id: "bigforager", group: "castes", term: "Big Forager",
+    known: game => held(game, "bigforager"),
+    short: "An oversized forager that hatches by chance from an ordinary forager egg. She cannot be laid on purpose.",
+    done: game => peakCasteCount(game, "bigforager") >= 2,
+    full: "Each is worth five foragers and grows five per cent stronger every minute she is alive, up to triple. They arrive rarely and on a widening gap, so they thin out as the colony grows — until the first nuptial flight, after which the colony knows how to feed them and each is worth twenty-five times what she was." },
+
+  { id: "excavator", group: "castes", term: "Excavator",
+    known: game => isUnlocked(game, "excavator"),
+    short: "Digs new chambers, which is the only thing that raises the population cap.",
+    done: game => held(game, "excavator"),
+    full: "When the nest is full, excavators are the only egg that can still be laid — they dig the chamber they will occupy. Without that rule a colony that filled its cap with foragers would be dead for good, unable to lay the diggers that were the only way out." },
+
+  { id: "nurse", group: "castes", term: "Nurse",
+    known: game => isUnlocked(game, "nurse"),
+    short: "Tends the brood, so more eggs develop at once.",
+    done: game => held(game, "nurse"),
+    full: "Only a few eggs develop at a time and the rest queue behind them, so nurses widen the throughput rather than speeding any single egg up. That is what makes them worth raising: hatching speed was never the constraint, the number of chambers being tended was." },
+
+  { id: "soldier", group: "castes", term: "Soldier",
+    known: game => isUnlocked(game, "soldier"),
+    short: "Fights the things that attack the nest, and hunts between attacks for protein.",
+    done: game => held(game, "soldier"),
+    full: "Soldiers fight from birth at twenty-five strength each. Every other caste fights at nothing until the Combat adaptations arm them. Between raids the soldiers are out hunting and come home in the last thirty seconds before an attack — workers never leave, which is why the colony only ever fights defensively." },
+
+  { id: "major", group: "castes", term: "Major",
+    known: game => held(game, "major") || held(game, "soldier"),
+    short: "A soldier grown into her armour: three times the strength, half the hunting.",
+    done: game => held(game, "major"),
+    full: "The first grade above a plain soldier, and the only one that comes free — surviving a raid promotes a small share of the rank and file. Everything above a Major has to be trained deliberately, with protein." },
+
+  { id: "supermajor", group: "castes", term: "Supermajor",
+    known: game => bestTrialLevel(game, "siege") > 0,
+    short: "Head and mandibles out of all proportion. Nine times a soldier's strength, and almost useless away from the gate.",
+    done: game => held(game, "supermajor"),
+    full: "Trained from a Major in the Units menu, at the cost of protein and of the ones who do not survive the training. She hunts at fifteen per cent of a plain soldier's rate — the trade that runs the whole rank ladder is that the head which wins a fight is the head that cannot carry food home." },
+
+  { id: "guard", group: "castes", term: "Phragmotic Guard",
+    known: game => bestTrialLevel(game, "siege") > 0,
+    short: "Her head is a living door, shaped to plug the tunnel. Twenty-five times a soldier, and she never hunts at all.",
+    done: game => held(game, "guard"),
+    full: "Phragmosis is real: several ants, including Colobopsis and Cephalotes, have heads shaped like plugs and block the nest entrance with their faces. In the game she is the heaviest grade there is, and an army of nothing but Guards fields enormous strength while bringing home none of the protein that trained it." },
+
+  // ------------------------------------------------------- running a colony
+  { id: "reserves", group: "colony", term: "Reserves",
+    known: () => true,
+    short: "What the queen's own body is worth. A finite pool, freed by shedding her wings, that never regenerates.",
+    done: game => game.emerged > 0,
+    full: "Eggs cost reserves until the first worker emerges, and after that reserves stop mattering for good. There is no way to make more — everything the colony becomes is bought on credit against her body." },
+
+  { id: "food", group: "colony", term: "Food",
+    known: () => true,
+    short: "The main currency. Foragers bring it in, and eggs and most adaptations are paid for with it.",
+    done: game => game.stats.foodEarned > 1000,
+    full: "Every food rate in the game has the same shape: a base that upgrades add flat amounts to, multiplied by everything that scales the whole thing. The Formulas panel in Settings shows that shape with live numbers, so you can see exactly which multiplier your rate is coming from." },
+
+  { id: "protein", group: "colony", term: "Protein",
+    known: game => raidsUnlocked(game) || game.protein > 0,
+    short: "The second resource. It comes off the things that attack the nest, and off what the soldiers hunt between attacks.",
+    done: game => game.stats.proteinEarned > 100,
+    full: "Protein feeds the brood so eggs develop twice as fast, buys the Combat adaptations, trains soldiers into higher grades, and pays for upgrade levels past their designed top. It can also be traded for food in the rendering pit, at a rate read from what the colony actually earns." },
+
+  { id: "brood", group: "colony", term: "Brood slot",
+    known: () => true,
+    short: "A chamber that can develop one egg. Eggs beyond the slots queue behind them and do nothing until a slot opens.",
+    done: game => game.stats.eggsHatched >= 10,
+    full: "Three slots to begin with, plus one for each living founder and a quarter for each nurse. This is why nurses matter and why hatching speed alone never did: the brood is a throughput limit, not a speed limit. The queue is strict first-in-first-out, so a batch laid by mistake sits in front of everything behind it." },
+
+  { id: "eggprice", group: "colony", term: "Egg price",
+    known: () => true,
+    short: "Each caste has its own rising price curve, counted from how many of that caste already exist.",
+    done: game => game.stats.eggsHatched >= 50,
+    full: "One caste's count never moves another's price. The count includes eggs already in the brood as well as hatched ants, so laying a batch at once costs exactly what laying them one at a time would — before that rule, buying a hundred at once was half price." },
+
+  { id: "rally", group: "colony", term: "Rallying",
+    known: () => true,
+    short: "The queen drives the foragers onto the trails: triple forager food for thirty seconds, then ninety to recover.",
+    done: game => (game.stats.playtime || 0) > 300,
+    full: "The one thing a hand can do to the food rate. Worked steadily it holds about one and a half times an idler's output. Big Foragers ride on it because they are paid as a multiple of a forager; the founding nanitics do not, because they are not out on the trails to be called back." },
+
+  { id: "exile", group: "colony", term: "Exiling",
+    known: game => held(game, "forager"),
+    short: "Sends ants of a caste away for good. Nothing is refunded and they do not come back.",
+    done: game => (game.stats.exiled || 0) > 0,
+    full: "It is blocked when it would strand the colony above its own population cap, so excavators cannot be dumped to trap the nest. Caste unlocks read a high-water mark rather than the live count, so exiling can never re-lock something the colony has already earned." },
+
+  // ------------------------------------------------------------- combat
+  { id: "raid", group: "combat", term: "Raid",
+    known: game => raidsUnlocked(game),
+    short: "Something finds the nest and attacks it. Win and it is stripped for protein and food; lose and ants die.",
+    done: game => raidsSeen(game) > 0,
+    full: "Losses fall in a fixed order — soldiers first, then foragers, big foragers, nanitics, nurses, and excavators last so the population cap survives the fight. A won raid still costs soldiers, scaled by how close it was: overmatch and you walk away nearly whole." },
+
+  { id: "strength", group: "combat", term: "Fighting strength",
+    known: game => raidsUnlocked(game),
+    short: "What the colony can field against the next attacker. Hold more than it has and you win.",
+    done: game => (game.peakStrength || 0) > 0,
+    full: "Soldiers fight from birth; every other caste contributes nothing until the Combat adaptations arm them, and that branch only appears once the colony has survived its first attack. The Combat tab breaks the total down by caste." },
+
+  { id: "hiding", group: "combat", term: "Going to ground",
+    known: game => raidsUnlocked(game),
+    short: "With no soldiers left, or after three straight defeats, the nest shuts. Nothing attacks, and foraging halves.",
+    done: game => (game.raidsLost || 0) > 0,
+    full: "This exists so a beaten colony is not ground to nothing. Before it, losing the last soldier began a spiral the colony could not escape. Half food for safety is a trade rather than a wall — and inside the Endless Siege it does not apply at all, which is what makes that trial endless." },
+
+  { id: "veterancy", group: "combat", term: "Veterancy",
+    known: game => raidsSeen(game) > 0,
+    short: "Surviving a raid promotes a small share of the rank and file into Majors, for nothing.",
+    done: game => held(game, "major"),
+    full: "It stops at Major deliberately. Left uncapped it turned an entire army elite on its own over a long run, which made the paid grades above it decoration. Free progress needs a ceiling or the ladder above it means nothing." },
+
+  { id: "training", group: "combat", term: "Training",
+    known: game => bestTrialLevel(game, "siege") > 0,
+    short: "Spending protein to raise a soldier into the next grade. Some of them do not survive it.",
+    done: game => (game.stats.trained || 0) > 0,
+    full: "Ten per cent are lost making Majors, twenty making Supermajors, thirty-five making Guards. Training is worth doing on a comfortable cushion and dangerous on a thin one — inside a siege, where a single defeat ends the run, thinning your own line at the wrong moment loses it." },
+
+  // ----------------------------------------------------------- adaptations
+  { id: "line", group: "upgrades", term: "Upgrade line",
+    known: () => true,
+    short: "An adaptation with levels rather than a single purchase. Each level costs more and does more.",
+    done: game => levelsOwned(game, null) > 0,
+    full: "There are twelve lines across the Colony and Combat branches, holding twenty-nine defined levels between them. Most were once separate one-off upgrades that turned out to be the same upgrade at a bigger number." },
+
+  { id: "maxlevel", group: "upgrades", term: "Max level",
+    known: game => levelsOwned(game, null) > 0,
+    short: "How far a line can currently be pushed. Clearing a trial raises it on every line that trial pays into.",
+    done: game => challengeLevelsTotal(game) > 0,
+    full: "Drought raises the three food lines, Endless Siege the four combat ones. Levels past a line's designed top cost protein as well as food, and are deliberately worth less than the level they repeat — at full strength they were a global multiplier large enough to be a different game." },
+
+  // ------------------------------------------------------------ prestige
+  { id: "flight", group: "prestige", term: "Nuptial flight",
+    known: game => runPeakCount(game, "population") >= 500,
+    short: "At a thousand ants the queen takes wing. The colony disperses and a daughter founds the next one.",
+    done: game => (game.prestige.flightsTaken || 0) > 0,
+    full: "It pays Royal Jelly based on the colony standing at the moment of the flight, so pushing further genuinely pays more. Food, ants, brood, bought adaptations and the raid record all reset; achievements, peaks, jelly and the Royal Lineage do not." },
+
+  { id: "jelly", group: "prestige", term: "Royal Jelly",
+    known: game => (game.prestige.royalJellyTotal || 0) > 0 || runPeakCount(game, "population") >= 500,
+    short: "What a nuptial flight pays. It buys the Royal Lineage and never resets.",
+    done: game => (game.prestige.royalJellyTotal || 0) > 0,
+    full: "Thirteen adaptations to spend it on. Eight make the next colony stronger, four sell automation, and the last one opens the Trials." },
+
+  { id: "matriline", group: "prestige", term: "Matriline",
+    known: game => (game.prestige.flightsTaken || 0) > 0,
+    short: "The whole line of queens, mother to daughter. The clock that never resets.",
+    done: game => (game.stats.playtime || 0) > 7200,
+    full: "Colony age resets with every flight; the matriline does not. The word is deliberate — ant colonies really are matrilineal, every worker descending from the queen and each new nest founded by her daughter. It is not a bloodline: ants have hemolymph, which is not red and not carried in vessels." },
+
+  { id: "automation", group: "prestige", term: "Automation",
+    known: game => PRESTIGE_UPGRADES.some(u => u.effect.type === "automation" && prestigeUpgradeOwned(game, u)),
+    short: "The colony doing for itself what you were doing by hand. Bought with jelly, never given.",
+    done: game => PRESTIGE_UPGRADES.filter(u => u.effect.type === "automation" && prestigeUpgradeOwned(game, u)).length >= 2,
+    full: "Nothing is automated before the first flight. Even afterwards, nothing exiles an ant or destroys an egg on your behalf — both are irreversible, and an automated mistake there is the kind you cannot see happening." },
+
+  // -------------------------------------------------------------- trials
+  { id: "trial", group: "trials", term: "Trial",
+    known: game => challengesUnlocked(game),
+    short: "A colony founded on purpose under conditions that should kill it. Claim it or abandon it; you lose only the colony.",
+    done: game => challengeLevelsTotal(game) > 0,
+    full: "The lineage's automation comes with you and its strength does not, and everything earned on the Achievements tab still pays. Each trial asks for the thing it is about — Drought asks for a colony, Endless Siege asks you to hold the gate." },
+
+  { id: "mastery", group: "trials", term: "Mastery",
+    known: game => challengesUnlocked(game),
+    short: "What clearing a trial pays, permanently. Each trial gives back the thing it took away.",
+    done: game => challengeLevelsTotal(game) > 0,
+    full: "Drought starves the colony and pays in food, as Deep Cisterns. Endless Siege demands soldiers and pays in soldiers, as Hardened Line. Both double per level cleared, both apply inside trials as well as outside, and both also raise the max level of every upgrade line that trial pays into." },
+
+  { id: "softcap", group: "trials", term: "Softcap",
+    known: game => (game.achievementPoints || 0) > 40,
+    short: "Past an achievement ladder's designed top, each further rung sits further from the last than the one before it.",
+    done: game => (game.achievementLevel || 0) >= 10,
+    full: "No ladder ends any more, because a track that finishes is a bar that pays nothing for the rest of the run. The softcap is what stops one number running away with the rest: the growth-driven tracks police themselves, but exiling ants and destroying eggs are free and repeatable, and could otherwise be farmed for tiers forever." },
+
+  { id: "tier", group: "trials", term: "Tier and level",
+    known: () => true,
+    short: "A tier is one rung of one achievement track. Tiers pay XP, and XP buys achievement levels.",
+    done: game => (game.achievementLevel || 0) > 0,
+    full: "A tier is worth its own depth — the first rung of a track pays 1 XP and the ninth pays 9 — because the first is a formality and the last is a grind. Each level costs more XP than the one before it, so the ladder throttles itself rather than needing a cap. Every level makes the whole colony gather more." }
+];
+
+const INDEX = {};
+for (const entry of LIBRARY) INDEX[entry.id] = entry;
+
+export function libraryEntry(id) {
+  return INDEX[id] || null;
+}
+
+// The library opens on the colony's first achievement tier -- earned rather than
+// bought, and early, because the player who most needs the words explained is
+// the one who has just met them.
+export function libraryUnlocked(game) {
+  return (game.achievementPoints || 0) > 0 ||
+    Object.keys(game.library || {}).length > 0;
+}
+
+// 0 unseen, 1 known, 2 expanded
+export function entryState(game, entry) {
+  return (game.library && game.library[entry.id]) || 0;
+}
+
+// Walked once a frame. Each predicate is a couple of reads, and an entry only
+// ever moves forward -- nothing already learned can be taken away by a reset.
+export function discoverLibrary(game) {
+  if (!game.library) game.library = {};
+  let found = 0;
+  for (const entry of LIBRARY) {
+    const at = game.library[entry.id] || 0;
+    if (at >= 2) continue;
+    let want = at;
+    if (entry.known(game)) want = Math.max(want, 1);
+    if (want >= 1 && entry.done(game)) want = 2;
+    if (want > at) {
+      game.library[entry.id] = want;
+      found++;
+    }
+  }
+  return found;
+}
+
+export function libraryCounts(game) {
+  let known = 0;
+  let expanded = 0;
+  for (const entry of LIBRARY) {
+    const at = entryState(game, entry);
+    if (at >= 1) known++;
+    if (at >= 2) expanded++;
+  }
+  return { known, expanded, total: LIBRARY.length };
+}
+
+// what the player has not read yet, for the tab dot
+export function libraryUnread(game) {
+  const seen = (game.seen && game.seen.library) || 0;
+  return Math.max(0, libraryCounts(game).known - seen);
+}
+
+// ------------------------------------------------------------- what changed
+//
+// The player-facing changelog. Deliberately NOT the devlog: that one records
+// why a decision was made and what was measured, which is written for whoever
+// maintains the game. This one says what is different for the person playing
+// it, in the words the game itself uses.
+//
+// Newest first. A version stays on this list once it ships.
+export const UPDATES = [
+  { version: "0.1.7.0", name: "The library, and a much faster brood",
+    changes: [
+      "A Library tab. Every term the game uses, written up in plain words — castes, resources, combat, the lineage, the trials. Entries appear as the colony meets them and fill out once it has actually done them.",
+      "Laying thousands of eggs no longer freezes the tab. A colony that could afford a hundred thousand eggs was doing a hundred thousand sums every frame just to label the Lay max button.",
+      "The instinct to shed now strips the wings as well. It only ever shed them before, which left four wings to click by hand every time you founded a colony.",
+      "You can choose how many eggs a batch lays. Type a number beside the Lay buttons — 250, or 2k — instead of clicking ×10 over and over.",
+      "The food-reserve row no longer squeezes itself into three lines with half the panel empty beside it."
+    ] },
+
+  { version: "0.1.6.0", name: "The achievement rework",
+    changes: [
+      "No achievement track ever finishes. Past its designed rungs a ladder keeps going, with each further rung a little harder than the last, so nothing ends up as a full bar paying nothing.",
+      "There is no level cap. Each level costs more than the one before it, so the climb slows itself instead of stopping.",
+      "A deep tier is worth more than a shallow one. The first rung of a track pays the least and the last pays the most.",
+      "Six new tracks: soldiers trained, Phragmotic Guards raised, your deepest single adaptation, matriline age, ants exiled and eggs destroyed.",
+      "Ladder steps now follow how fast each thing actually grows, so food rungs are far apart and big forager rungs are close together."
+    ] },
+
+  { version: "0.1.5.0", name: "Soldier ranks, and the second trial",
+    changes: [
+      "Soldiers have grades. Major, Supermajor and the Phragmotic Guard, whose head is a living door. Every grade fights harder and hunts worse, so an army of nothing but Guards brings home no protein.",
+      "Surviving a raid promotes some of the rank and file into Majors for free. Everything above that is trained with protein in the new Units menu, and some of them do not survive the training.",
+      "Endless Siege, the second trial. Attacks from 16 ants, one every ninety seconds, and a single defeat ends the run. Clearing it once opens the Units menu.",
+      "Winning a raid now costs soldiers, scaled by how close the fight was.",
+      "The twenty-nine adaptations became twelve lines with levels. Clearing a trial raises the max level of every line it pays into.",
+      "Food and protein can be traded in the rendering pit, at what the colony currently earns."
+    ] },
+
+  { version: "0.1.4.0", name: "Trials that end, and a interface that fits",
+    changes: [
+      "Drought stops at five levels and is then mastered, rather than grinding on forever.",
+      "Everything you own on the Achievements tab keeps paying inside a trial, including the bonus for big foragers.",
+      "The queen, brood and details panel moved into their own column, so a tab starts at the top of the page instead of halfway down it.",
+      "Press E to read the details panel at full size."
+    ] },
+
+  { version: "0.1.3.0", name: "The Trials",
+    changes: [
+      "The last Royal Lineage adaptation opens a tab. A trial founds a colony under conditions that should kill it.",
+      "The lineage's automation comes with you; its strength does not."
+    ] },
+
+  { version: "0.1.2.0", name: "The founding generation",
+    changes: [
+      "The queen's four wings survive the shed. Strip them one at a time for food — they are the only food that exists before the first workers emerge.",
+      "Nanitics start at six times a forager and fade as the queen's flight muscle runs out. They hatch at double speed and each one tends a brood chamber."
+    ] },
+
+  { version: "0.1.1.0", name: "Automation, and a colony that can recover",
+    changes: [
+      "Four Royal Lineage adaptations sell automation: buying adaptations, laying eggs, holding a caste balance, and keeping a food reserve back.",
+      "A colony with no soldiers goes to ground instead of being ground down. Nothing attacks, and foraging halves until an army stands again.",
+      "A Formulas panel in Settings shows how every rate is built, with live numbers."
+    ] },
+
+  { version: "0.1.0.0", name: "The Nuptial Flight",
+    changes: [
+      "At a thousand ants the queen takes flight and a daughter founds the next colony.",
+      "Royal Jelly buys the Royal Lineage, which survives every flight."
+    ] },
+
+  { version: "0.0.4.0", name: "Raids, soldiers and protein",
+    changes: [
+      "A monster attacks on a timer. Soldiers fight from birth; every other caste fights at nothing until the Combat adaptations arm them.",
+      "Protein feeds the brood so eggs develop twice as fast, and buys its own branch of adaptations."
+    ] },
+
+  { version: "0.0.3.0", name: "Nurses, brood slots and the Big Forager",
+    changes: [
+      "Only a few eggs develop at once and the rest queue. Nurses widen that, which is what makes them worth raising.",
+      "Big Foragers hatch by chance from ordinary forager eggs and grow stronger the longer they live."
+    ] },
+
+  { version: "0.0.1.0", name: "The founding phase",
+    changes: [
+      "A mated queen who has already landed. Shedding her wings frees a finite pool of reserves, and those buy her first eggs.",
+      "The first four workers emerge as nanitics whatever caste you chose."
+    ] }
+];
+
+export function latestVersion() {
+  return UPDATES.length ? UPDATES[0].version : "";
+}
+
+// true when something has shipped that this player has not looked at
+export function updatesUnread(game) {
+  return ((game.seen && game.seen.updates) || "") !== latestVersion();
+}

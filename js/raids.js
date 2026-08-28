@@ -1,7 +1,7 @@
 import { effectTotal, foodPerSecond, globalFoodMultiplier, population, runPeakCount,
   SOLDIER_RANKS, RANK_IDS, rankOf, soldierCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
-import { masterySoldier, siegeActive, siegeThreatScale, challengeFailed,
+import { masterySoldier, bestTrialLevel, siegeActive, siegeThreatScale, challengeFailed,
   SIEGE_UNLOCK, SIEGE_INTERVAL, SIEGE_REFERENCE, SIEGE_BASE, SIEGE_LOSS_CAP,
   SIEGE_RAMP } from "./challenges.js";
 
@@ -142,9 +142,49 @@ export function huntRate(game) {
     (1 + effectTotal(game, "proteinYield"));
 }
 
+
+// ---------------------------------------------------------- how hard raids are
+//
+// A colony that has mastered every trial outguns the next attacker by about 350
+// times, because the soldier mastery and the adaptation strength both compound
+// while the threat only follows the nest's size. Rather than cut what clearing
+// a trial pays -- the reward is earned, and taking it back is the wrong lever --
+// the ceiling comes off by choice.
+//
+// It is unlocked by clearing the Endless Siege once: the trial that teaches the
+// colony to fight is the one that lets it ask for a real fight.
+export const RAID_DIFFICULTIES = [
+  { id: "sheltered", name: "Sheltered",
+    note: "The default. An attacker grows five per cent with each raid you win, and stops growing after twenty-five of them.",
+    capWins: true, seesMastery: 0, exponent: MONSTER_EXPONENT },
+  { id: "unchecked", name: "Unchecked",
+    note: "The growth per win never stops. Every victory makes the next attacker larger, for as long as you keep winning.",
+    capWins: false, seesMastery: 0, exponent: MONSTER_EXPONENT },
+  { id: "hunted", name: "Hunted",
+    note: "Uncapped, and what you have learned about fighting is known to whatever is coming. Everything Hardened Line pays you, it brings with it.",
+    capWins: false, seesMastery: 1, exponent: MONSTER_EXPONENT },
+  { id: "relentless", name: "Relentless",
+    note: "As Hunted, and a larger nest draws far worse than it used to. There is no arrangement of ants that wins this comfortably.",
+    capWins: false, seesMastery: 1, exponent: 1.12 }
+];
+
+export function raidDifficulty(game) {
+  const chosen = (game.settings && game.settings.raidDifficulty) || "sheltered";
+  if (!raidDifficultyUnlocked(game)) return RAID_DIFFICULTIES[0];
+  return RAID_DIFFICULTIES.find(d => d.id === chosen) || RAID_DIFFICULTIES[0];
+}
+
+// the trial that demands soldiers is the one that lets you ask for worse
+export function raidDifficultyUnlocked(game) {
+  return bestTrialLevel(game, "siege") > 0;
+}
+
 // what the colony's own record adds to the next attacker, capped
 export function monsterWinGrowth(game) {
-  return 1 + MONSTER_GROWTH * Math.min(game.raidsWon || 0, MONSTER_GROWTH_CAP);
+  const wins = game.raidsWon || 0;
+  const counted = raidDifficulty(game).capWins
+    ? Math.min(wins, MONSTER_GROWTH_CAP) : wins;
+  return 1 + MONSTER_GROWTH * counted;
 }
 
 // one place decides the run-up, so the raid and the Formulas panel agree
@@ -172,8 +212,93 @@ export function monsterBase(game) {
 export function monsterPower(game) {
   const reference = monsterReference(game);
   const reach = Math.max(reference, runPeakCount(game, "population"));
-  return monsterBase(game) * Math.pow(reach / reference, MONSTER_EXPONENT) *
-    monsterWinGrowth(game) * monsterRamp(game);
+  const level = raidDifficulty(game);
+  // at the harder settings the attacker knows what the colony has learned
+  const learned = level.seesMastery > 0
+    ? Math.pow(masterySoldier(game), level.seesMastery) : 1;
+  return monsterBase(game) * Math.pow(reach / reference, level.exponent) *
+    monsterWinGrowth(game) * monsterRamp(game) * learned;
+}
+
+
+// ------------------------------------------------------------ the attackers
+//
+// "What kind of monster am I facing" was a fair question with no answer: the
+// nest was attacked by a number. Each attacker is now a thing, drawn from the
+// band its strength falls in -- real ant predators for as long as the colony is
+// a plausible size, and then rather less plausible ones, because by the time a
+// nest holds a million ants a wild boar is no longer the frightening option.
+//
+// `from` is the attacker power at which one starts appearing. The band stays
+// open afterwards, so a strong colony still meets the occasional woodpecker.
+export const MONSTERS = [
+  { id: "phorid", name: "Phorid Fly", from: 0,
+    note: "A fly the size of a pinhead that lays a single egg in a worker's head. Barely an attack at all, and every colony's first." },
+  { id: "antlion", name: "Antlion", from: 200,
+    note: "It does not hunt. It digs a pit in loose sand and waits at the bottom for the trail to cross it." },
+  { id: "spider", name: "Wolf Spider", from: 600,
+    note: "No web. It runs the foraging trails down one ant at a time and carries them off." },
+  { id: "assassin", name: "Assassin Bug", from: 1500,
+    note: "It drains a worker and wears the empty shell on its back, stacked with the others, and walks into the nest wearing them." },
+  { id: "mantis", name: "Praying Mantis", from: 4000,
+    note: "Still for hours at the mouth of the tunnel, then not still." },
+  { id: "raiders", name: "Army Ant Raiders", from: 10000,
+    note: "Another colony, and a bigger one. They take the brood rather than the workers, which is worse." },
+  { id: "toad", name: "Cane Toad", from: 25000,
+    note: "Sits on the entrance and swallows whatever comes out of it, for as long as anything does." },
+  { id: "woodpecker", name: "Green Woodpecker", from: 60000,
+    note: "It is not after the wood. Its tongue is longer than its head and sticky along its whole length." },
+  { id: "pangolin", name: "Pangolin", from: 150000,
+    note: "Armoured, clawed, and entirely uninterested in being bitten. It opens the nest like a tin." },
+  { id: "aardvark", name: "Aardvark", from: 400000,
+    note: "A metre of digging muscle that eats fifty thousand insects a night and sleeps somewhere else." },
+  { id: "anteater", name: "Giant Anteater", from: 1e6,
+    note: "Two metres, no teeth, and a tongue that goes in and out a hundred and fifty times a minute." },
+  { id: "echidna", name: "Echidna", from: 2.5e6,
+    note: "Spined, egg-laying, and older than almost everything. It has been eating ants since before there were anteaters to compete with." },
+  { id: "bear", name: "Sloth Bear", from: 6e6,
+    note: "It closes its nostrils, puts its face into the nest and inhales. The noise carries for half a mile." },
+  { id: "badger", name: "Honey Badger", from: 1.5e7,
+    note: "It is not especially large. It is simply unwilling to stop, and nothing it meets has yet convinced it otherwise." },
+  { id: "monitor", name: "Monitor Lizard", from: 4e7,
+    note: "It excavates rather than raids, and it returns to the same nest until there is nothing left worth returning for." },
+  { id: "boar", name: "Wild Boar", from: 1e8,
+    note: "Not a specialist. It simply ploughs the ground where the colony happens to be and eats what surfaces." },
+  { id: "basilisk", name: "Basilisk", from: 2.5e8,
+    note: "The trails nearest the entrance are found stopped mid-step, every ant still facing the way it came." },
+  { id: "wyvern", name: "Wyvern", from: 7e8,
+    note: "Two legs, two wings, and a descent steep enough that the first warning is the shadow crossing the trail." },
+  { id: "chimera", name: "Chimera", from: 2e9,
+    note: "Three heads that do not agree on which chamber to open first, which is the only reason anything survives it." },
+  { id: "dragon", name: "Dragon", from: 5e9,
+    note: "It does not dig. It waits above the nest for the alates to rise, and takes the whole flight in one pass." },
+  { id: "wyrm", name: "Elder Wyrm", from: 2e10,
+    note: "It was underground before the colony was, and it has been moving towards the warmth for a very long time." }
+];
+
+// Which attackers a threat of this size could be. The last few bands stay open
+// so a colony meets some variety rather than the same creature for ever.
+export function monsterChoices(power) {
+  const open = MONSTERS.filter(m => power >= m.from);
+  if (!open.length) return [MONSTERS[0]];
+  return open.slice(Math.max(0, open.length - 3));
+}
+
+export function monsterById(id) {
+  return MONSTERS.find(m => m.id === id) || MONSTERS[0];
+}
+
+// Rolled once and remembered, so the attacker does not change identity between
+// frames while the colony is looking at it.
+export function rollMonster(game) {
+  const choices = monsterChoices(monsterPower(game));
+  game.monster = choices[Math.floor(Math.random() * choices.length)].id;
+  return game.monster;
+}
+
+export function currentMonster(game) {
+  if (!game.monster) rollMonster(game);
+  return monsterById(game.monster);
 }
 
 // Protein and food are not comparable by their raw numbers: measured across a
@@ -327,7 +452,8 @@ export function resolveRaid(game) {
     const fallen = killSoldiers(game, winToll(game, defence, power));
     const promoted = promoteVeterans(game);
     game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food,
-      dead: fallen, promoted };
+      dead: fallen, promoted, monster: game.monster };
+    rollMonster(game);
     return game.lastRaid;
   }
 
@@ -340,6 +466,8 @@ export function resolveRaid(game) {
   game.stats.proteinEarned = (game.stats.proteinEarned || 0) + salvage;
   game.raidsLost++;
   game.lossStreak = (game.lossStreak || 0) + 1;
-  game.lastRaid = { won: false, power, protein: salvage, food: 0, dead, promoted: {} };
+  game.lastRaid = { won: false, power, protein: salvage, food: 0, dead, promoted: {},
+    monster: game.monster };
+  rollMonster(game);
   return game.lastRaid;
 }

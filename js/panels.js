@@ -12,6 +12,7 @@ import {
   isUnlocked,
   layableCastes,
   naniticLifespan,
+  slotsPerNanitic,
   slotsPerNurse,
   NANITIC_BROOD_SLOTS,
   population,
@@ -39,18 +40,30 @@ import {
 } from "./game.js";
 import { spriteFor } from "./sprites.js";
 
-const SUFFIXES = ["", "K", "M", "B", "T", "Qa", "Qi"];
+// Runs to 10^63. The ladder used to stop at Qi and fall back to exponential
+// halfway through a long run, which reads as a different kind of number
+// appearing out of nowhere. A player who prefers the exponential form can ask
+// for it in Settings instead of being handed it unannounced.
+const SUFFIXES = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No",
+  "Dc", "UDc", "DDc", "TDc", "QaDc", "QiDc", "SxDc", "SpDc", "OcDc", "NoDc", "Vg"];
 
 // The inverse of fmt(): reads back the same suffixes it writes, so a player can
 // type what the game showed them. Also takes plain digits, commas and
 // scientific notation. Returns NaN on anything it cannot read, so the caller
 // can leave a half-typed value alone rather than treating it as zero.
-const SUFFIX_VALUE = { k: 1e3, m: 1e6, b: 1e9, t: 1e12, qa: 1e15, qi: 1e18 };
+// the inverse of the list above, so a player can type back anything fmt() wrote
+const SUFFIX_VALUE = {};
+SUFFIXES.forEach((suffix, tier) => {
+  if (suffix) SUFFIX_VALUE[suffix.toLowerCase()] = Math.pow(1000, tier);
+});
+// longest first, so "qidc" is not read as "qi" with "dc" left over
+const SUFFIX_PATTERN = Object.keys(SUFFIX_VALUE)
+  .sort((a, b) => b.length - a.length).join("|");
 
 export function parseAmount(text) {
   const clean = String(text).trim().toLowerCase().replace(/[\s,]/g, "");
   if (!clean) return 0;
-  const match = clean.match(/^(\d*\.?\d+(?:e[+-]?\d+)?)(qa|qi|k|m|b|t)?$/);
+  const match = clean.match(new RegExp("^(\\d*\\.?\\d+(?:e[+-]?\\d+)?)(" + SUFFIX_PATTERN + ")?$"));
   if (!match) return NaN;
   const value = Number(match[1]);
   if (!isFinite(value)) return NaN;
@@ -72,10 +85,17 @@ export function shortAmount(n) {
   return String(n);
 }
 
+// A player can ask for the exponential form outright rather than meeting it
+// only when the suffixes run out.
+export function scientificNotation() {
+  return game.settings && game.settings.notation === "scientific";
+}
+
 export function fmt(n) {
   if (!isFinite(n)) return "0";
   if (n < 0) return "-" + fmt(-n);
   if (n < 10) return (Math.round(n * 10) / 10).toString();
+  if (scientificNotation() && n >= 1000) return n.toExponential(2);
   if (n < 1000) return Math.floor(n).toString();
   let tier = Math.floor(Math.log10(n) / 3);
   let scaled = n / Math.pow(1000, tier);
@@ -271,7 +291,7 @@ function casteEffectText(id) {
     if (held <= 0) return "";
     const each = casteFoodPerSecond(game, id);
     return fmt(each * held) + "/s total (" + fmt(each) + " each, fading) · +" +
-      fmt(held * NANITIC_BROOD_SLOTS) + " brood slots";
+      fmt(held * slotsPerNanitic(game)) + " brood slots";
   }
   if (id === "nurse") {
     // only what the nurses themselves add -- the base, the upgrades, the
@@ -311,11 +331,13 @@ export function renderAnts() {
     ui.held.textContent = fmt(held);
     ui.pending.textContent = coming > 0 ? "+" + fmt(coming) + " pending" : "";
 
-    const dying = id === "nanitic" && held > 0
-      ? Math.max(0, naniticLifespan(game) - (game.runTime || 0))
-      : 0;
-    ui.lifespan.hidden = dying <= 0;
-    ui.lifespan.textContent = dying > 0 ? fmtTime(dying) + " left" : "";
+    // the founders can outlive their own lifespan once Long Burning is held, and
+    // fmtTime(Infinity) is not a thing anyone wants to read
+    const span = id === "nanitic" && held > 0 ? naniticLifespan(game) : 0;
+    const dying = isFinite(span) ? Math.max(0, span - (game.runTime || 0)) : Infinity;
+    ui.lifespan.hidden = !(dying > 0);
+    ui.lifespan.textContent = !isFinite(dying) ? "no longer ages"
+      : dying > 0 ? fmtTime(dying) + " left" : "";
 
     const allowed = maxExilable(id);
     // the cell stays on every row so the sprites and counts line up; only the
@@ -411,6 +433,10 @@ export function buildSettings(handlers) {
     setSetting("theme", event.target.value);
     handlers.applyTheme();
   };
+  el("setNotation").onchange = event => {
+    setSetting("notation", event.target.value);
+    handlers.refresh();
+  };
   // The panel following the scroll is what makes hover-to-inspect work without
   // moving the mouse, but it also means a panel that never leaves the screen.
   // Asked for as a choice rather than a default either way.
@@ -494,6 +520,7 @@ export function renderSettings() {
   renderAutomation();
   el("setExile").checked = !!game.settings.exileEnabled;
   el("setTheme").value = game.settings.theme || "dark";
+  el("setNotation").value = game.settings.notation || "suffix";
   const sticky = game.settings.stickyInspector !== false;
   el("setStickyInspector").checked = sticky;
   el("stickyInspectorNote").textContent = sticky

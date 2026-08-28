@@ -13,7 +13,15 @@ export const CHALLENGE_TARGET = 600;
 
 export const TARGET_KINDS = {
   population: { noun: "ants", verb: "Raise", gerund: "raising", of: "in one colony" },
-  raids: { noun: "raids", verb: "Win", gerund: "winning", of: "without the nest falling" }
+  raids: { noun: "raids", verb: "Win", gerund: "winning", of: "without the nest falling" },
+  // a colony that is not allowed to grow cannot be asked for a headcount, so
+  // the sealed nest is asked to make what little it has produce instead
+  foodRate: { noun: "food a second", verb: "Reach", gerund: "reaching",
+    of: "from a nest that cannot widen", rate: true },
+  // a trial about holding output up over time cannot be measured on a rate,
+  // which a handful of ants meets in the first minute
+  runFood: { noun: "food", verb: "Gather", gerund: "gathering",
+    of: "with this one colony" }
 };
 
 // A trial can be LOST as well as won. Declared per trial so the next ones can
@@ -113,6 +121,63 @@ export const SIEGE_LOSS_CAP = 0.5;
 // were being lost rather than at the end where the scaling is meant to bite.
 // Five gentler steps give the colony a run-up, so the trial is decided late.
 export const SIEGE_RAMP = [0.15, 0.3, 0.45, 0.6, 0.8];
+
+// Barren Brood. Nurses add nothing to the brood at any level -- that is its
+// identity -- so the difficulty has to come from somewhere else, and it comes
+// from the chambers themselves running cold: eggs develop more slowly each
+// attempt. The scale has to beat the x2 brood mastery or level five arrives
+// easier than level one, the same trap Drought and the Siege both hit.
+export const BARREN_SCALE = 0.42;
+
+// Sealed Nest. Excavators raise no cap, so the colony is stuck at whatever its
+// base is -- and that base shrinks each attempt. It cannot be asked for a
+// headcount when it is not allowed to grow, so it is asked for a rate instead.
+// 0.40 and 2,500 are measured together, and they trade against each other. The
+// cap mastery doubles per level, so a debuff of 0.40 leaves the nest at 0.8^level
+// -- a gentle ramp on purpose, because a shrinking cap against a fixed rate has
+// a hard ceiling: per-ant output tops out at what the adaptations allow, and
+// below about 12 ants no amount of time reaches 4,000/s. Swept at 0.33, 0.36 and
+// 0.38 the last levels became impossible rather than slow; at 0.40 with a 2,500
+// target every level is reachable and the ramp is in how long it takes.
+export const SEALED_SCALE = 0.40;
+export const SEALED_TARGET_RATE = 2500;
+
+// Sterile. The colony may hold only so many bought adaptation levels at once,
+// and that allowance falls to nothing by the last attempt. Unlike the others
+// this debuff is a count rather than a multiplier, so it steps rather than
+// scales.
+export const STERILE_ALLOWANCE = [10, 7, 4, 2, 0];
+
+// Nanitic Line. Every egg emerges as a founder, and the founders burn each other
+// out: the more of them there are, the faster the whole generation fades. That
+// crowding IS the mechanic, and it is what makes the trial buildable at all --
+// the old note called it blocked because the founders share one decay clock and
+// a colony of them would die together, but a decay that rises with the count
+// needs no per-ant ageing. They fade towards nothing rather than dropping dead,
+// so the colony is never wiped, it just stops being worth anything.
+//
+// More ants therefore means less output each, and past a point less output in
+// total. Finding that point is the trial, so it is asked for a rate.
+// Crowding bites on what a founder gathers as well as on how fast she fades. A
+// shorter half-life alone is a weaker lever than a doubled output, so as a pure
+// decay debuff it lost to the x2 mastery every time and the last level came in
+// easier than the first.
+//
+// The scale is 2.15 rather than something steeper because the output goes to
+// zero either way -- the line always burns out -- so what each level really sets
+// is how much one colony can extract before it does. At 2.8 those ceilings ran
+// a fifteenfold spread that no single target can ramp across; at 2.15 they run
+// 279K / 203K / 130K / 77K / 43K, and a target of 38,000 is an eighth of the
+// first attempt's ceiling and seven eighths of the last one's.
+//
+// How LONG a level takes is not set here. The founders' half-life is twenty
+// minutes and nothing extends it any more, so almost everything a colony will
+// ever gather arrives in the first half hour whatever these numbers say. Making
+// the trial a longer sitting means a longer half-life inside it, not more
+// crowding.
+export const CALLOW_CROWDING = 0.012;
+export const CALLOW_SCALE = 2.15;
+export const CALLOW_TARGET_FOOD = 38000;
 export const CHALLENGE_BASE_DEBUFF = 0.25;
 export const CHALLENGE_LEVEL_SCALE = 0.36;
 export const CHALLENGE_REWARD_STEP = 1.1;
@@ -153,18 +218,27 @@ export const CHALLENGES = [
   {
     id: "sealed",
     name: "Sealed Nest",
-    open: false,
+    open: true,
+    kind: "sealed",
     flavour: "The soil sets like stone. However many diggers she raises, the chambers do not widen.",
-    debuff: "",
-    plan: "Planned: excavators would raise no population cap at all, leaving the colony at its base 30 ants. Its target would be a food rate rather than a headcount, because a colony that cannot grow cannot be asked to grow. Clearing it would pay back in population cap, the thing it denies."
+    debuff: "Excavators raise no population cap at all, and the base nest is smaller with every attempt.",
+    // it denies you room, so it gives room back
+    target: { kind: "foodRate", amount: SEALED_TARGET_RATE },
+    mastery: { type: "cap", step: 2, name: "Hollowed Earth",
+      desc: "What the colony learned sealed in. Every level of it doubles the population cap, for good." },
+    plan: ""
   },
   {
     id: "barren",
     name: "Barren Brood",
-    open: false,
+    open: true,
+    kind: "barren",
     flavour: "The chambers stay cold. Nurses tend them and nothing develops any faster for it.",
-    debuff: "",
-    plan: "Planned: nurses would add no brood slots, so only the base chambers ever develop eggs. Growth would be bound by time rather than by food, which is the opposite of every other trial. Clearing it would pay back in brood slots, the thing it denies."
+    debuff: "Nurses add no brood slots at all, and every egg develops more slowly with each attempt.",
+    // it denies you throughput, so it gives throughput back
+    mastery: { type: "brood", step: 2, name: "Warm Chambers",
+      desc: "What the colony learned from the cold. Every level of it doubles the brood, for good." },
+    plan: ""
   },
   {
     id: "siege",
@@ -185,21 +259,33 @@ export const CHALLENGES = [
   {
     id: "sterile",
     name: "Sterile",
-    open: false,
+    open: true,
+    kind: "sterile",
     flavour: "Nothing the colony learns takes hold. Every generation begins from instinct alone.",
-    debuff: "",
+    debuff: "The colony can hold only a few bought adaptation levels at once, and fewer with every attempt \u2014 none at all on the last.",
+    // it denies you adaptations, so it gives adaptations back
+    mastery: { type: "upgrades", step: 1.25, levels: 1, name: "Learned by Heart",
+      desc: "What the colony kept when nothing else took hold. Every level raises the max of every upgrade line by one, and makes every level you buy a quarter stronger." },
     // Akami spotted that Drought already suppresses the lineage, which left
     // Sterile with no identity of its own. Its restriction is the twenty-nine
     // bought upgrades, which no other trial touches.
-    plan: "Planned: no Colony or Combat upgrade could be bought. Every trial already leaves the Royal Lineage's strength behind — this one takes the twenty-nine adaptations you buy with food and protein as well, leaving caste balance and nothing else. Clearing it would pay back in the strength of every adaptation you buy."
+    plan: ""
   },
   {
     id: "callow",
     name: "Nanitic Line",
-    open: false,
+    open: true,
+    kind: "callow",
     flavour: "Every daughter emerges undersized, burns bright on the queen's reserves, and is gone.",
-    debuff: "",
-    plan: "Planned: every worker would emerge as a founder — six times a forager's output, fading fast, and dead within hours. It is not built because the founders currently share one decay clock rather than ageing one at a time, so a whole colony of them would fail at the same instant. Clearing it would pay back in what the founders produce."
+    debuff: "Every egg hatches as a founder, whatever caste you chose \u2014 and the more founders there are, the faster the whole generation fades.",
+    target: { kind: "runFood", amount: CALLOW_TARGET_FOOD },
+    // It takes a workforce that will not last, so the first clear buys exactly
+    // that: the founders stop dying of old age. After that every level makes a
+    // founder better at all of it rather than at foraging alone -- she gathers,
+    // she tends the brood, and a trial about founders should lift the whole ant.
+    mastery: { type: "nanitic", step: 1.6, lifespan: true, name: "Long Burning",
+      desc: "What the colony learned from a generation that would not last. The first level means the founders never die of old age; every level makes each of them better at everything she does." },
+    plan: ""
   }
 ];
 
@@ -266,6 +352,89 @@ export function siegeActive(game) {
   return challengeKind(game) === "siege";
 }
 
+export function barrenActive(game) {
+  return challengeKind(game) === "barren";
+}
+
+export function sealedActive(game) {
+  return challengeKind(game) === "sealed";
+}
+
+export function sterileActive(game) {
+  return challengeKind(game) === "sterile";
+}
+
+export function callowActive(game) {
+  return challengeKind(game) === "callow";
+}
+
+// How much faster the generation fades for being crowded. Every founder shortens
+// the half-life of every other one, and each attempt makes the crowding worse.
+export function callowCrowding(game, founders) {
+  if (!callowActive(game)) return 1;
+  const level = Math.min(challengeLevel(game, "callow"), CHALLENGE_MAX_LEVEL - 1);
+  const weight = CALLOW_CROWDING * Math.pow(CALLOW_SCALE, level);
+  return 1 + Math.max(0, founders) * weight;
+}
+
+export function masteryNanitic(game) {
+  return masteryOf(game, "nanitic");
+}
+
+// The founders stop dying of old age once the Nanitic Line has been cleared
+// even once. Inside the trial nothing dies anyway -- the whole colony shares one
+// decay clock, so a lifespan would end every ant at the same instant.
+export function naniticsImmortal(game) {
+  for (const challenge of CHALLENGES) {
+    if (!challenge.mastery || !challenge.mastery.lifespan) continue;
+    if (bestTrialLevel(game, challenge.id) > 0) return true;
+  }
+  return false;
+}
+
+// how much slower the brood runs on this attempt
+export function barrenHatchScale(game) {
+  if (!barrenActive(game)) return 1;
+  return Math.pow(BARREN_SCALE, Math.min(challengeLevel(game, "barren"), CHALLENGE_MAX_LEVEL - 1));
+}
+
+// how much of the base nest is left on this attempt
+export function sealedCapScale(game) {
+  if (!sealedActive(game)) return 1;
+  return Math.pow(SEALED_SCALE, Math.min(challengeLevel(game, "sealed"), CHALLENGE_MAX_LEVEL - 1));
+}
+
+// how many bought adaptation levels the colony may hold at once
+export function sterileAllowance(game) {
+  if (!sterileActive(game)) return Infinity;
+  const level = Math.min(challengeLevel(game, "sterile"), STERILE_ALLOWANCE.length - 1);
+  return STERILE_ALLOWANCE[level];
+}
+
+export function masteryBrood(game) {
+  return masteryOf(game, "brood");
+}
+
+export function masteryCap(game) {
+  return masteryOf(game, "cap");
+}
+
+// Sterile gives back the strength of what you buy, not a resource. The
+// multiplier lifts every additive adaptation effect; the level count raises how
+// far every line can be pushed.
+export function masteryUpgradeStrength(game) {
+  return masteryOf(game, "upgrades");
+}
+
+export function masteryUpgradeLevels(game) {
+  let total = 0;
+  for (const challenge of CHALLENGES) {
+    if (!challenge.mastery || !challenge.mastery.levels) continue;
+    total += challenge.mastery.levels * bestTrialLevel(game, challenge.id);
+  }
+  return total;
+}
+
 // how much harder this attempt's attackers are than the first
 // one source for how much harder an attempt's attackers are, so the cards, the
 // hover and the raid itself cannot drift apart
@@ -325,17 +494,20 @@ export function trialLevelsEver(game) {
   return Math.max(stat, challengeLevelsTotal(game));
 }
 
-// what this trial counts, read from the colony
-export function challengeProgress(game, population) {
+// What this trial counts, read from the colony. The caller passes the live
+// figures because this file cannot import ants.js -- ants.js imports it.
+export function challengeProgress(game, values) {
   const challenge = activeChallenge(game);
   if (!challenge) return 0;
-  return challengeTarget(challenge).kind === "raids"
-    ? (game.raidsWon || 0)
-    : population;
+  const kind = challengeTarget(challenge).kind;
+  if (kind === "raids") return game.raidsWon || 0;
+  if (kind === "foodRate") return (values && values.foodRate) || 0;
+  if (kind === "runFood") return (values && values.runFood) || 0;
+  return (values && values.population) || 0;
 }
 
-export function challengeTargetMet(game, population) {
+export function challengeTargetMet(game, values) {
   const challenge = activeChallenge(game);
   if (!challenge || challengeFailed(game)) return false;
-  return challengeProgress(game, population) >= challengeTarget(challenge).amount;
+  return challengeProgress(game, values) >= challengeTarget(challenge).amount;
 }

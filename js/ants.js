@@ -1,5 +1,8 @@
 import { CHALLENGES, bestTrialLevel, challengeDebuff, challengeReward, masteryFood,
-  siegeActive, SIEGE_UNLOCK } from "./challenges.js";
+  siegeActive, SIEGE_UNLOCK, barrenActive, sealedActive, sterileActive,
+  barrenHatchScale, sealedCapScale, sterileAllowance,
+  callowActive, callowCrowding, masteryNanitic, naniticsImmortal,
+  masteryBrood, masteryCap, masteryUpgradeStrength, masteryUpgradeLevels } from "./challenges.js";
 import {
   prestigeFoodMultiplier,
   prestigeBaseCap,
@@ -238,13 +241,22 @@ export const UPGRADES = [
         desc: "The first generation works itself to the bone." }
     ] },
 
-  { id: "nanitic_vigour", name: "Borrowed time", branch: "colony",
-    effect: { type: "naniticVigour" },
+  // This line used to buy the founders TIME -- a longer half-life and a longer
+  // life with it. Long Burning takes the lifespan away entirely from its first
+  // clear, which left these two upgrades selling something the trial gives for
+  // nothing. They buy the other thing a founder does instead: she does not only
+  // forage, she tends a chamber of the brood, and the opening is bound by brood
+  // throughput rather than by food.
+  //
+  // The id is unchanged on purpose. A save stores levels against it, and the
+  // migration from the retired nanitic_3 and nanitic_4 maps onto it.
+  { id: "nanitic_vigour", name: "The founders' chambers", branch: "colony",
+    effect: { type: "naniticSlots" },
     levels: [
-      { name: "Living Larder", cost: 500, req: { caste: "nanitic", count: 3 }, add: 1,
-        desc: "Nanitics store food in their own crops. They fade half as fast." },
-      { name: "Borrowed Time", cost: 1200, req: { caste: "nanitic", count: 4 }, add: 2,
-        desc: "They will not live to see the colony they build, but they last longer trying." }
+      { name: "Living Larder", cost: 500, req: { caste: "nanitic", count: 3 }, add: 0.5,
+        desc: "Nanitics store food in their own crops, and feed the brood from it. Each founder tends half a chamber more." },
+      { name: "Borrowed Time", cost: 1200, req: { caste: "nanitic", count: 4 }, add: 1,
+        desc: "They will not live to see the colony they build. They spend what time they have on it. Each founder tends a full chamber more." }
     ] },
 
   { id: "forager", name: "Foraging", branch: "colony",
@@ -369,8 +381,22 @@ export function upgradeLevel(game, line) {
 // given back: a trial pays into the thing it took, so Drought's cleared levels
 // raise the food lines and nothing else.
 export function upgradeMaxLevel(game, line) {
-  if (!line.mastery) return line.levels.length;
-  return line.levels.length + masteryLevels(game, line.mastery);
+  // Sterile pays into every line rather than into one kind of them, so its
+  // levels are added on top of whatever that line's own trial gives it
+  const universal = masteryUpgradeLevels(game);
+  if (!line.mastery) return line.levels.length + universal;
+  return line.levels.length + masteryLevels(game, line.mastery) + universal;
+}
+
+// Inside Sterile the colony may hold only so many bought levels at once, and
+// none at all on the last attempt. It is a count rather than a multiplier, so
+// it steps down attempt by attempt instead of scaling.
+export function upgradeAllowance(game) {
+  return sterileAllowance(game);
+}
+
+export function overAllowance(game) {
+  return levelsOwned(game, null) >= upgradeAllowance(game);
 }
 
 // Which upgrade lines a trial's mastery raises the cap on. The trials pay in
@@ -505,6 +531,7 @@ export function upgradeNeedsRaid(game, upgrade) {
 // gated on the NEXT level's requirement, so a line opens one rung at a time
 export function upgradeUnlocked(game, upgrade) {
   if (upgradeNeedsRaid(game, upgrade)) return false;
+  if (overAllowance(game)) return false;
   const next = Math.min(upgradeLevel(game, upgrade) + 1, upgradeMaxLevel(game, upgrade));
   const req = levelReq(upgrade, next);
   return runPeakCount(game, req.caste) >= req.count;
@@ -541,7 +568,14 @@ export function globalUpgradeMultiplier(game) {
 // Every level bought on every matching line. This is the one place the old
 // "is it owned" test became "how many levels", and everything that reads a rate
 // goes through here, so a line and its levels can never disagree with the game.
+// Sterile gives back the strength of what you buy, so its mastery lifts every
+// additive adaptation effect at once -- and unlike the level allowance it is
+// felt inside the trial too, on the few levels the colony is still allowed.
 function sumEffect(game, type, caste) {
+  return rawSumEffect(game, type, caste) * masteryUpgradeStrength(game);
+}
+
+function rawSumEffect(game, type, caste) {
   let total = 0;
   for (const line of UPGRADES) {
     const effect = line.effect;
@@ -607,7 +641,7 @@ export function casteMultiplier(game, casteId) {
 // how long the founders take to halve, stretched by the upgrades that buy them
 // time rather than output
 export function naniticHalflife(game) {
-  return NANITIC_HALFLIFE * (1 + sumEffect(game, "naniticVigour"));
+  return NANITIC_HALFLIFE / callowCrowding(game, game.ants.nanitic);
 }
 
 // The upgrades that slow the fade extend the life with it. Without this a
@@ -615,7 +649,12 @@ export function naniticHalflife(game) {
 // they were producing a quarter of their output -- the cliff the decay exists
 // to remove, handed back to the player who paid to avoid it.
 export function naniticLifespan(game) {
-  return NANITIC_LIFESPAN * (1 + sumEffect(game, "naniticVigour"));
+  // Inside the Nanitic Line nothing dies of old age -- the whole colony is
+  // founders sharing one clock, so a lifespan would end every ant at the same
+  // instant. Clearing that trial once buys the same thing for every colony
+  // afterwards, which is the trial giving back precisely what it took.
+  if (callowActive(game) || naniticsImmortal(game)) return Infinity;
+  return NANITIC_LIFESPAN;
 }
 
 export function naniticVigour(game) {
@@ -638,8 +677,15 @@ export function rallyMultiplier(game, casteId) {
 export function casteFoodPerSecond(game, casteId) {
   const base = FOOD_PER_SECOND[casteId];
   if (!base) return 0;
+  // Crowding bites on what a founder gathers, not only on how fast she fades.
+  // A shorter half-life is a weaker lever than a doubled output -- it only
+  // reduces what she makes later -- so as a pure decay debuff it lost to the x2
+  // mastery every time and the last level came in easier than the first. Now
+  // every founder takes something off every other founder, immediately, which
+  // is what makes "past a point, more of them is worse" true.
   const naniticMult = casteId === "nanitic"
-    ? prestigeNaniticMult(game) * naniticVigour(game)
+    ? prestigeNaniticMult(game) * naniticVigour(game) * masteryNanitic(game) /
+      callowCrowding(game, game.ants.nanitic)
     : 1;
   return (base + casteFlatBonus(game, casteId)) *
     casteMultiplier(game, casteId) * naniticMult * rallyMultiplier(game, casteId) *
@@ -699,22 +745,34 @@ export function foodPerSecond(game) {
 }
 
 export function populationCap(game) {
-  const perExcavator = CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
-  return BASE_POPULATION_CAP + prestigeBaseCap(game) + perExcavator * game.ants.excavator;
+  const perExcavator = sealedActive(game)
+    ? 0   // the soil sets like stone; diggers widen nothing
+    : CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
+  const base = (BASE_POPULATION_CAP + prestigeBaseCap(game)) * sealedCapScale(game);
+  return Math.max(1, Math.floor((base + perExcavator * game.ants.excavator) * masteryCap(game)));
 }
 
 export function hatchRate(game) {
-  return achievementHatchBonus(game);
+  return achievementHatchBonus(game) * barrenHatchScale(game);
+}
+
+export function slotsPerNanitic(game) {
+  return NANITIC_BROOD_SLOTS + sumEffect(game, "naniticSlots");
 }
 
 export function slotsPerNurse(game) {
+  // the whole point of Barren Brood: tend them all you like, nothing develops
+  // any faster for it
+  if (barrenActive(game)) return 0;
   return SLOTS_PER_NURSE + sumEffect(game, "nurseSlots");
 }
 
 export function broodCapacity(game) {
   return Math.max(1, Math.floor(
-    BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
-    slotsPerNurse(game) * game.ants.nurse + NANITIC_BROOD_SLOTS * game.ants.nanitic
+    (BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
+      slotsPerNurse(game) * game.ants.nurse +
+      slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game)) *
+    masteryBrood(game)
   ));
 }
 
@@ -737,6 +795,61 @@ export function eggPrice(casteId, n) {
   const curve = CASTE_COSTS[casteId] || CASTE_COSTS.forager;
   const exponent = curve.breakAt && n > curve.breakAt ? curve.exponent2 : curve.exponent;
   return curve.base * Math.pow(n, exponent);
+}
+
+// What a run of eggs costs, without adding them up one at a time. Egg n costs
+// base * n^e, so the total from stock+1 to stock+count is a sum of powers --
+// close enough to the integral of the same curve that the midpoint rule is
+// accurate to a fraction of a percent, and it is O(1) instead of O(count).
+//
+// This exists because the "Lay max (N)" label recomputed the count every frame
+// by walking one egg at a time: a colony that could afford 187,000 eggs did
+// 187,000 iterations per frame to draw a button, which is what froze the tab.
+function powerSum(base, exponent, from, to) {
+  if (to <= from) return 0;
+  const p = exponent + 1;
+  return base * (Math.pow(to + 0.5, p) - Math.pow(from + 0.5, p)) / p;
+}
+
+// small runs are summed exactly: the midpoint rule is at its worst on the first
+// few eggs, where the curve is steepest against the interval -- measured at 6%
+// out on a single egg from an empty colony, which is precisely the opening
+export const EXACT_BATCH = 32;
+
+export function eggBatchCost(casteId, stock, count) {
+  if (count <= 0) return 0;
+  if (count <= EXACT_BATCH) {
+    let total = 0;
+    for (let i = 1; i <= count; i++) total += eggPrice(casteId, stock + i);
+    return total;
+  }
+  const curve = CASTE_COSTS[casteId] || CASTE_COSTS.forager;
+  const from = stock;
+  const to = stock + count;
+  if (!curve.breakAt || to <= curve.breakAt) {
+    return powerSum(curve.base, curve.exponent, from, to);
+  }
+  if (from >= curve.breakAt) {
+    return powerSum(curve.base, curve.exponent2, from, to);
+  }
+  // the curve steepens partway through this batch, so it is two sums
+  return powerSum(curve.base, curve.exponent, from, curve.breakAt) +
+    powerSum(curve.base, curve.exponent2, curve.breakAt, to);
+}
+
+// the largest batch affordable on `budget`, found by bisection rather than by
+// counting. Deliberately never overshoots: layEggs() stops when the money runs
+// out anyway, so a label that is one low is harmless and one high is a lie.
+export function affordableBatch(casteId, stock, budget, limit) {
+  if (!(limit > 0) || !(budget > 0)) return 0;
+  if (eggBatchCost(casteId, stock, limit) <= budget) return limit;
+  let low = 0;
+  let high = limit;
+  while (low < high) {
+    const mid = Math.floor((low + high + 1) / 2);
+    if (eggBatchCost(casteId, stock, mid) <= budget) low = mid; else high = mid - 1;
+  }
+  return low;
 }
 
 export function eggCost(game, casteId) {
@@ -764,10 +877,13 @@ export function layableCastes() {
 }
 
 export function emergingCaste(game, egg, queuePosition) {
+  // in the Nanitic Line every daughter is a founder, whatever was laid
+  if (callowActive(game)) return "nanitic";
   const before = game.emerged + (queuePosition || 0);
   return before < NANITIC_GENERATION ? "nanitic" : egg.caste;
 }
 
 export function nextEggCaste(game) {
+  if (callowActive(game)) return "nanitic";
   return game.emerged + game.eggs.length < NANITIC_GENERATION ? "nanitic" : game.nextCaste;
 }

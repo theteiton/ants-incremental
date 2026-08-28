@@ -129,9 +129,12 @@ const BRANCH_TOTALS = {
 // do not grow by a ratio at all, so they state their own step.
 export const RUNG_HOURS = 2;
 
-// Every level of every trial that can actually be played. It was fixed at 5 --
-// one mastered trial -- which two playable trials already passed.
-export const TRIAL_TIER_TOP = CHALLENGE_MAX_LEVEL * CHALLENGES.filter(c => c.open).length;
+// Every level of every trial there will ever be -- counting the ones not built
+// yet, deliberately. Counting only the playable ones made this move each time a
+// trial opened, and because ladder() interpolates, moving the top shifts every
+// rung under it: going from two playable trials to five pushed the fifth rung
+// from 5 to 6 and took a tier off anyone standing on it.
+export const TRIAL_TIER_TOP = CHALLENGE_MAX_LEVEL * CHALLENGES.length;
 
 // rounds to something a player would recognise: 1, 1.5, 2, 3, 5, 7 x 10^k
 const NICE = [1, 1.5, 2, 3, 5, 7];
@@ -147,8 +150,14 @@ function niceNumber(value) {
   return Math.round(best * power);
 }
 
-// start, top and the ratio between rungs -> a strictly increasing ladder that
-// ends exactly on the top
+// A strictly increasing ladder that ends exactly on the stated top.
+//
+// It interpolates between start and top, which means the TOP MUST BE STABLE:
+// raise it and every rung underneath shifts, which silently takes tiers from
+// anyone who had already earned them. That is not hypothetical -- the trials
+// ladder was topped at "five levels per playable trial", and opening three more
+// trials moved its fifth rung from 5 to 6. Any top fed to this must be a figure
+// that does not move as content is added.
 export function ladder(start, top, step) {
   const rungs = Math.max(2, Math.round(Math.log(top / start) / Math.log(step)) + 1);
   const out = [];
@@ -157,7 +166,6 @@ export function ladder(start, top, step) {
     const value = niceNumber(raw);
     if (out.length === 0 || value > out[out.length - 1]) out.push(value);
   }
-  // the top is stated, so it is the top whatever the rounding did
   if (out[out.length - 1] !== top) {
     if (out[out.length - 1] > top) out.pop();
     out.push(top);
@@ -510,11 +518,11 @@ const UNLOCK_BOXES = [
         " times what she did. They stop being a curiosity and carry the colony until the deep forager upgrades land."
       : "Locked until your first nuptial flight." },
   { id: "autoshed", name: "Instinct to shed",
-    desc: "She has landed before. She sheds her wings without being told.",
+    desc: "She has landed before. She sheds her wings on touching down, and strips them for food without being told.",
     unlocked: () => autoShedUnlocked(),
     value: () => autoShedUnlocked() ? (autoShedOn() ? "On" : "Off") : "Locked",
     note: () => autoShedUnlocked()
-      ? "Unlocked — shedding her wings is automatic. Turn it on or off under Automation in Settings."
+      ? "Unlocked — she sheds on landing and strips each wing for food by herself. Turn it off under Automation in Settings."
       : "Locked until your first nuptial flight." }
 ];
 
