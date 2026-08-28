@@ -206,13 +206,13 @@ export const LIBRARY = [
     known: game => challengesUnlocked(game),
     short: "A colony founded on purpose under conditions that should kill it. Claim it or abandon it; you lose only the colony.",
     done: game => challengeLevelsTotal(game) > 0,
-    full: "The lineage's automation comes with you and its strength does not, and everything earned on the Achievements tab still pays. Each trial asks for the thing it is about — Drought asks for a colony, Endless Siege asks you to hold the gate." },
+    full: "The lineage's automation comes with you and its strength does not, and everything earned on the Achievements tab still pays. Each trial asks for the thing it is about: Drought, Barren Brood and Sterile ask for a colony of 600, Sealed Nest asks for a food rate from a nest that cannot widen, the Nanitic Line asks for what one burning-out generation can gather, and Endless Siege asks you to hold the gate for fifteen attacks without losing one." },
 
   { id: "mastery", group: "trials", term: "Mastery",
     known: game => challengesUnlocked(game),
     short: "What clearing a trial pays, permanently. Each trial gives back the thing it took away.",
     done: game => challengeLevelsTotal(game) > 0,
-    full: "Drought starves the colony and pays in food, as Deep Cisterns. Endless Siege demands soldiers and pays in soldiers, as Hardened Line. Both double per level cleared, both apply inside trials as well as outside, and both also raise the max level of every upgrade line that trial pays into." },
+    full: "Drought pays food as Deep Cisterns, Sealed Nest pays population cap as Hollowed Earth, Barren Brood pays brood as Warm Chambers, Endless Siege pays soldier strength as Hardened Line — all four double per level cleared. Sterile pays Learned by Heart, which raises the max level of every upgrade line and makes each level a quarter stronger; the Nanitic Line pays Long Burning, which stops the founders dying of old age and makes each of them better at everything. Every one of them applies inside trials as well as outside, or the ladder would stall at its second rung." },
 
   { id: "softcap", group: "trials", term: "Softcap",
     known: game => (game.achievementPoints || 0) > 40,
@@ -292,12 +292,21 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
-  { version: "0.1.7.0", name: "The library, and a much faster brood",
+  { version: "0.1.7.0", name: "Every trial playable, and a library",
     changes: [
+      "All six trials are open. Sealed Nest, Barren Brood, Sterile and the Nanitic Line join Drought and the Endless Siege, and each still gives back exactly the thing it took away.",
+      "Sealed Nest — excavators widen nothing and the nest is smaller with every attempt. It asks for a food rate rather than a headcount, because a colony that is not allowed to grow cannot be asked to grow. Clearing it doubles the population cap for good.",
+      "Barren Brood — nurses add no chambers at all, and the ones you have run colder each attempt, so growth is bound by time instead of by food. Clearing it doubles the brood for good.",
+      "Sterile — the colony may hold only ten bought adaptation levels at once, then seven, four, two, and none at all on the last attempt. Clearing it raises the max level of every upgrade line and makes every level you buy a quarter stronger.",
+      "The Nanitic Line — every egg hatches as a founder, whatever caste you chose, and the more founders there are the faster the whole generation fades. Nothing dies of old age in it; the line burns out instead, so the trial is finding how much one colony can gather before it does. The first clear stops the founders dying of old age in every colony afterwards.",
+      "Living Larder and Borrowed Time buy brood chambers now instead of a longer life, because the Nanitic Line hands the lifespan over for nothing.",
+      "The nest is attacked by something rather than by a number. Twenty-one named attackers, from the phorid fly to the elder wyrm, each drawn from the band its strength falls in.",
+      "How hard raids are is yours to choose. Sheltered, Unchecked, Hunted and Relentless, on the Combat tab once the siege has been cleared once — a colony that has mastered the trials outguns the next attacker several hundred times over, and this is the dial for that.",
       "A Library tab. Every term the game uses, written up in plain words — castes, resources, combat, the lineage, the trials. Entries appear as the colony meets them and fill out once it has actually done them.",
       "Laying thousands of eggs no longer freezes the tab. A colony that could afford a hundred thousand eggs was doing a hundred thousand sums every frame just to label the Lay max button.",
       "The instinct to shed now strips the wings as well. It only ever shed them before, which left four wings to click by hand every time you founded a colony.",
       "You can choose how many eggs a batch lays. Type a number beside the Lay buttons — 250, or 2k — instead of clicking ×10 over and over.",
+      "Numbers run to 10^63, and Settings offers scientific notation outright rather than handing it over when the suffixes run out.",
       "The food-reserve row no longer squeezes itself into three lines with half the panel empty beside it."
     ] },
 

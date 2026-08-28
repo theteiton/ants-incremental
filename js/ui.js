@@ -1165,6 +1165,10 @@ function listNames(names) {
 function masteryLineText(type) {
   const raised = linesWithMastery(type);
   if (type === "nanitic") return "the founders stop dying of old age from the first level";
+  // Sterile pays into every line rather than into one kind of them, so no line
+  // carries its tag -- and the card was reading that empty list as "nothing
+  // else" while it was in fact raising the max of all twelve
+  if (type === "upgrades") return "the max level of every upgrade line rises by one";
   if (!raised.length) return "nothing else";
   return raised.length === 1
     ? "the max level of " + raised[0].name + " rises by one"

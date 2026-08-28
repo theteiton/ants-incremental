@@ -13,6 +13,56 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.7.1 — 28 August 2026
+
+**Saying that four trials shipped, and laddering all six to see what happens.**
+
+The player-facing changelog for 0.1.7.0 never mentioned the four trials it
+opened. It listed the library, the brood fix and the batch field, and a player
+reading it had no way to learn that Sealed Nest, Barren Brood, Sterile and the
+Nanitic Line existed at all — nor the twenty-one named attackers, nor the raid
+difficulty setting. It names all six trials now, a line each for what the trial
+takes and what clearing it gives back. The `trial` and `mastery` library entries
+went the same way: both named only Drought and the Endless Siege, and `mastery`
+still claimed both rewards "double per level cleared" when Sterile pays ×1.25 and
+Long Burning ×1.6. The version stays 0.1.7.0, because `UPDATES` carries feature
+releases and correcting what an entry says is not one.
+
+**Sterile's card called its own reward "nothing else".** `masteryLineText()`
+lists the upgrade lines carrying a trial's mastery tag, and Sterile pays into
+every line rather than into one kind of them — so nothing carries the tag, the
+list came back empty, and the largest mastery in the game printed as nothing.
+`cap`, `brood` and `nanitic` genuinely raise no line and still read that way.
+
+**Then every trial was laddered 1 to 5 under one fixed policy**, driven by the
+game's own automation. Three things came out of it, none of them fixed here.
+
+Drought gates the rest and the game does not say so. Deep Cisterns is ×2 food a
+level, three of the six trials are measured in food, and ×32 settles all three:
+with no other trial cleared, Sealed Nest cannot clear level 1 at all (411/s
+against 2,500), the Nanitic Line cannot clear level 5 (a 32,798 ceiling against a
+38,000 target) and Sterile cannot clear 3, 4 or 5. With Drought mastered the same
+runs clear in twenty to thirty *seconds* a level. There is no window in which
+either is a trial.
+
+The excavator dig-out rule is an unbounded cap bypass inside Sealed Nest.
+Excavator eggs may exceed the cap because they dig their own chamber, which
+closes behind itself everywhere else because each one raises the cap; Sealed Nest
+sets that gain to zero, so it never closes — 1,631 ants against a cap of 30. And
+`managedCaste()` digs whenever the nest is tight, which under Sealed Nest is
+always, so Standing Orders spends the trial doing it unasked.
+
+Sterile is decided by whether Nest Memory is switched off. At an allowance of
+two, the automation spends both levels on `nanitic_food` and the colony stalls at
+445 ants; spent by hand on the forager line the same colony clears in 91.6
+minutes. Nothing refunds a level, so the choice is permanent and unstated.
+
+What held: forty-eight hours of a mastered colony under Unchecked with no NaN, no
+negative resource and no runaway, save round-trips exact, v6 migration intact,
+bad save codes refused, every achievement ladder increasing through its softcap,
+and the four raid difficulties at 659× / 234× / 8.6× / 5.2× — though none of them
+ever loses a raid.
+
 ## 0.1.7.0 — 27 August 2026
 
 **Every trial playable, a library, and a brood that does not freeze the tab.**

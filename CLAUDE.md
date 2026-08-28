@@ -355,6 +355,29 @@ rather than written out, so they cannot drift when a line is added or retagged.
 
 **The Library is the answer to "I understand less than half of that".** A playtester who had reached 187,000 ants said exactly that, and the explanations were not missing — they lived in hover text he had no reason to point at. Its own tab, unlocked by the colony's first achievement tier, holding 32 entries in six groups. An entry becomes *known* when the thing it describes is available and *expands* once the colony has actually done it, so a short definition arrives in time to be useful and the full one arrives when there is something to attach it to. Nothing undiscovered is listed at all. Beside it sits **What changed**, a player-facing changelog — deliberately not the devlog, which records why a decision was made and what was measured for whoever maintains the game.
 
+**The changelog has to name what shipped, or for the player the release did not
+happen.** 0.1.7.0's entry listed the library and the brood fix and never
+mentioned that four trials had opened — Sealed Nest, Barren Brood, Sterile and
+the Nanitic Line — nor the twenty-one named attackers, nor the raid difficulty
+setting. A player reading it had no way to learn the trials existed. It names all
+six now, a line each for what a trial takes away and what clearing it gives back,
+and the `trial` and `mastery` library entries were widened to match: both listed
+only Drought and the Endless Siege, and `mastery` still said "both double per
+level cleared" when two of the six do not double at all. **A version already on
+the list keeps its number**, so correcting what an entry *says* does not re-fire
+the tab dot for anyone who has read it — only a new feature release moves
+`latestVersion()`, and `UPDATES` has never carried a `.1` fix entry.
+
+**Sterile's card called its own reward "nothing else", and it is the largest one
+in the game.** `masteryLineText()` builds that half of the sentence from
+`linesWithMastery(type)`, which finds the lines carrying a trial's `mastery` tag.
+Sterile pays into *every* line rather than into one kind of them, so no line
+carries the `upgrades` tag, the list came back empty, and the card printed "and
+nothing else" for the one mastery that raises the max level of all twelve.
+`cap`, `brood` and `nanitic` really do raise no line and still read that way;
+`upgrades` is named explicitly now. A mastery whose type tags no line is the case
+to check whenever one is added.
+
 **Laying a large batch froze the tab, and it was two bugs.** `affordableEggs()` ran *every frame* to label the "Lay max (N)" button by walking one egg at a time, so a colony that could afford 187,000 eggs did 187,000 iterations a frame before anything was clicked. And `layEggs` re-counted the whole brood twice per egg, making laying quadratic: 60,000 eggs took 5.2 seconds. The price of a run of eggs now has a closed form — the sum of `base × n^exponent` is close enough to the integral of the same curve that the midpoint rule is exact to a fraction of a percent — bisected instead of counted, with small runs summed exactly because the rule is at its worst on the first few eggs. 60,000 eggs now take 8ms, and the label is free. The tick loop also stopped walking every queued egg to skip all but the tended ones.
 
 **Numbers run to 10^63**, and Settings offers scientific notation outright rather than handing it over unannounced when the suffixes run out. `parseAmount()` reads back every suffix `fmt()` writes, verified exact.
@@ -409,6 +432,59 @@ Gyroth and amsel both reached 1K+ ants. Done since: four nanitics, achievement d
 - **Big foragers fade.** Their count grows logarithmically — each threshold is 3.5× the last — while foragers grow linearly, so at 2.43K foragers eight of them are about 4% of production. Raising their multiplier does not fix that shape.
 - Scouts that forage outside the nest for protein — overlaps what soldiers already do between raids, so it needs its own constraint.
 - More achievement bonus types. Deferred by decision until a few prestige layers exist.
+
+---
+
+## Measured 28 August 2026 — the trial ladder
+
+Every trial laddered from level 1 to 5 under one fixed policy, driven by the
+game's own automation so the real code paths run. Nothing below is fixed yet.
+
+**The trials are gated behind Drought and nothing says so.** Deep Cisterns pays
+×2 food a level, so a mastered Drought is ×32 on every food figure in the game —
+and three of the six trials are measured in food. With no other trial cleared,
+Drought and Barren Brood both clear all five levels (Barren at 35 / 32 / 32 / 47
+/ 79m) and Endless Siege clears four; but **Sealed Nest cannot clear level 1**
+(the rate tops out at 411/s against a 2,500 target, 16% of it), **the Nanitic
+Line cannot clear level 5** (its ceiling is 32,798 food against a 38,000 target),
+and **Sterile cannot clear levels 3, 4 or 5** (463–552 ants against 600). With
+Drought mastered the same runs clear Sealed Nest in 24–36 *seconds* a level and
+the Nanitic Line in 18–30 seconds. There is no window in which either is a
+trial: impossible before Drought, a formality after. The measured 10–34m and
+12–50m in *Every trial is playable* above were taken on a colony that already
+held masteries; a first-time player meets neither number.
+
+**The excavator dig-out rule is an unbounded cap bypass inside Sealed Nest.**
+`broodSlots()` lets excavator eggs exceed the cap because an excavator digs the
+chamber she will occupy — outside a trial the exemption closes behind itself,
+since each one raises the cap. Sealed Nest sets that gain to zero, so it never
+closes: measured, hand-laying reached **1,631 ants against a cap of 30**. Worse,
+`managedCaste()` returns `excavator` whenever `cap - pop < max(8, pop × 0.12)`,
+which under Sealed Nest is permanently true, so Standing Orders does it unasked —
+49 of 75 ants after four hours were excavators, in the one trial measured on a
+food rate. The check counts digging eggs, not the population already over.
+
+**Sterile is decided by whether the player switches Nest Memory off.** At level 4
+the allowance is two bought levels. Nest Memory spends both on `nanitic_food`,
+which is worth nothing two hours in: 445 ants at three hours, never clears. The
+same colony with those two levels spent by hand on the forager line clears in
+**91.6 minutes**. Nothing gives an upgrade level back, so the allocation is
+permanent for that run, and the trial never says the choice was made.
+
+**What was measured and is sound.** Forty-eight hours of a fully mastered colony
+under Unchecked: no NaN, no negative resource, no runaway — level 35, 479W/0L,
+food/s 1.04e13, and every per-minute invariant held. Save export and import
+round-trip exactly, a v6 save migrates, and truncated or garbage codes are
+refused rather than thrown. The four raid difficulties measure 659× / 234× / 8.6×
+/ 5.2× defence against threat on a mastered colony, the shape the settings
+promise — though none of the four ever actually loses a raid. Every achievement
+ladder is strictly increasing through its softcap, and the library's predicates
+survive both a blank colony and a fully mastered one.
+
+**The pacing table above predates the achievement rework.** Measured now, the
+same policy reaches 1,000 ants at 60.9m idle and 47.7m rallying against the 93m
+and 64m recorded there. 0.1.6.0 says the rework moved it; the table was not
+moved with it.
 
 ---
 
