@@ -128,6 +128,7 @@ export function migrate(data) {
     }
     data.matriline = { haplotype: 0, haplotypeTotal: 0, resets: 0, species: null,
       finished: [], upgrades: [], flights: 0, trialLevels: 0 };
+    data.instincts = [];
     data.version = 8;
   }
   return data;
@@ -205,6 +206,7 @@ export function applySave(game, fresh, data) {
   game.seen = { upgrades: seen.upgrades || 0, tracks: seen.tracks || null,
     library: seen.library || 0, updates: seen.updates || "" };
   game.library = Object.assign({}, data.library || {});
+  game.instincts = Array.isArray(data.instincts) ? data.instincts.slice() : [];
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   // an array here is a save that predates lines; migrate() has already turned

@@ -15,6 +15,51 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.1.0 — 29 August 2026
+
+**What the line keeps.**
+
+Three changes, all about what survives when the matriline becomes something else.
+
+**A mastery is earned once and kept by every line.** Reading it per species meant
+food mastery fell from ×32 to ×1 the moment a line committed to a new species,
+which punished the player for using the layer at all. Clearing a trial unlocks
+its bonus and does nothing else; the per-species record still decides what a
+species is finished on, so the ladders are still worth replaying and no longer
+have to be. That also settles what the colony trials are for: a menu you take
+from for the mastery this line is short of, not six ladders to grind.
+
+**Each species has its own tab of adaptations**, four each, bought with Haplotype
+and held for good, paying only while that species is playing. That is what keeps
+their buffs from reading as one pile — and the species check enforcing it is
+load-bearing, because Eciton and Polyergus share a capture key outright and each
+one's branch had been silently buying the other's.
+
+**Achievement tiers finally buy something.** Eight permanent instincts priced at
+232 against a measured tier count of 131 at one hour and 192 at forty-eight, so a
+player buys about five of eight early and finishes the set over a long game.
+Spending never lowers the level: the level is computed from XP, and nothing in
+`instincts.js` touches XP.
+
+That last one exists because of a measurement. The six species passives — the
+entire permanent reward of layer 2 — were worth **nothing** to a growth run: level
+25 alone reaches 1,000 ants in 28.2m, level 25 with three species finished takes
+30.2m, and with all six, 30.2m, identical to three. Every one of them paid into
+combat, protein, salvage or the offline cap, and none touched food → eggs → ants,
+which is the whole game. The rule that no reward may multiply all food was right
+and I over-applied it; four of the eight instincts are scoped to cap, brood and
+hatch instead.
+
+**One crash, caught by the species sweep.** `export { foodPerProtein } from
+"./raids.js"` creates no local binding, so Myrmecocystus holding Overflow threw
+inside `tick()`. It fires for exactly one species holding exactly one node, which
+is why nothing but a sweep would have found it.
+
+Polyergus was trimmed twice on the way: her two new adaptations compound with
+each other, and at a digger cap of 4 she reached 103,476 ants against about
+24,000 for the field. At 2 she lands near twice it, which is what a species that
+grows only by war should be.
+
 ## 0.2.0.0 — 29 August 2026
 
 **The Matriline.**

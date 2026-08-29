@@ -46,6 +46,7 @@ import {
   upgradeUnlocked
 } from "./ants.js";
 import {
+  foodPerProtein,
   EGG_PROTEIN_COST,
   FED_EGG_SPEED,
   RAID_INTERVAL,
@@ -83,8 +84,11 @@ import {
   matrilineReady, matrilineJellyNeeded, matrilineVisible, matrilineCount,
   haplotypeEarned, haplotype, jellyBanked, jellyKept, inheritedPrestige,
   matrilineUpgradeById, matrilineUpgradeOwned, LINEAGE_COST,
-  speciesProteinCostMult, passiveFeedFree, dulosis, gardenActive
+  speciesProteinCostMult, passiveFeedFree, dulosis, gardenActive,
+  speciesOverflowsToProtein
 } from "./matriline.js";
+import { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctKeptFood
+} from "./instincts.js";
 import { discoverLibrary } from "./library.js";
 import {
   automationUnlocked,
@@ -118,6 +122,10 @@ export { GENERIC, SPECIES, SPECIES_TARGET, currentSpecies, playingSpecies, speci
   passiveCombat, passiveProtein, passiveHunt, passiveSalvage, passiveFeedFree,
   passiveOfflineHours, dulosis, nomadic } from "./matriline.js";
 export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
+export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent,
+  instinctBaseCap, instinctBrood, instinctCombat, instinctProtein, instinctHatch,
+  instinctOfflineHours, instinctKeptFood } from "./instincts.js";
+export { speciesTrialLevel } from "./challenges.js";
 export { challengeTarget, challengeTargetAmount, targetKind, challengeProgress, TARGET_KINDS,
   challengeFailed, challengeFailKind, FAIL_KINDS,
   callowActive, callowCrowding, masteryNanitic,
@@ -206,6 +214,9 @@ function blankGame() {
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
     seen: { upgrades: 0, tracks: null, library: 0, updates: "" },
     library: {},
+    // what achievement tiers have been spent on. Spending never lowers the
+    // level: the level is computed from XP and nothing here touches XP.
+    instincts: [],
     runTime: 0,
     run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0, foodEarned: 0, broodFull: 0 },
     best: { population: 0, jelly: 0, timeTo1000: 0 },
@@ -730,13 +741,19 @@ function refoundColony(extra) {
     library: game.library,
     queenName: game.queenName,
     challenges: game.challenges,
+    instincts: game.instincts,
     // The matriline outlives every colony AND every flight -- it is the layer
     // above them. Without this the reset wiped the species it had just
     // committed to, along with the whole tree that paid for the inheritance.
     matriline: game.matriline
   };
+  const keptFood = (game.food || 0) * instinctKeptFood(game);
   Object.assign(game, blankGame());
   Object.assign(game, surviving, extra || {});
+  // Living Memory: a daughter leaves with a full crop. Applied after the wipe
+  // rather than carried in `surviving`, because it is a share of what was
+  // standing and not a field that persists.
+  game.food = keptFood;
 }
 
 export function enterChallenge(id) {
@@ -826,6 +843,14 @@ export function doMatrilineReset(speciesId) {
     upgrades: inherited.filter(id => id !== "autoShed")
   };
   return earned;
+}
+
+export function buyInstinct(id) {
+  const instinct = instinctById(id);
+  if (!instinct || instinctOwned(game, id)) return false;
+  if (instinctPoints(game) < instinct.cost) return false;
+  game.instincts = (game.instincts || []).concat([id]);
+  return true;
 }
 
 export function buyMatrilineUpgrade(id) {
@@ -930,7 +955,18 @@ export function tick(dt) {
   // gathered it gathered -- the ladders count it -- but what it cannot hang up
   // it loses, so growing the nest is the only way to save.
   const holds = foodCap(game);
-  if (holds > 0 && game.food > holds) game.food = holds;
+  if (holds > 0 && game.food > holds) {
+    const spill = game.food - holds;
+    game.food = holds;
+    // Overflow renders what will not fit rather than losing it, at the rate the
+    // colony currently earns — the same rate the rendering pit trades at, so
+    // there is no loop to run between the two.
+    if (speciesOverflowsToProtein(game)) {
+      const rendered = spill / Math.max(1, foodPerProtein(game));
+      game.protein += rendered;
+      game.stats.proteinEarned = (game.stats.proteinEarned || 0) + rendered;
+    }
+  }
   // what THIS colony has gathered, which resets with it -- a trial that is
   // about sustaining output cannot be measured on a lifetime total
   if (game.run) game.run.foodEarned = (game.run.foodEarned || 0) + earned;

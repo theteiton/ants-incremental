@@ -1,9 +1,10 @@
 import { capPerExcavator, effectTotal, foodPerSecond, globalFoodMultiplier, population, populationCap, runPeakCount,
   SOLDIER_RANKS, RANK_IDS, rankOf, soldierCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
+import { instinctCombat, instinctProtein } from "./instincts.js";
 import {
-  passiveCombat, passiveProtein, passiveHunt, passiveSalvage,
-  speciesHuntMult, speciesLossMult, speciesRaidIntervalMult, speciesCapture, dulosis
+  passiveCombat, passiveProtein, passiveHunt, passiveSalvage, speciesHuntMult,
+  speciesLossMult, speciesRaidIntervalMult, speciesCapture, speciesCaptureDiggerMult, dulosis
 } from "./matriline.js";
 import { masterySoldier, bestTrialLevel, siegeActive, siegeThreatScale, challengeFailed,
   SIEGE_UNLOCK, SIEGE_INTERVAL, SIEGE_REFERENCE, SIEGE_BASE, SIEGE_LOSS_CAP,
@@ -102,7 +103,7 @@ export function combatPerCaste(game, caste) {
 export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
-  return power * passiveCombat(game);
+  return power * passiveCombat(game) * instinctCombat(game);
 }
 
 export function raidsSeen(game) {
@@ -144,7 +145,7 @@ export function huntRate(game) {
   if (!hunting(game)) return 0;
   return huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
     (1 + effectTotal(game, "proteinYield")) *
-    passiveHunt(game) * speciesHuntMult(game);
+    passiveHunt(game) * speciesHuntMult(game) * instinctProtein(game);
 }
 
 
@@ -356,7 +357,7 @@ export function proteinPurchaseCost(game, n) {
 export function raidRewards(game, power) {
   return {
     protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
-      (1 + effectTotal(game, "proteinYield")) * passiveProtein(game))),
+      (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) * instinctProtein(game))),
     food: power * FOOD_PER_POWER * globalFoodMultiplier(game)
   };
 }
@@ -369,7 +370,12 @@ export const DULOSIS_UNLOCK = 16;
 export const CAPTURE_FLOOR = 4;
 // the share of a capture that is somebody else's diggers
 export const CAPTURE_DIGGERS = 0.25;
-export const CAPTURE_DIGGER_CAP = 4;
+// Measured at 24 hours on a fully mastered colony with the whole tree bought:
+// at 4 Polyergus reaches 103,476 ants against about 24,000 for every other
+// species, because each captured digger is worth up to 58 cap once the
+// excavator line is deep and she wins 299 raids in a day. At 2 she lands near
+// twice the field, which is what a species that grows only by war should be.
+export const CAPTURE_DIGGER_CAP = 2;
 
 export function raidUnlockAt(game) {
   if (siegeActive(game)) return SIEGE_UNLOCK;
@@ -486,8 +492,9 @@ function captureBrood(game) {
   // against about 6,600 for every other species. Capped, the nest grows by a
   // fixed amount per raid WON, which is exactly what dulosis should be: she
   // grows by raiding and by nothing else, so the growth is linear in raids.
+  const diggerCap = CAPTURE_DIGGER_CAP * speciesCaptureDiggerMult(game);
   const diggers = capPerExcavator(game) > 0
-    ? Math.min(CAPTURE_DIGGER_CAP, Math.max(1, Math.round(want * CAPTURE_DIGGERS))) : 0;
+    ? Math.min(diggerCap, Math.max(1, Math.round(want * CAPTURE_DIGGERS))) : 0;
   // and a ceiling on the rest: the column carries what it can carry. Without it
   // Eciton walked its own captures past the nomadic cap -- 859 ants in a column
   // built for 500 -- which is the cap bypass again in a new coat.

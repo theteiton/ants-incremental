@@ -68,6 +68,7 @@ import {
   speciesBranchOwned,
   matrilineUpgradeOwned,
   buyMatrilineUpgrade,
+  buyInstinct,
   doMatrilineReset,
   matrilineReady,
   matrilineVisible,
@@ -180,6 +181,8 @@ import {
   buildAchievements,
   newTrackCount,
   renderAchievements,
+  renderInstincts,
+  setInstinctBuyer,
   seedSeenTracks
 } from "./achievements.js";
 import { drawSprite, spriteFor } from "./sprites.js";
@@ -1446,11 +1449,11 @@ function renderChallenges() {
     // nothing -- and is not meant to climb all of them. Which masteries this
     // line needs is the whole decision: the food ones or the fighting ones.
     (currentSpecies(game) !== GENERIC
-      ? " This line is " + speciesName(currentSpecies(game)) + ", and a trial is cleared " +
-        "as the species that cleared it — none of these are carried over from another line, " +
-        "and none of them have to be climbed. Take the ones this colony is short of: Drought " +
-        "and the Nanitic Line pay food, the Endless Siege pays fighting strength, Sealed Nest " +
-        "pays room, Barren Brood pays chambers, and Sterile pays into every adaptation line."
+      ? " This line is " + speciesName(currentSpecies(game)) + ", and the ladders start from " +
+        "nothing for her — but every bonus the matriline has ever earned is still paying, and " +
+        "always will be. Clearing a trial unlocks its bonus and nothing else, so none of these " +
+        "have to be climbed twice. Climb them as her for the points that finish a species, and " +
+        "for the compounding food a cleared level pays this colony."
       : "");
 
   const note = el("challengeRunning");
@@ -1588,7 +1591,7 @@ function render() {
   renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
-  else if (activeTab === "achievements") renderAchievements(game);
+  else if (activeTab === "achievements") { renderAchievements(game); renderInstincts(game); }
   else if (activeTab === "combat") renderFighters();
   else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "matriline") renderMatriline();
@@ -1614,8 +1617,26 @@ function render() {
 const speciesCards = {};
 const matUpgradeCards = {};
 let matPick = null;
+// "line" is the matriline itself -- the reset, the overview and the tree that
+// every species shares. Each species then has its own tab holding only its own
+// adaptations, which is what keeps their buffs from reading as one pile.
+let matSubTab = "line";
+
+function buildMatrilineTabs() {
+  const bar = el("matTabs");
+  const tabs = [{ id: "line", name: "The line" }].concat(
+    SPECIES.map(s => ({ id: s.id, name: s.name })));
+  for (const tab of tabs) {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.dataset.tab = tab.id;
+    button.addEventListener("click", () => { matSubTab = tab.id; render(); });
+    bar.appendChild(button);
+  }
+}
 
 function buildMatriline() {
+  buildMatrilineTabs();
   const list = el("matSpeciesList");
   for (const s of SPECIES) {
     const card = document.createElement("section");
@@ -1699,6 +1720,20 @@ function buildMatriline() {
 function renderMatriline() {
   const m = game.matriline || {};
   const line = currentSpecies(game);
+  const onLine = matSubTab === "line";
+  for (const button of el("matTabs").children) {
+    button.classList.toggle("active", button.dataset.tab === matSubTab);
+  }
+  // the reset only belongs on the line's own tab; a species tab is its
+  // adaptations and nothing else
+  el("matDesc").parentElement.hidden = !onLine;
+  el("matSpeciesHead").textContent = onLine ? "The species" : speciesName(matSubTab);
+  el("matUpgradeHead").textContent = onLine
+    ? "Matriline adaptations" : speciesName(matSubTab) + " adaptations";
+  el("matUpgradeNote").textContent = onLine
+    ? "Held by the line itself, whichever species it becomes."
+    : "Held by " + speciesName(matSubTab) + " for good, and paying only while she is the one " +
+      "being played \u2014 which is why one species' adaptations never turn up in another's.";
   el("matHaploTally").textContent = fmt(haplotype(game)) + " Haplotype";
   el("matSpeciesTally").textContent = "this line: " + speciesName(line);
   el("matResetTally").textContent = matrilineCount(game) === 1
@@ -1738,6 +1773,7 @@ function renderMatriline() {
 
   for (const s of SPECIES) {
     const ui = speciesCards[s.id];
+    ui.card.hidden = !onLine && matSubTab !== s.id;
     const finished = speciesFinished(game, s.id);
     const playing = line === s.id;
     const points = speciesPoints(game, s.id);
@@ -1764,6 +1800,7 @@ function renderMatriline() {
 
   for (const u of MATRILINE_UPGRADES) {
     const ui = matUpgradeCards[u.id];
+    ui.card.hidden = onLine ? !!u.species : u.species !== matSubTab;
     const owned = matrilineUpgradeOwned(game, u.id);
     const afford = haplotype(game) >= u.cost;
     ui.name.textContent = u.name;
@@ -2187,6 +2224,7 @@ buildRaidDifficulty();
 buildLibrary();
 buildUpdates();
 buildMatriline();
+setInstinctBuyer(id => { if (buyInstinct(id)) render(); });
 buildLibraryTabs();
 buildCombatTabs();
 buildRanks();

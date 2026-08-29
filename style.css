@@ -1022,3 +1022,10 @@ ul { list-style: none; margin: 0; padding: 0; }
 .mat-upgrade.expression { border-left: 3px solid var(--accent); }
 .mat-upgrade.species { border-left: 3px solid var(--dim); }
 .panel p.bottleneck.is-garden { border-left-color: var(--accent); color: var(--text); }
+
+/* Instincts — what achievement tiers buy. Permanent, so they read as earned
+   rather than as something the colony currently holds. */
+#instinctList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.upgrade.instinct { border-left: 3px solid var(--good); }
+#matTabs { margin: 10px 0 4px; }
+#matUpgradeNote { margin: 0 0 10px; font-size: 12px; }

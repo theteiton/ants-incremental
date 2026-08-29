@@ -5,7 +5,7 @@
 undecided, and every line of it is arguable until it lands. When something here
 ships, it moves into the canon files and comes out of this one.
 
-Last updated 29 August 2026, against 0.2.0.0.
+Last updated 29 August 2026, against 0.2.1.0.
 
 ---
 
@@ -123,21 +123,18 @@ was meant as one.
 
 ## Open decisions
 
-1. **The species passives are worth almost nothing, and they are the whole
-   permanent reward of the layer.** Measured at three hours on a matched policy:
-   level 25 alone reaches 1,000 ants at 28.2m; level 25 with three species
-   finished takes 30.2m; with all six, 30.2m — identical. Every one of the six
-   pays into combat, protein, salvage or the offline cap, and **none of them
-   touches the growth loop**, which is what the whole game is. The rule that no
-   mastery may multiply all food was right, but it was over-applied: a passive
-   scoped to brood slots, population cap, hatch speed or egg price moves a large
-   fraction of the loop without being a global multiplier. This needs deciding
-   before more species or matriline trials are built on top of it.
+1. **Do the species passives still need re-aiming?** 0.2.1.0 answered the
+   symptom rather than the cause: the Instincts tree now carries the
+   growth-shaped permanent progression the passives lacked, and each species has
+   four adaptations of its own. But the six passives themselves are unchanged and
+   still pay only into combat, protein, salvage and the offline cap, so finishing
+   a species is still not felt in a growth run. Re-aiming two of them at brood
+   and cap is the smallest fix if it should be.
 2. **Is Polyergus too strong?** Measured at 24 hours with every passive live and
-   the whole tree bought: 55,211 ants and 4.08e6 food/s against about 24,000 and
+   the whole tree bought: 51,889 ants and 3.70e6 food/s against about 24,000 and
    2.7e6 for the other four non-nomadic species. Growth is linear in raids won
    rather than exponential, which was the fix — but she wins 239 raids in a day.
-   The dial is `CAPTURE_DIGGER_CAP`, currently 4.
+   The dial is `CAPTURE_DIGGER_CAP`, cut from 4 to 2 in 0.2.1.0 after her two new adaptations compounded her to 103,476.
 3. **Should Eciton be able to flight at all?** Her nomadic cap is 1,400 purely so
    she can clear the 1,000-ant flight gate. That is the gate driving the design
    rather than the other way round. A species-scoped flight gate would be

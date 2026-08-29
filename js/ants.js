@@ -1,5 +1,8 @@
 import {
-  gardenActive, gardenMultiplier, speciesCapMult, speciesBroodAdd,
+  instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours
+} from "./instincts.js";
+import {
+  gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
   speciesFoodCapPerAnt, dulosis, passiveOfflineHours
 } from "./matriline.js";
@@ -742,7 +745,8 @@ export function gardenBringing(game) {
 }
 
 export function gardenCapacity(game) {
-  return (GARDEN_BASE + game.ants.nurse * GARDEN_PER_NURSE) * gardenMultiplier(game);
+  return (GARDEN_BASE + game.ants.nurse * GARDEN_PER_NURSE * gardenNurseMultiplier(game)) *
+    gardenMultiplier(game);
 }
 
 export function gardenThrottle(game) {
@@ -769,7 +773,7 @@ export function foodCap(game) {
 // Myrmecocystus banks its own passive here too -- the social stomach is what
 // keeps the colony working while nobody is watching.
 export function offlineCapSeconds(game) {
-  return (8 + passiveOfflineHours(game)) * 3600;
+  return (8 + passiveOfflineHours(game) + instinctOfflineHours(game)) * 3600;
 }
 
 export function bigForagerThreshold(game) {
@@ -822,15 +826,15 @@ export function capPerExcavator(game) {
 
 export function populationCap(game) {
   const base = nomadic(game)
-    ? nomadCap(game)
-    : (BASE_POPULATION_CAP + prestigeBaseCap(game)) * sealedCapScale(game);
+    ? nomadCap(game) + instinctBaseCap(game)
+    : (BASE_POPULATION_CAP + prestigeBaseCap(game) + instinctBaseCap(game)) * sealedCapScale(game);
   return Math.max(1, Math.floor(
     (base + capPerExcavator(game) * game.ants.excavator) *
     masteryCap(game) * speciesCapMult(game)));
 }
 
 export function hatchRate(game) {
-  return achievementHatchBonus(game) * barrenHatchScale(game);
+  return achievementHatchBonus(game) * barrenHatchScale(game) * instinctHatch(game);
 }
 
 export function slotsPerNanitic(game) {
@@ -849,7 +853,7 @@ export function broodCapacity(game) {
     (BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
       slotsPerNurse(game) * game.ants.nurse +
       slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game) +
-      speciesBroodAdd(game)) *
+      speciesBroodAdd(game) + instinctBrood(game)) *
     masteryBrood(game)
   ));
 }

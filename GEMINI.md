@@ -82,6 +82,7 @@ js/game.js          state object, tick loop, exiling
 js/prestige.js      prestige formulas, upgrades, flight reset
 js/species.js       the six species: their actives, their passives
 js/matriline.js     layer 2: the reset, the Haplotype, the matriline tree
+js/instincts.js     what achievement tiers buy, and what they do
 js/save.js          save keys, migrations, the one-tab lock, import and export
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
@@ -520,6 +521,71 @@ survives the reset can be collected against twice. `4 × flights^0.7 × (1 + tri
 levels / 8)`, measured at 6.5 for a thin matriline and 88.8 for a deep one
 against a tree costing 199.
 
+
+**A mastery is earned once and kept by every line.** `bestTrialLevel()` reads the
+deepest level *any* species has reached, so it is a high-water mark across the
+whole game and no reset walks it back. Reading it per species made every
+matriline a cliff: measured, food mastery fell from ×32 to ×1 the moment the line
+committed to a new species, which punished the player for using the layer.
+**Clearing a trial unlocks its bonus and does nothing else.** The per-species
+record still exists as `speciesTrialLevel()` and still decides what a species is
+finished on — it just does not gate the bonus.
+
+**The colony trials are a menu, not a ladder.** A new species starts every
+layer-1 ladder from nothing and is not meant to climb all six; the player takes
+the ones that line is short of. Drought and the Nanitic Line pay food, the
+Endless Siege pays fighting strength, Sealed Nest pays room, Barren Brood pays
+chambers, Sterile pays into every adaptation line. Three of the nine at five
+levels is about 45 hours across six matrilines; all six ladders six times over is
+134 measured hours, which is a wall whether or not it was meant as one. The
+Trials tab says this outright while a species is playing.
+
+**Each species has its own tab of adaptations, and that is what keeps their buffs
+apart.** Four nodes each, bought with Haplotype, held for good, paying only while
+that species is being played. `branchApplies()` is load-bearing rather than
+decoration: without the species check, Second Queen raised the cap of whatever
+line was actually playing, and Eciton and Polyergus share the `captureMult` key
+outright, so each one's branch silently bought the other's — measured, a mastered
+Eciton column held 3,150 against a nomadic cap of 2,100. **A new species node
+must either use a key no other species uses, or be covered by that check.**
+
+**Instincts are what achievement tiers buy**, in `js/instincts.js`. Tiers were
+pure scoring — they fed XP, XP fed a level, the level paid three fixed bonuses,
+and nothing ever spent them; the deferred note for this has been in these files
+since the 20 August playtest and two layers now exist. Eight nodes costing 232
+against a measured tier count of 131 at one hour and 192 at forty-eight, so a
+player buys about five of eight early and finishes the set over a long game.
+
+**Spending never lowers the achievement level.** The level is computed from XP
+and the XP from tiers, neither of which `instincts.js` touches; a cost is
+subtracted only from the pool that file reports. **Four of the eight move the
+growth loop** — cap, brood, hatch, cap again — which is precisely what the species
+passives turned out not to do. Measured, level 25 with no species finished
+reaches 1,000 ants in 28.2m; with three species finished, 30.2m; with all six,
+30.2m, identical to three, because every passive paid into combat, protein,
+salvage or the offline cap and none touched food → eggs → ants. The rule that no
+mastery may multiply all food was right and was over-applied: a reward scoped to
+cap or brood moves a large fraction of the loop without being a global multiplier.
+
+**`js/instincts.js` imports nothing**, for the same reason `species.js` does not:
+`ants.js` cannot import `achievements.js` without evaluating it before `UPGRADES`
+exists. Anything `ants.js` or `raids.js` must read has to live in a leaf module.
+
+**A re-export is not an import.** `export { foodPerProtein } from "./raids.js"`
+creates no local binding, so Myrmecocystus holding Overflow threw
+`foodPerProtein is not defined` inside `tick()` — a crash that fires for one
+species holding one node, and the 24-hour species sweep is what caught it. The
+same trap had already cost a pass on `sterileActive` and on `capPerExcavator`.
+When a symbol is used rather than merely forwarded, it needs a real `import`.
+
+**Polyergus grows only by war, and the slope is `CAPTURE_DIGGER_CAP`.** Each
+captured digger is worth up to 58 cap once the excavator line is deep, and she
+wins 299 raids in a day, so the constant is the whole difference between a
+species and a runaway: measured at 24 hours fully mastered, 4 gives 103,476 ants
+against about 24,000 for the field, and 2 gives 51,889. Her growth is linear in
+raids won either way — the cap is what sets how steep that line is.
+
+---
 
 ## Playtest feedback — 23 August 2026
 

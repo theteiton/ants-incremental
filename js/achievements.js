@@ -11,6 +11,8 @@ import {
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch } from "./panels.js";
 
+import { INSTINCTS, instinctOwned, instinctPoints } from "./instincts.js";
+
 const el = id => document.getElementById(id);
 
 // A tier is not worth the same as every other tier. The first rung of a track
@@ -448,7 +450,8 @@ const trackRows = {};
 
 const ACH_TABS = [
   { id: "tracks", name: "Tracks" },
-  { id: "bonuses", name: "Bonuses" }
+  { id: "bonuses", name: "Bonuses" },
+  { id: "instincts", name: "Instincts" }
 ];
 let achTab = "tracks";
 
@@ -548,10 +551,15 @@ export function selectAchievementTab(name) {
   achTab = name;
   el("achievementPanel-tracks").hidden = name !== "tracks";
   el("achievementPanel-bonuses").hidden = name !== "bonuses";
+  el("achievementPanel-instincts").hidden = name !== "instincts";
   for (const button of el("achievementTabs").children) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
 }
+
+let onBuyInstinct = () => {};
+
+export function setInstinctBuyer(fn) { onBuyInstinct = fn; }
 
 export function buildAchievements(game) {
   ACH_TABS.forEach(tab => {
@@ -564,6 +572,7 @@ export function buildAchievements(game) {
   BONUS_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
   TRIAL_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
   UNLOCK_BOXES.forEach(entry => buildBox(el("unlockList"), entry, game));
+  buildInstincts(onBuyInstinct);
   selectAchievementTab("tracks");
   buildTracks(game);
 }
@@ -617,6 +626,51 @@ function buildTracks(game) {
     };
     list.appendChild(row);
   });
+}
+
+const instinctCards = {};
+
+// Tiers finally buy something. Cards are built once and never reparented -- a
+// node detached between mousedown and mouseup never receives its click, which is
+// what once made upgrades unbuyable.
+function buildInstincts(onBuy) {
+  const list = el("instinctList");
+  if (!list || list.children.length) return;
+  for (const instinct of INSTINCTS) {
+    const card = document.createElement("button");
+    card.className = "upgrade instinct";
+    card.innerHTML = '<div class="upgrade-head"><b></b><span class="upgrade-level"></span></div>' +
+      '<span class="upgrade-desc"></span><span class="upgrade-cost"></span>';
+    card.addEventListener("click", () => onBuy(instinct.id));
+    list.appendChild(card);
+    instinctCards[instinct.id] = { card, name: card.querySelector("b"),
+      level: card.querySelector(".upgrade-level"), desc: card.querySelector(".upgrade-desc"),
+      cost: card.querySelector(".upgrade-cost") };
+  }
+}
+
+export function renderInstincts(game) {
+  const available = instinctPoints(game);
+  el("instinctIntro").textContent =
+    "Every tier the colony has ever earned is a point, and these are what points buy. " +
+    "Spending never lowers your achievement level \u2014 the level is what the tiers scored, and " +
+    "this is what they can be traded for. Nothing here is ever lost: an instinct is held " +
+    "through a nuptial flight, a matriline and a trial alike. " +
+    available + " of " + (game.achievementPoints || 0) + " points unspent.";
+  for (const instinct of INSTINCTS) {
+    const ui = instinctCards[instinct.id];
+    if (!ui) continue;
+    const owned = instinctOwned(game, instinct.id);
+    const afford = available >= instinct.cost;
+    ui.name.textContent = instinct.name;
+    ui.level.textContent = owned ? "held" : "";
+    ui.desc.textContent = instinct.desc;
+    ui.cost.textContent = owned ? "held" : instinct.cost + " points";
+    ui.cost.classList.toggle("affordable", !owned && afford);
+    ui.cost.classList.toggle("owned-tag", owned);
+    ui.card.classList.toggle("owned", owned);
+    ui.card.disabled = owned || !afford;
+  }
 }
 
 export function renderAchievements(game) {

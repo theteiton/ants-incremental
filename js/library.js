@@ -215,7 +215,7 @@ export const LIBRARY = [
     known: game => challengesUnlocked(game),
     short: "What clearing a trial pays, permanently. Each trial gives back the thing it took away.",
     done: game => challengeLevelsTotal(game) > 0,
-    full: "Drought pays food as Deep Cisterns, Sealed Nest pays population cap as Hollowed Earth, Barren Brood pays brood as Warm Chambers, Endless Siege pays soldier strength as Hardened Line — all four double per level cleared. Sterile pays Learned by Heart, which raises the max level of every upgrade line and makes each level a quarter stronger; the Nanitic Line pays Long Burning, which stops the founders dying of old age and makes each of them better at everything. Every one of them applies inside trials as well as outside, or the ladder would stall at its second rung." },
+    full: "A mastery is earned once and held for good, by every line the matriline ever becomes \u2014 clearing a trial unlocks its bonus and does nothing else, so a new species keeps everything the last one learned. Drought pays food as Deep Cisterns, Sealed Nest pays population cap as Hollowed Earth, Barren Brood pays brood as Warm Chambers, Endless Siege pays soldier strength as Hardened Line — all four double per level cleared. Sterile pays Learned by Heart, which raises the max level of every upgrade line and makes each level a quarter stronger; the Nanitic Line pays Long Burning, which stops the founders dying of old age and makes each of them better at everything. Every one of them applies inside trials as well as outside, or the ladder would stall at its second rung." },
 
   { id: "softcap", group: "trials", term: "Softcap",
     known: game => (game.achievementPoints || 0) > 40,
@@ -235,6 +235,12 @@ export const LIBRARY = [
     short: "What the line becomes. Six real subfamilies, each with a half that rewrites the game and a half that pays for ever.",
     done: game => SPECIES.some(s => speciesFinished(game, s.id)),
     full: "The active half rewrites a mechanic and runs only while you are playing that species. The passive half is a plain modifier and pays at full strength for ever once the species is finished, whichever line you play next. So no matriline is ever wasted and no choice is ever regretted: what a run buys is another permanent passive, and what it costs is only the time. Finishing one takes twenty points \u2014 two for a trial level cleared as it, one for a nuptial flight as it, four for each of its own two adaptations \u2014 so the trials are the fast road and never the only one." },
+
+  { id: "instinct", group: "matriline", term: "Instinct",
+    known: game => (game.achievementPoints || 0) > 8,
+    short: "What achievement tiers buy. Every tier the line has ever earned is a point, and points buy instincts.",
+    done: game => (game.instincts || []).length > 0,
+    full: "Spending never lowers your achievement level \u2014 the level is what the tiers scored, and this is what they can be traded for besides. Nothing here is ever lost: an instinct is held through a nuptial flight, a matriline and a trial alike, which makes it the only thing in the game that only ever grows. Four of the eight move the growth loop \u2014 population cap, brood chambers, hatch speed \u2014 which is the part of the game every other permanent reward turned out not to touch." },
 
   { id: "haplotype", group: "matriline", term: "Haplotype",
     known: game => matrilineVisible(game),
@@ -320,6 +326,14 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.1.0", name: "What the line keeps",
+    changes: [
+      "A trial mastery is earned once and kept by every line. Clearing a trial unlocks its bonus and nothing else, so becoming a new species never costs you the food, the strength or the room the matriline had already learned \u2014 it only starts the ladders again.",
+      "Every species has its own tab of adaptations, bought with Haplotype and held for good. Four each, and they pay only while that species is the one being played, so no two species\u2019 buffs ever pile up together.",
+      "Achievement tiers finally buy something. The Instincts page spends them on eight permanent traits \u2014 population cap, brood chambers, hatch speed, fighting strength, protein, offline time, and a crop of food that survives every reset. Spending never lowers your level, and nothing there is ever lost.",
+      "Atta can widen her garden by teaching her nurses to chew; Solenopsis can seat a third queen; Camponotus can cut into the heartwood; Eciton can bivouac; Myrmecocystus can render what will not fit rather than lose it; Polyergus can take the diggers as well as the workers."
+    ] },
+
   { version: "0.2.0.0", name: "The Matriline",
     changes: [
       "A second prestige layer. Once the Royal Lineage is complete and the line has gathered enough Royal Jelly in all, the queen can begin a matriline \u2014 and every trial level the line has ever mastered cuts the jelly it asks for, so clearing trials is the fast road there and never the only one.",
@@ -331,7 +345,7 @@ export const UPDATES = [
       "Eciton has no nest at all. The column holds what it holds, something finds you two and a half times as often, and a raid you win is a raid you took something from.",
       "Solenopsis lays from several queens at once; Camponotus recycles nitrogen and cuts her chambers from wood; Myrmecocystus keeps her whole store in the bodies of living ants, so growing the nest is the only way to save.",
       "Trial clears are recorded per species now. Playing as Atta re-earns the ladders as Atta, and everything cleared before this belongs to the common line \u2014 the first run is common ants, and it always was.",
-      "Finishing a species takes twenty points: two for a trial level cleared as it, one for a nuptial flight as it, four for each of its own two adaptations."
+      "Finishing a species takes twenty points: two for a trial level cleared as it, one for a nuptial flight as it, four for each of its first two adaptations."
     ] },
 
   { version: "0.1.8.0", name: "Trials you can actually reach, and a colony that says what it is short of",

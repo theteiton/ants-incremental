@@ -504,7 +504,33 @@ export function challengeReward(game) {
 // The deepest level ever reached in one particular trial. Read from a lifetime
 // stat as well as the colony, because cleared levels live on the colony and a
 // deeper reset would otherwise take an achievement back.
-export function bestTrialLevel(game, id, speciesId) {
+// A mastery, once earned, is held for good and by every line. Clearing a trial
+// unlocks its bonus and does nothing else — so a matriline that becomes a new
+// species keeps the x32 food it already had rather than dropping to x1, which is
+// what reading this per species did, and it made every reset a cliff.
+//
+// The deepest level ANY line has reached, so it is a high-water mark across the
+// whole game and no reset of any kind can walk it back. The per-species record
+// still exists and still matters: it is what a species is finished on and why
+// the ladders are worth replaying. It just does not gate the bonus.
+export function bestTrialLevel(game, id) {
+  let top = 0;
+  const best = (game.stats && game.stats.bestTrial) || {};
+  for (const line in best) {
+    const held = best[line];
+    if (held && (held[id] || 0) > top) top = held[id];
+  }
+  const cleared = game.challenges || {};
+  for (const line in cleared) {
+    const held = cleared[line];
+    if (held && (held[id] || 0) > top) top = held[id];
+  }
+  return top;
+}
+
+// what ONE line has done with this trial, which is what finishing a species
+// counts and what the per-species records are for
+export function speciesTrialLevel(game, id, speciesId) {
   const key = speciesId || currentSpecies(game);
   const best = (game.stats && game.stats.bestTrial && game.stats.bestTrial[key]) || {};
   return Math.max(best[id] || 0, challengeLevel(game, id, key));
