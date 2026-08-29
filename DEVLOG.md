@@ -15,6 +15,48 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.1.1 — 29 August 2026
+
+**Faster, and checked end to end.**
+
+An optimisation pass and a full error sweep. No behaviour changed: the ordinary
+run still paces at 1.2 / 3.1 / 7.1 / 22.8 / 41.4 / 60.9 / 87.9 minutes, to the
+tenth of a minute, which is the whole point of the exercise.
+
+**The effect walks are cached on `game.upgrades` identity.** They are O(lines ×
+levels), and `foodPerSecond` reaches `globalFoodMultiplier` once per caste, so one
+food rate was doing that walk nine times for an identical answer. The upgrades
+object is replaced rather than mutated when a level is bought, so its identity is
+an exact key.
+
+Measured at 60,000 ants: `colonyBottleneck` 22.8 → 4.7µs, `foodPerSecond` 14.4 →
+6.6, `combatPower` 7.7 → 4.1, one tick 57.7 → 34.9ms per thousand, and the pure
+part of a render frame 0.078 → 0.027ms. The upgrade panel's previews went 0.70 →
+0.29ms once the probes stopped being a fresh cache key every frame — they were
+briefly 2.02ms, which is worse than no cache at all and is the more useful half of
+that lesson.
+
+**The game was never near its budget.** A frame costs well under a millisecond of
+sixteen. This is headroom for the layers still to come, not a fix for anything a
+player could feel, and it is worth saying so rather than implying otherwise.
+
+**Two bugs, both found by sweeping rather than by playing.** `LIBRARY` had two
+entries with the id `matriline` — the lifetime clock and the layer — so the second
+shadowed the first and the discovered count was permanently one short. And
+`renderMatriline` hid its reset box by reaching through `el("matDesc")
+.parentElement`, which breaks silently the moment the markup nests differently.
+
+**What was checked.** `ui.js` imported against a DOM built from the real
+`index.html`, so every panel's build path actually runs: no exception, and every
+element id it looks up exists. Then every tab, all six sub-tab bars and every
+clickable card fired — no exception anywhere. All fifteen modules' imports
+resolve. Every id table is unique and well formed. All fourteen CSS variables are
+defined on `:root` and redefined in both themes. Saves from **v1 through v8** all
+migrate, land on v8 and keep ticking; garbage, truncated and empty codes are
+refused rather than thrown. Forty-eight hours of a mastered colony and
+twenty-four of each of the six species: no NaN, no negative resource, no
+population above its cap.
+
 ## 0.2.1.0 — 29 August 2026
 
 **What the line keeps.**

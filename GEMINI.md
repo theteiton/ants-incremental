@@ -587,6 +587,51 @@ raids won either way — the cap is what sets how steep that line is.
 
 ---
 
+**The effect walks are cached on `game.upgrades` identity.** `rawSumEffect` and
+`productEffect` are O(lines × levels held), and `foodPerSecond` reaches
+`globalFoodMultiplier` once per caste — so a single food rate did that walk nine
+times over for an identical answer. `game.upgrades` is **replaced** rather than
+mutated when a level is bought, so its object identity is an exact cache key: a
+different object means different levels. A WeakMap holds it, so the upgrade
+panel's probe objects are collected rather than accumulated.
+
+**A cache key that is fresh every frame is worse than no cache.** The upgrade
+panel builds a probe per line per frame, and each one was a brand new key: the
+panel went from 0.70ms a frame to **2.02ms**, because every probe allocated a
+Map, filled it, and dropped it. The fix is that the probe has to be fresh — it is
+measured against the colony standing now — but the *levels map inside it* does
+not, so those are held stable per line-and-level until something is bought.
+0.29ms after, against 0.70 before any of this.
+
+**Measured at 60,000 ants**, before → after: `colonyBottleneck` 22.8 → 4.7µs,
+`foodPerSecond` 14.4 → 6.6, `combatPower` 7.7 → 4.1, `broodCapacity` 3.1 → 1.7,
+`populationCap` 2.8 → 1.0; one tick 57.7 → 34.9ms per thousand; the pure part of a
+render frame 0.078 → 0.027ms. **The game was never near its budget** — a frame
+costs under a millisecond of sixteen — so this is headroom for the layers still
+to come rather than a fix for anything a player could feel.
+
+**`colonyBottleneck` was the most expensive single call in the game** at 22.8µs,
+because it runs every frame and asked for the population cap five times over and
+chose the automation caste before it knew whether it needed one. It is the same
+answer, asked once.
+
+**A hidden upgrade card is not rendered.** The preview copies the whole game
+object and recomputes the food rate, the cap, the brood and the fighting strength
+against it; with a branch filter or Hide owned on, most of the twelve are hidden
+and none of that work is read.
+
+**Two entries may never share an id.** `LIBRARY` had two called `matriline` — the
+lifetime clock, from before layer 2, and the layer itself — so the second
+shadowed the first in the index and the discovered count was permanently one
+short of the list. The clock is `matrilineAge` now. Every id table in the game is
+swept for this.
+
+**Nothing reaches for `parentElement` to find a panel.** `renderMatriline` hid its
+reset box through `el("matDesc").parentElement`, which is a silent break the
+moment the markup nests differently. The box has its own id.
+
+---
+
 ## Playtest feedback — 23 August 2026
 
 From the itch.io comments: CoolRadGamer, Akami and sir_pinski.

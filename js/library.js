@@ -192,7 +192,11 @@ export const LIBRARY = [
     done: game => (game.prestige.royalJellyTotal || 0) > 0,
     full: "Thirteen adaptations to spend it on. Eight make the next colony stronger, four sell automation, and the last one opens the Trials." },
 
-  { id: "matriline", group: "prestige", term: "Matriline",
+  // The layer took the bare name in 0.2.0.0, so the older entry -- which is
+  // about the clock in the header rather than about the layer -- keeps its own
+  // id. Two entries sharing one id means the second silently shadows the first
+  // in the index and the discovered count is wrong by one.
+  { id: "matrilineAge", group: "prestige", term: "Matriline age",
     known: game => (game.prestige.flightsTaken || 0) > 0,
     short: "The whole line of queens, mother to daughter. The clock that never resets.",
     done: game => (game.stats.playtime || 0) > 7200,

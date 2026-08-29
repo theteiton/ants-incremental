@@ -1726,7 +1726,7 @@ function renderMatriline() {
   }
   // the reset only belongs on the line's own tab; a species tab is its
   // adaptations and nothing else
-  el("matDesc").parentElement.hidden = !onLine;
+  el("matResetBox").hidden = !onLine;
   el("matSpeciesHead").textContent = onLine ? "The species" : speciesName(matSubTab);
   el("matUpgradeHead").textContent = onLine
     ? "Matriline adaptations" : speciesName(matSubTab) + " adaptations";

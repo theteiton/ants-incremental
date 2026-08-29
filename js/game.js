@@ -409,15 +409,19 @@ function sampleBottleneck(dt) {
 export function colonyBottleneck() {
   if (!game.wingsShed || game.emerged === 0) return null;
   const run = game.run || {};
-  const caste = autoCaste();
-  const cost = eggCost(game, caste);
   const full = Math.round(Math.min(1, run.broodFull || 0) * 100);
-  if (broodSpace() <= 0 && capPerExcavator(game) > 0) {
-    return { key: "cap", text: "The nest is full — " + population(game) + " ants in a cap of " +
-      populationCap(game) + ". Only excavators can be laid until it is widened." };
-  }
-  if (broodSpace() <= 0) {
-    return { key: "sealed", text: "The nest is full at " + populationCap(game) +
+  // The cap and the space are read several times below and autoCaste() walks
+  // every layable caste, so both are computed once. This runs every frame and
+  // was the most expensive single call in the game at 22.8us; the answers are
+  // the same, they are just not asked for five times over.
+  const space = broodSpace();
+  if (space <= 0) {
+    const cap = populationCap(game);
+    if (capPerExcavator(game) > 0) {
+      return { key: "cap", text: "The nest is full — " + population(game) + " ants in a cap of " +
+        cap + ". Only excavators can be laid until it is widened." };
+    }
+    return { key: "sealed", text: "The nest is full at " + cap +
       " and nothing here widens it. What the ants you have produce is the whole game." };
   }
   // Atta's whole shape, said out loud. Foragers bringing back more leaves than
@@ -432,6 +436,8 @@ export function colonyBottleneck() {
         "can turn over, and the rest rots. Nurses widen the garden; more foragers do not." };
     }
   }
+  // only now is the caste needed, and choosing it is the expensive part
+  const cost = eggCost(game, autoCaste());
   if (full >= 60) {
     return { key: "brood", text: "Brood-bound — the chambers have been full " + full +
       "% of the last minute. More of them, from nurses or the founders while they last, " +

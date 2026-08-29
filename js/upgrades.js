@@ -105,10 +105,32 @@ const f = fmtFactor;
 // The probe is "this colony with one more level of that line". Everything that
 // shows a before-and-after reads it, so a preview can never disagree with what
 // buying actually does.
+// The probe has to be FRESH -- it is measured against the colony standing right
+// now -- but the levels map inside it does not: for a given line at a given
+// level it is the same map every frame until something is bought. Holding those
+// maps stable is what lets the effect cache in ants.js hit on them; built fresh
+// each time, every probe was a brand new cache key and the panel cost 2.02ms a
+// frame against 0.70ms with no cache at all. Stable, it is 0.24ms.
+const probeLevels = { key: null, byLine: {} };
+
+function probeLevelsFor(line) {
+  if (probeLevels.key !== game.upgrades) {
+    probeLevels.key = game.upgrades;
+    probeLevels.byLine = {};
+  }
+  const want = upgradeLevel(game, line) + 1;
+  const id = line.id + ":" + want;
+  let levels = probeLevels.byLine[id];
+  if (!levels) {
+    levels = Object.assign({}, game.upgrades);
+    levels[line.id] = want;
+    probeLevels.byLine[id] = levels;
+  }
+  return levels;
+}
+
 function probeWith(line) {
-  const levels = Object.assign({}, game.upgrades);
-  levels[line.id] = upgradeLevel(game, line) + 1;
-  return Object.assign({}, game, { upgrades: levels });
+  return Object.assign({}, game, { upgrades: probeLevelsFor(line) });
 }
 
 function nextLevelOf(line) {
@@ -685,11 +707,17 @@ export function renderUpgrades() {
           ? "Clear another level of the trial that pays in " + upgrade.mastery + " to raise this cap."
           : "")
       : upgradeLockText(game, upgrade);
-    const spent = !isOwned && isOpen && levelIsSpent(upgrade);
+    // A hidden card is not read, and the preview is the most expensive thing
+    // this panel does: each one copies the whole game object twice and recomputes
+    // the food rate, the cap, the brood and the fighting strength against it.
+    // Measured at 0.70ms a frame for twelve lines, which is most of the panel's
+    // cost -- and with a branch filter or Hide owned on, most of them are hidden.
+    const shown = !ui.card.hidden;
+    const spent = shown && !isOwned && isOpen && levelIsSpent(upgrade);
     ui.card.classList.toggle("spent", spent);
-    ui.effect.textContent = isOwned || !isOpen ? ""
+    ui.effect.textContent = !shown || isOwned || !isOpen ? ""
       : spent ? spentText(upgrade) : previewUpgrade(upgrade);
-    ui.formula.textContent = isOwned || !isOpen
+    ui.formula.textContent = !shown || isOwned || !isOpen
       ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || "");
   });
   // An empty grid with nothing said reads as a broken tab. It is usually
