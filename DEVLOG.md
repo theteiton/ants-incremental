@@ -15,6 +15,81 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.0.0 — 29 August 2026
+
+**The Matriline.**
+
+The second prestige layer. The first run is common ants, exactly as it always
+was; a matriline reset is where the line commits to a species and plays it out.
+
+**The gate is the finished lineage plus a Royal Jelly total, and every trial
+level the line has ever mastered cuts that total down** — 120 down to a floor of
+30, three per level. Clearing trials is never forced and always worth it, which
+is the shape asked for: the fast road to layer 2 rather than a wall in front of
+it.
+
+**The reset clears everything layer 1 gave the line** and hands back only what the
+matriline tree has bought the right to inherit. That is what the tree's first
+purchases are for; without them a second matriline replays four and a half hours
+of finished content.
+
+**Six species, each with two halves that are not the same kind of thing.** The
+active half rewrites a mechanic and runs only while you are playing it; the
+passive half pays at full strength for ever once the species is finished,
+whichever line comes next. No matriline is wasted and no choice is regretted.
+Atta farms a fungus and cannot eat what she carries; Polyergus lays nothing but
+soldiers and takes her workers from raids; Eciton has no nest at all; Solenopsis
+lays from several queens; Camponotus recycles nitrogen and cuts her chambers from
+wood; Myrmecocystus keeps her whole store in the bodies of living ants.
+
+**Atta is the one that answers the measurement.** On an ordinary colony a day in,
+foragers carry 84.6% of all food and ten of the twelve adaptation lines move the
+rate by exactly nothing — the game is one resource wide. Under Atta the garden is
+the constraint and nurses are what widen it, so for the first time the thing the
+colony is short of is not food. `GARDEN_YIELD` 2 and `GARDEN_PER_NURSE` 4 are
+measured against the generic line: at yield 3 she peaks at ×4.73, which is a buff
+rather than a rewrite; at 1.6 she peaks at ×0.24 and is never worth playing; at 2
+she peaks at ×1.59 with a fifth of the colony nursing and runs ×0.01 if you play
+her like a common colony. The response is that sharp because it compounds, so the
+bottleneck line gained a `garden` case — without the colony saying which way the
+constraint runs, the cliff is a trap rather than a puzzle.
+
+**Trial clears are recorded per species**, so an Atta mastery pays only while the
+line is Atta. Save v8 folds every existing clear under the common line, which is
+exactly right. It only works because 0.1.8.0 made food-measured trial targets
+scale with the food mastery held: a species starting its trials from nothing now
+meets the same trial a mastered one does.
+
+**Five bugs, all found by measuring rather than by reading.**
+
+`refoundColony()` did not keep `game.matriline`, so the reset wiped the species
+it had just committed to. Every symptom looked like a different bug — the species
+would not commit, the shed was not inherited, the garden never widened, all six
+species measured identically — and it was one missing line in the surviving set.
+
+Three cap bypasses, all the same shape: an ant added outside the laying path does
+not meet the cap check. Eciton's captures walked her column to 859 against a cap
+of 500. Clamping them then left Polyergus unable to grow at all — 30 ants in a
+nest built for 30, winning every raid — because dulosis means no excavator can
+ever be laid, so a quarter of every capture is now somebody else's diggers. That
+made her exponential, at **107,233 ants against about 6,600 for everyone else**,
+because each captured digger raised the cap that sized the next capture; the
+digger count is capped flat, so the nest grows a fixed amount per raid won and
+the growth is linear in raids, which is what dulosis should be.
+
+And the species branch nodes leaked across species. Second Queen raised the cap of
+whatever line you were actually playing, and Eciton and Polyergus share the
+capture key outright, so each one's branch silently bought the other's.
+
+Also: under dulosis the soldier is priced on the forager curve, because she is not
+an army raised on top of a workforce — she is the workforce, and at the soldier
+price the colony reached 21 ants in an hour and then spiralled. Eciton's nomadic
+cap is 1,400 rather than 500, because at 500 she could never reach the flight gate
+and so could never earn anything at all.
+
+The ordinary run is untouched to the tenth of a minute: 1.2 / 3.1 / 7.1 / 22.8 /
+41.4 / 60.9 / 87.9 minutes, the same as before the layer existed.
+
 ## 0.1.8.0 — 29 August 2026
 
 **Trials you can actually reach, and a colony that says what it is short of.**

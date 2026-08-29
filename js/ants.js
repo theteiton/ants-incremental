@@ -1,3 +1,8 @@
+import {
+  gardenActive, gardenMultiplier, speciesCapMult, speciesBroodAdd,
+  speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
+  speciesFoodCapPerAnt, dulosis, passiveOfflineHours
+} from "./matriline.js";
 import { CHALLENGES, bestTrialLevel, challengeDebuff, challengeReward, masteryFood,
   siegeActive, SIEGE_UNLOCK, barrenActive, sealedActive, sterileActive,
   barrenHatchScale, sealedCapScale, sterileAllowance,
@@ -641,7 +646,8 @@ export function casteMultiplier(game, casteId) {
 // how long the founders take to halve, stretched by the upgrades that buy them
 // time rather than output
 export function naniticHalflife(game) {
-  return NANITIC_HALFLIFE / callowCrowding(game, game.ants.nanitic);
+  return NANITIC_HALFLIFE * speciesNaniticHalflifeMult(game) /
+    callowCrowding(game, game.ants.nanitic);
 }
 
 // The upgrades that slow the fade extend the life with it. Without this a
@@ -706,8 +712,64 @@ export function globalFoodMultiplier(game) {
 
 // Everything that takes food away, multiplied together. Trials plug in here,
 // and so does whatever comes after them.
+// Atta's whole rewrite, in one term. Foragers bring back leaves rather than
+// food and only the fungus garden turns leaves into food, so gathering beyond
+// what the garden can turn over is simply wasted -- and what widens the garden
+// is nurses, not foragers. The comparison is in ants rather than in food on
+// purpose: a food-denominated throttle would have to read foodPerSecond, which
+// reads the penalty, which reads the throttle.
+//
+// It is the point of the whole layer. Measured on a colony 24 hours in,
+// foragers carry 84.6% of all food and ten of the twelve upgrade lines move the
+// rate by nothing at all; under Atta the binding constraint stops being food.
+// Measured against the generic line at one hour, sweeping yield against
+// capacity-per-nurse. At yield 3 Atta peaks at x4.73 -- strictly better, which
+// is a buff rather than a rewrite. At 1.6 she peaks at x0.24 and is never worth
+// playing. At 2 she peaks at x1.59 with 20% nurses and runs x0.01 on the
+// generic 5%, which is the shape wanted: a species that demands a differently
+// shaped colony and rewards finding it.
+//
+// The response is that sharp because it compounds -- half the rate in the first
+// ten minutes is a fraction of the colony an hour later -- so the colony has to
+// SAY when the garden is the thing binding it, or the cliff is a trap rather
+// than a puzzle. That is what the bottleneck line does.
+export const GARDEN_BASE = 4;
+export const GARDEN_PER_NURSE = 4;
+export const GARDEN_YIELD = 2;
+
+export function gardenBringing(game) {
+  return game.ants.forager + game.ants.bigforager * BIG_FORAGER_BASE + game.ants.nanitic;
+}
+
+export function gardenCapacity(game) {
+  return (GARDEN_BASE + game.ants.nurse * GARDEN_PER_NURSE) * gardenMultiplier(game);
+}
+
+export function gardenThrottle(game) {
+  if (!gardenActive(game)) return 1;
+  const bringing = gardenBringing(game);
+  if (bringing <= 0) return GARDEN_YIELD;
+  return Math.min(1, gardenCapacity(game) / bringing) * GARDEN_YIELD;
+}
+
+// Everything that takes food away, multiplied together. Trials plug in here,
+// and so does whatever comes after them.
 export function foodPenalty(game) {
-  return hidingPenalty(game) * challengeDebuff(game);
+  return hidingPenalty(game) * challengeDebuff(game) * gardenThrottle(game);
+}
+
+// Myrmecocystus keeps its store in the bodies of living ants, so what the
+// colony can bank is set by how many of them there are and anything gathered
+// beyond it is lost. 0 means no cap, which is every other line.
+export function foodCap(game) {
+  const per = speciesFoodCapPerAnt(game);
+  return per > 0 ? per * Math.max(1, population(game)) : 0;
+}
+
+// Myrmecocystus banks its own passive here too -- the social stomach is what
+// keeps the colony working while nobody is watching.
+export function offlineCapSeconds(game) {
+  return (8 + passiveOfflineHours(game)) * 3600;
 }
 
 export function bigForagerThreshold(game) {
@@ -750,13 +812,21 @@ export function foodPerSecond(game) {
 // because she raises it, and where she does not, the exemption never closes.
 export function capPerExcavator(game) {
   if (sealedActive(game)) return 0;
-  return CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
+  // A nomadic column has no nest to widen, so a digger digs nothing -- the same
+  // shape as Sealed Nest, and it reaches the same guard: no cap gain means no
+  // dig-out exemption and no Standing Orders digging.
+  if (nomadic(game)) return 0;
+  return (CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game)) *
+    speciesExcavatorCapMult(game);
 }
 
 export function populationCap(game) {
-  const base = (BASE_POPULATION_CAP + prestigeBaseCap(game)) * sealedCapScale(game);
+  const base = nomadic(game)
+    ? nomadCap(game)
+    : (BASE_POPULATION_CAP + prestigeBaseCap(game)) * sealedCapScale(game);
   return Math.max(1, Math.floor(
-    (base + capPerExcavator(game) * game.ants.excavator) * masteryCap(game)));
+    (base + capPerExcavator(game) * game.ants.excavator) *
+    masteryCap(game) * speciesCapMult(game)));
 }
 
 export function hatchRate(game) {
@@ -778,7 +848,8 @@ export function broodCapacity(game) {
   return Math.max(1, Math.floor(
     (BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
       slotsPerNurse(game) * game.ants.nurse +
-      slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game)) *
+      slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game) +
+      speciesBroodAdd(game)) *
     masteryBrood(game)
   ));
 }
@@ -798,8 +869,22 @@ export function casteStock(game, casteId) {
   return held + broodCount(game, casteId);
 }
 
-export function eggPrice(casteId, n) {
-  const curve = CASTE_COSTS[casteId] || CASTE_COSTS.forager;
+// Under dulosis the soldier is not an army raised on top of a workforce -- she
+// IS the workforce, and the only egg the queen can lay. Priced on the soldier
+// curve (200 x n^1.6 against a forager's 1.5 x n^1.65) the colony could not
+// afford to grow at all: measured, 21 ants after an hour and then a spiral into
+// losing every raid, which is the one thing this species cannot survive.
+//
+// eggPrice() stays the single source for the curve; the species only chooses
+// WHICH curve, and `game` is optional so nothing that does not care has to pass
+// it. The three callers that price a real egg all have it.
+export function eggCurve(game, casteId) {
+  if (casteId === "soldier" && game && dulosis(game)) return CASTE_COSTS.forager;
+  return CASTE_COSTS[casteId] || CASTE_COSTS.forager;
+}
+
+export function eggPrice(casteId, n, game) {
+  const curve = eggCurve(game, casteId);
   const exponent = curve.breakAt && n > curve.breakAt ? curve.exponent2 : curve.exponent;
   return curve.base * Math.pow(n, exponent);
 }
@@ -823,14 +908,14 @@ function powerSum(base, exponent, from, to) {
 // out on a single egg from an empty colony, which is precisely the opening
 export const EXACT_BATCH = 32;
 
-export function eggBatchCost(casteId, stock, count) {
+export function eggBatchCost(casteId, stock, count, game) {
   if (count <= 0) return 0;
   if (count <= EXACT_BATCH) {
     let total = 0;
-    for (let i = 1; i <= count; i++) total += eggPrice(casteId, stock + i);
+    for (let i = 1; i <= count; i++) total += eggPrice(casteId, stock + i, game);
     return total;
   }
-  const curve = CASTE_COSTS[casteId] || CASTE_COSTS.forager;
+  const curve = eggCurve(game, casteId);
   const from = stock;
   const to = stock + count;
   if (!curve.breakAt || to <= curve.breakAt) {
@@ -847,14 +932,14 @@ export function eggBatchCost(casteId, stock, count) {
 // the largest batch affordable on `budget`, found by bisection rather than by
 // counting. Deliberately never overshoots: layEggs() stops when the money runs
 // out anyway, so a label that is one low is harmless and one high is a lie.
-export function affordableBatch(casteId, stock, budget, limit) {
+export function affordableBatch(casteId, stock, budget, limit, game) {
   if (!(limit > 0) || !(budget > 0)) return 0;
-  if (eggBatchCost(casteId, stock, limit) <= budget) return limit;
+  if (eggBatchCost(casteId, stock, limit, game) <= budget) return limit;
   let low = 0;
   let high = limit;
   while (low < high) {
     const mid = Math.floor((low + high + 1) / 2);
-    if (eggBatchCost(casteId, stock, mid) <= budget) low = mid; else high = mid - 1;
+    if (eggBatchCost(casteId, stock, mid, game) <= budget) low = mid; else high = mid - 1;
   }
   return low;
 }
@@ -864,13 +949,16 @@ export function eggCost(game, casteId) {
     return { resource: "reserves", amount: RESERVE_EGG_COST };
   }
   const caste = casteId || game.nextCaste;
-  return { resource: "food", amount: eggPrice(caste, casteStock(game, caste) + 1) };
+  return { resource: "food", amount: eggPrice(caste, casteStock(game, caste) + 1, game) };
 }
 
 // Under siege the colony meets its first attacker at 16 ants, so it has to be
 // able to lay a soldier at 16 as well. Without this the trial is unwinnable by
 // construction: attacked from 16, unable to raise a defender until 256.
 export function casteUnlockAt(game, casteId) {
+  // under dulosis the soldier is the only thing that can be laid, so she cannot
+  // also be gated behind a colony size that only soldiers could reach
+  if (dulosis(game) && casteId === "soldier") return 0;
   if (casteId === "soldier" && siegeActive(game)) return SIEGE_UNLOCK;
   return CASTES[casteId].unlockAt;
 }
@@ -879,8 +967,12 @@ export function isUnlocked(game, casteId) {
   return runPeakCount(game, "population") >= casteUnlockAt(game, casteId);
 }
 
-export function layableCastes() {
-  return Object.keys(CASTES).filter(id => CASTES[id].layable);
+export function layableCastes(game) {
+  const all = Object.keys(CASTES).filter(id => CASTES[id].layable);
+  // Polyergus lays nothing but soldiers. Every worker in the nest is brood
+  // taken from a raid, which is what dulosis actually is.
+  if (game && dulosis(game)) return all.filter(id => id === "soldier");
+  return all;
 }
 
 export function emergingCaste(game, egg, queuePosition) {

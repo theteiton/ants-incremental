@@ -2,6 +2,8 @@ import { CASTES, isUnlocked, peakCasteCount, population, runPeakCount,
   UPGRADES, upgradeLevel, levelsOwned } from "./ants.js";
 import { raidsUnlocked, raidsSeen } from "./raids.js";
 import { challengesUnlocked, challengeLevelsTotal, bestTrialLevel } from "./challenges.js";
+import { SPECIES, currentSpecies, speciesFinished, matrilineVisible, matrilineCount,
+  gardenActive, haplotype } from "./matriline.js";
 import { prestigeUpgradeOwned, PRESTIGE_UPGRADES } from "./prestige.js";
 
 // The colony's own record of what the words mean. Raised because a playtester
@@ -22,7 +24,8 @@ export const LIBRARY_GROUPS = [
   { id: "combat", name: "Combat" },
   { id: "upgrades", name: "Adaptations" },
   { id: "prestige", name: "The lineage" },
-  { id: "trials", name: "The trials" }
+  { id: "trials", name: "The trials" },
+  { id: "matriline", name: "The matriline" }
 ];
 
 const held = (game, caste) => peakCasteCount(game, caste) > 0;
@@ -220,6 +223,31 @@ export const LIBRARY = [
     done: game => (game.achievementLevel || 0) >= 10,
     full: "No ladder ends any more, because a track that finishes is a bar that pays nothing for the rest of the run. The softcap is what stops one number running away with the rest: the growth-driven tracks police themselves, but exiling ants and destroying eggs are free and repeatable, and could otherwise be farmed for tiers forever." },
 
+  // ------------------------------------------------------------ matriline
+  { id: "matriline", group: "matriline", term: "Matriline",
+    known: game => matrilineVisible(game),
+    short: "The line of queens itself. A colony ends with a flight; a matriline ends when the line becomes something else.",
+    done: game => matrilineCount(game) > 0,
+    full: "Beginning one clears everything the Royal Lineage ever gave you \u2014 the jelly, every adaptation \u2014 and commits the line to a single species for the whole run. What survives is only what the matriline tree has bought the right to inherit, which is why its first purchases are the ones that make a second matriline bearable. Colonies really are matrilineal: every worker descends from the queen, and each nest is founded by her daughter." },
+
+  { id: "species", group: "matriline", term: "Species",
+    known: game => matrilineVisible(game),
+    short: "What the line becomes. Six real subfamilies, each with a half that rewrites the game and a half that pays for ever.",
+    done: game => SPECIES.some(s => speciesFinished(game, s.id)),
+    full: "The active half rewrites a mechanic and runs only while you are playing that species. The passive half is a plain modifier and pays at full strength for ever once the species is finished, whichever line you play next. So no matriline is ever wasted and no choice is ever regretted: what a run buys is another permanent passive, and what it costs is only the time. Finishing one takes twenty points \u2014 two for a trial level cleared as it, one for a nuptial flight as it, four for each of its own two adaptations \u2014 so the trials are the fast road and never the only one." },
+
+  { id: "haplotype", group: "matriline", term: "Haplotype",
+    known: game => matrilineVisible(game),
+    short: "What a matriline pays. It buys the matriline tree, and nothing else spends it.",
+    done: game => haplotype(game) > 0,
+    full: "A haplotype is a set of alleles inherited together, and mitochondrial haplotypes are how a matriline is actually traced in biology \u2014 so it is the accurate word for what passes down a line of queens. It is paid on what the matriline did rather than on the colony standing at the end of it: the flights it took and the trial levels it cleared." },
+
+  { id: "garden", group: "matriline", term: "Fungus garden",
+    known: game => gardenActive(game) || speciesFinished(game, "atta"),
+    short: "Atta does not eat what she carries. Foragers bring leaves, and only the garden turns leaves into food.",
+    done: game => speciesFinished(game, "atta"),
+    full: "Gathering more leaves than the garden can turn over wastes the rest, and what widens the garden is nurses rather than foragers \u2014 so the thing the colony is short of stops being food. That is the whole reason the species exists: measured on an ordinary colony a day in, foragers carry 84.6% of all food and ten of the twelve adaptation lines move the rate by nothing at all." },
+
   { id: "tier", group: "trials", term: "Tier and level",
     known: () => true,
     short: "A tier is one rung of one achievement track. Tiers pay XP, and XP buys achievement levels.",
@@ -292,6 +320,20 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.0.0", name: "The Matriline",
+    changes: [
+      "A second prestige layer. Once the Royal Lineage is complete and the line has gathered enough Royal Jelly in all, the queen can begin a matriline \u2014 and every trial level the line has ever mastered cuts the jelly it asks for, so clearing trials is the fast road there and never the only one.",
+      "Beginning a matriline clears everything layer one gave you: the jelly, every adaptation, all of it. What survives is what the matriline tree has bought the right to inherit, and its first purchases are the ones that carry your automation through.",
+      "The line commits to one of six real species for the whole run. Atta the leafcutter, Solenopsis the fire ant, Camponotus the carpenter, Eciton the army ant, Myrmecocystus the honeypot, and Polyergus the amazon.",
+      "Each species has two halves. The active half rewrites a mechanic and runs only while you are playing it; the passive half pays at full strength for ever once the species is finished, whichever line you play next. No matriline is wasted and no choice is regretted.",
+      "Atta does not eat what she carries. Foragers bring leaves, only the fungus garden turns leaves into food, and nurses are what widen the garden \u2014 so for the first time the thing the colony is short of is not food.",
+      "Polyergus lays nothing but soldiers. Every worker in her nest is brood taken from a raid she won, so the only way that colony grows is by winning.",
+      "Eciton has no nest at all. The column holds what it holds, something finds you two and a half times as often, and a raid you win is a raid you took something from.",
+      "Solenopsis lays from several queens at once; Camponotus recycles nitrogen and cuts her chambers from wood; Myrmecocystus keeps her whole store in the bodies of living ants, so growing the nest is the only way to save.",
+      "Trial clears are recorded per species now. Playing as Atta re-earns the ladders as Atta, and everything cleared before this belongs to the common line \u2014 the first run is common ants, and it always was.",
+      "Finishing a species takes twenty points: two for a trial level cleared as it, one for a nuptial flight as it, four for each of its own two adaptations."
+    ] },
+
   { version: "0.1.8.0", name: "Trials you can actually reach, and a colony that says what it is short of",
     changes: [
       "The trials no longer have a secret order. Deep Cisterns doubles all food per level, and three trials are measured in food — so five levels of Drought made Sealed Nest and the Nanitic Line clear in half a minute, while a colony that had not cleared Drought could not clear either of them at all. A food-measured target now rises with the food masteries you hold, so every trial asks what this colony manages under its own debuff.",

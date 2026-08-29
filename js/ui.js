@@ -54,6 +54,30 @@ import {
   destroyEggRange,
   broodSpace,
   colonyBottleneck,
+  SPECIES,
+  SPECIES_TARGET,
+  MATRILINE_UPGRADES,
+  currentSpecies,
+  speciesName,
+  speciesFinished,
+  speciesPoints,
+  speciesTrialLevels,
+  speciesFlights,
+  speciesBranch,
+  speciesBranchOwned,
+  matrilineUpgradeOwned,
+  buyMatrilineUpgrade,
+  doMatrilineReset,
+  matrilineReady,
+  matrilineVisible,
+  matrilineCount,
+  matrilineJellyNeeded,
+  matrilineFlights,
+  matrilineTrialLevels,
+  haplotype,
+  haplotypeEarned,
+  jellyBanked,
+  lineageComplete,
   buyPrestigeUpgrade,
   canLay,
   doFlight,
@@ -162,7 +186,7 @@ import { LIBRARY, LIBRARY_GROUPS, entryState, libraryCounts, libraryUnlocked,
   libraryUnread, UPDATES, latestVersion, updatesUnread } from "./library.js";
 
 const el = id => document.getElementById(id);
-const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "challenges", "library", "settings"];
+const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "matriline", "challenges", "library", "settings"];
 let activeTab = "ants";
 const casteButtons = {};
 
@@ -460,7 +484,7 @@ function renderBottleneck() {
   box.hidden = !state;
   if (!state) return;
   box.textContent = state.text;
-  for (const key of ["cap", "sealed", "brood", "food", "none"]) {
+  for (const key of ["cap", "sealed", "garden", "brood", "food", "none"]) {
     box.classList.toggle("is-" + key, state.key === key);
   }
 }
@@ -1538,6 +1562,7 @@ function render() {
   if (flown) el("valMatriline").textContent = fmtTime(game.stats.playtime);
 
   el("tabButton-prestige").hidden = !prestigeUnlocked(game);
+  el("tabButton-matriline").hidden = !matrilineVisible(game);
   el("tabButton-challenges").hidden = !challengesUnlocked(game);
   el("tabButton-library").hidden = !libraryUnlocked(game);
   el("takeover").hidden = holdsSave();
@@ -1555,6 +1580,7 @@ function render() {
   else if (activeTab === "achievements") renderAchievements(game);
   else if (activeTab === "combat") renderFighters();
   else if (activeTab === "prestige") renderPrestige();
+  else if (activeTab === "matriline") renderMatriline();
   else if (activeTab === "challenges") renderChallenges();
   else if (activeTab === "library") {
     if (libraryTab === "terms") renderLibrary(); else renderUpdates();
@@ -1564,6 +1590,179 @@ function render() {
     if (settingsTab === "formulas") renderFormulas();
     const unlocked = !el("automationSection").hidden;
     el("automationLocked").hidden = unlocked;
+  }
+}
+
+// ---------------------------------------------------------- the Matriline
+//
+// Layer 2. The species cards say what each one rewrites and what it banks for
+// good; the tree says what carries through a reset. Cards are built once and
+// updated in place, never reparented -- a node detached between mousedown and
+// mouseup never receives its click, which is what once made upgrades unbuyable.
+
+const speciesCards = {};
+const matUpgradeCards = {};
+let matPick = null;
+
+function buildMatriline() {
+  const list = el("matSpeciesList");
+  for (const s of SPECIES) {
+    const card = document.createElement("section");
+    card.className = "species-card";
+    card.innerHTML = '<div class="species-head"><b></b><span class="species-common"></span>' +
+      '<span class="species-state"></span></div>' +
+      '<p class="species-flavour"></p>' +
+      '<p class="species-active"></p>' +
+      '<p class="species-passive"></p>' +
+      '<p class="species-progress"></p>';
+    list.appendChild(card);
+    speciesCards[s.id] = {
+      card,
+      name: card.querySelector("b"),
+      common: card.querySelector(".species-common"),
+      state: card.querySelector(".species-state"),
+      flavour: card.querySelector(".species-flavour"),
+      active: card.querySelector(".species-active"),
+      passive: card.querySelector(".species-passive"),
+      progress: card.querySelector(".species-progress")
+    };
+    watch(card, {
+      title: s.name + " — " + s.common,
+      body: s.flavour,
+      note: () => "WHILE YOU ARE PLAYING IT\n  · " + s.activeText +
+        "\n\nONCE IT IS FINISHED, FOR GOOD\n  · " + s.passiveName + " — " + s.passiveText +
+        "\n\nFINISHING IT\n  · " + SPECIES_TARGET + " points. A trial level as this species is worth " +
+        "2, a nuptial flight as it is worth 1, and each of its two adaptations is worth 4 — " +
+        "so the trials are the fast road and the flights are the patient one, and neither is forced.",
+      warn: false });
+  }
+
+  const pick = el("matPickList");
+  for (const s of SPECIES) {
+    const button = document.createElement("button");
+    button.className = "species-pick";
+    button.textContent = s.name;
+    button.addEventListener("click", () => { matPick = s.id; render(); });
+    pick.appendChild(button);
+    speciesCards[s.id].pick = button;
+  }
+
+  const tree = el("matUpgradeList");
+  for (const u of MATRILINE_UPGRADES) {
+    const card = document.createElement("button");
+    card.className = "upgrade mat-upgrade " + u.group;
+    card.innerHTML = '<div class="upgrade-head"><b></b><span class="upgrade-level"></span></div>' +
+      '<span class="upgrade-desc"></span><span class="upgrade-cost"></span>';
+    card.addEventListener("click", () => { if (buyMatrilineUpgrade(u.id)) render(); });
+    tree.appendChild(card);
+    matUpgradeCards[u.id] = {
+      card,
+      name: card.querySelector("b"),
+      level: card.querySelector(".upgrade-level"),
+      desc: card.querySelector(".upgrade-desc"),
+      cost: card.querySelector(".upgrade-cost")
+    };
+    watch(card, { title: u.name, body: u.desc,
+      note: () => "COSTS\n  · " + u.cost + " Haplotype" +
+        (u.species ? "\n\nCOUNTS TOWARDS\n  · Finishing " + speciesName(u.species) +
+          ", worth 4 of the " + SPECIES_TARGET + " points it needs." : ""),
+      warn: false });
+  }
+
+  el("btnMatriline").addEventListener("click", () => {
+    const button = el("btnMatriline");
+    // armed on the button itself, the same two-step the erase button uses:
+    // confirm() returns false inside a blocked embed and reads as a dead button
+    if (button.dataset.armed !== "yes") {
+      button.dataset.armed = "yes";
+      render();
+      return;
+    }
+    button.dataset.armed = "";
+    doMatrilineReset(matPick);
+    matPick = null;
+    render();
+  });
+}
+
+function renderMatriline() {
+  const m = game.matriline || {};
+  const line = currentSpecies(game);
+  el("matHaploTally").textContent = fmt(haplotype(game)) + " Haplotype";
+  el("matSpeciesTally").textContent = "this line: " + speciesName(line);
+  el("matResetTally").textContent = matrilineCount(game) === 1
+    ? "1 matriline behind her" : fmt(matrilineCount(game)) + " matrilines behind her";
+
+  const ready = matrilineReady(game);
+  const needed = matrilineJellyNeeded(game);
+  el("matDesc").textContent =
+    "A queen's daughter founds the next colony; her daughters found the next line. " +
+    "Beginning a matriline clears everything the Royal Lineage ever gave you — the jelly, " +
+    "the adaptations, all of it — and commits the line to one species for the whole run. " +
+    "What survives is what the matriline tree below has bought the right to inherit.";
+
+  const earned = haplotypeEarned(game);
+  el("matYield").textContent = ready
+    ? "Beginning one now would pay " + fmt(earned) + " Haplotype — " +
+      matrilineFlights(game) + " flights and " + matrilineTrialLevels(game) +
+      " trial levels behind this line."
+    : "";
+  el("matGate").textContent = ready
+    ? "Ready. Choose what the line becomes."
+    : !lineageComplete(game)
+    ? "The Royal Lineage has to be complete first — every adaptation bought."
+    : "The lineage is complete. " + fmt(jellyBanked(game)) + " of " + fmt(needed) +
+      " Royal Jelly gathered in all. Every trial level the line has ever mastered cuts " +
+      "that figure by " + 3 + ", so clearing trials is the fast road here and never the only one.";
+
+  el("matSpeciesPick").hidden = !ready;
+  const button = el("btnMatriline");
+  button.hidden = !ready;
+  button.disabled = ready && !matPick;
+  button.textContent = !matPick
+    ? "Choose a species first"
+    : button.dataset.armed === "yes"
+    ? "Really begin as " + speciesName(matPick) + "? This clears the lineage."
+    : "Begin a matriline as " + speciesName(matPick);
+
+  for (const s of SPECIES) {
+    const ui = speciesCards[s.id];
+    const finished = speciesFinished(game, s.id);
+    const playing = line === s.id;
+    const points = speciesPoints(game, s.id);
+    ui.name.textContent = s.name;
+    ui.common.textContent = s.common;
+    ui.state.textContent = playing ? "you are this" : finished ? "finished" : "not yet finished";
+    ui.card.classList.toggle("playing", playing);
+    ui.card.classList.toggle("finished", finished);
+    ui.flavour.textContent = s.flavour;
+    ui.active.textContent = (playing ? "Active now — " : "Active only while chosen — ") + s.activeText;
+    ui.passive.textContent = s.passiveName + (finished ? " (paying) — " : " (once finished) — ") +
+      s.passiveText;
+    ui.progress.textContent = finished
+      ? "Banked for good, at full strength, whichever species the line becomes next."
+      : points + " of " + SPECIES_TARGET + " points — " +
+        speciesTrialLevels(game, s.id) + " trial levels, " +
+        speciesFlights(game, s.id) + " flights, " +
+        speciesBranchOwned(game, s.id) + " of " + speciesBranch(s.id).length + " adaptations.";
+    if (ui.pick) {
+      ui.pick.classList.toggle("active", matPick === s.id);
+      ui.pick.textContent = s.name + (finished ? " ✓" : "");
+    }
+  }
+
+  for (const u of MATRILINE_UPGRADES) {
+    const ui = matUpgradeCards[u.id];
+    const owned = matrilineUpgradeOwned(game, u.id);
+    const afford = haplotype(game) >= u.cost;
+    ui.name.textContent = u.name;
+    ui.level.textContent = u.species ? speciesName(u.species) : u.group;
+    ui.desc.textContent = u.desc;
+    ui.cost.textContent = owned ? "bought" : fmt(u.cost) + " Haplotype";
+    ui.cost.classList.toggle("affordable", !owned && afford);
+    ui.cost.classList.toggle("owned-tag", owned);
+    ui.card.classList.toggle("owned", owned);
+    ui.card.disabled = owned || !afford;
   }
 }
 
@@ -1976,6 +2175,7 @@ buildChallenges();
 buildRaidDifficulty();
 buildLibrary();
 buildUpdates();
+buildMatriline();
 buildLibraryTabs();
 buildCombatTabs();
 buildRanks();

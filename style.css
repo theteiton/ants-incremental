@@ -996,3 +996,29 @@ ul { list-style: none; margin: 0; padding: 0; }
    readable and the player can see why. */
 .upgrade.spent { opacity: 0.55; }
 .upgrade.spent .upgrade-effect { color: var(--danger); }
+
+/* ---------------------------------------------------------- the Matriline */
+#matSpeciesList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.species-card {
+  background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--line);
+  border-radius: 6px; padding: 10px 12px;
+}
+.species-card.finished { border-left-color: var(--good); }
+.species-card.playing { border-left-color: var(--accent); background: var(--hover); }
+.species-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.species-head b { font-size: 15px; }
+.species-common { color: var(--dim); font-size: 12px; }
+.species-state { margin-left: auto; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.species-card.playing .species-state { color: var(--accent); }
+.species-card.finished .species-state { color: var(--good); }
+.species-card p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; }
+.species-flavour { color: var(--dim); font-style: italic; }
+.species-progress { color: var(--dim); }
+#matPickList { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.species-pick { font-size: 12px; padding: 5px 10px; }
+.species-pick.active { border-color: var(--accent); color: var(--accent); }
+#matUpgradeList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.mat-upgrade.inheritance { border-left: 3px solid var(--good); }
+.mat-upgrade.expression { border-left: 3px solid var(--accent); }
+.mat-upgrade.species { border-left: 3px solid var(--dim); }
+.panel p.bottleneck.is-garden { border-left-color: var(--accent); color: var(--text); }

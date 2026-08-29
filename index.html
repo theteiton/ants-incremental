@@ -105,6 +105,7 @@
     <button id="tabButton-combat" hidden>Combat</button>
     <button id="tabButton-achievements">Achievements<span class="badge" id="badge-achievements" hidden></span></button>
     <button id="tabButton-prestige" hidden>Nuptial<span class="badge" id="badge-prestige" hidden></span></button>
+    <button id="tabButton-matriline" hidden>Matriline<span class="badge" id="badge-matriline" hidden></span></button>
     <button id="tabButton-challenges" hidden>Trials</button>
     <button id="tabButton-library" hidden>Library<span class="badge" id="badge-library" hidden></span></button>
     <button id="tabButton-settings">Settings</button>
@@ -231,6 +232,29 @@
     <h2>Royal Lineage Adaptations</h2>
     <p class="lineage-done" id="lineageDone" hidden></p>
     <div id="prestigeUpgradeList"></div>
+  </section>
+
+  <section class="panel tab" id="tab-matriline" hidden>
+    <div class="panel-head">
+      <span class="tally" id="matHaploTally">0 Haplotype</span>
+      <span class="dim" id="matSpeciesTally"></span>
+      <span class="dim" id="matResetTally"></span>
+    </div>
+    <div class="prestige-flight-box">
+      <h2>The Matriline</h2>
+      <p id="matDesc"></p>
+      <p class="flight-yield" id="matYield"></p>
+      <p class="milestone" id="matGate"></p>
+      <div id="matSpeciesPick" hidden>
+        <p class="dim">Choose what the line becomes. The choice holds for the whole matriline.</p>
+        <div id="matPickList"></div>
+      </div>
+      <button id="btnMatriline" class="danger">Begin a new matriline</button>
+    </div>
+    <h2>The species</h2>
+    <div id="matSpeciesList"></div>
+    <h2>Matriline adaptations</h2>
+    <div id="matUpgradeList"></div>
   </section>
 
   <section class="panel tab" id="tab-challenges" hidden>

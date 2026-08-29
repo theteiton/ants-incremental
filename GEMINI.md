@@ -80,6 +80,8 @@ index.html          entry point, root, do not move
 style.css           all styling
 js/game.js          state object, tick loop, exiling
 js/prestige.js      prestige formulas, upgrades, flight reset
+js/species.js       the six species: their actives, their passives
+js/matriline.js     layer 2: the reset, the Haplotype, the matriline tree
 js/save.js          save keys, migrations, the one-tab lock, import and export
 js/raids.js         combat strength, monsters, raid resolution, hunting
 js/ants.js          castes, production, costs, upgrades
@@ -107,7 +109,7 @@ Keep to this layout. Files are organized by feature domain. A file can comfortab
 - Single global state object named `game`. All persistent values live inside it. No stray module-level mutable variables.
 - One `tick(dt)` function drives all production. `dt` is seconds elapsed. Never assume a fixed frame rate.
 - UI reads from `game` and renders. UI never mutates `game` directly — it calls functions in `game.js` or `ants.js`.
-- Save with `localStorage` under the key `ants_save_v7`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
+- Save with `localStorage` under the key `ants_save_v8`. Bump the version suffix when the save shape changes, and write a migration rather than silently wiping saves.
 - Offline progress = elapsed wall-clock seconds since last save, capped, fed through the same `tick()`. Do not write a separate offline code path.
 - Numbers: plain JavaScript numbers for now. When values exceed roughly `1e300`, tell me — we will discuss a big-number library then. Do not add one preemptively.
 - Format displayed numbers through one shared `fmt()` function. Never format inline.
@@ -334,7 +336,7 @@ rather than written out, so they cannot drift when a line is added or retagged.
 
 **A trial is claimed, never taken.** Meeting 600 ants shows a Claim button rather than dissolving the colony where it stands — a nest that vanished the moment it crossed a threshold would be a nasty surprise in the middle of a run. Entering and abandoning both arm on the button itself, the same two-step the erase button uses, because `confirm()` returns false inside a blocked embed. `refoundColony()` is now the one function that founds a new colony; the flight, entering a trial and leaving one all call it and differ only in what they set afterwards. Cleared levels survive flights and live in `game.challenges`.
 
-**Not built.** Prestige layers beyond the first. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.
+**Not built.** Prestige layers beyond the second. A competent player finishes the Royal Lineage in about five hours and then has Drought to climb, so that is the current edge of the game.
 
 **Soldiers have ranks, and every grade fights harder and hunts worse.** Soldier, Major (×3 strength, hunts at 50%), Supermajor (×9, 15%) and Phragmotic Guard (×25, never hunts — her head is a living door, which is a real ant). That trade is what keeps the rule that a caste is never a strictly better version of another one: an army of nothing but guards fields enormous strength and brings home no protein, which is the protein that trained it. Every rank counts as a soldier for egg price, upgrade gates and achievement tracks, or promoting one would discount the next soldier egg and re-lock Combat upgrades the army had already passed.
 
@@ -406,6 +408,118 @@ to check whenever one is added.
 **When layer 2 lands, the lifetime clock is the Matriline.** Not the bloodline: ants have hemolymph rather than blood, in an open system with no hemoglobin, so nothing about them is red or vessel-borne. Colonies genuinely are matrilineal — every worker descends from the queen, and each new nest is founded by her daughter — so the Matriline is the accurate word for the line of queens, and the right home for the total-time figure the header stopped showing when colony age began resetting. Layer 1 keeps *Lineage*; the two read as related without colliding.
 
 ---
+
+## Prestige Layer 2 — the Matriline
+
+**The first run is common ants; a matriline reset is where the line commits to a
+species.** Layer 0 and layer 1 are played as no particular species and are
+untouched by any of this — measured, the ordinary run still paces at
+1.2 / 3.1 / 7.1 / 22.8 / 41.4 / 60.9 / 87.9 minutes, to the tenth of a minute.
+
+**The gate is the finished lineage plus a Royal Jelly total, and trials cut that
+total down.** `MATRILINE_JELLY_BASE` is 120, each mastered trial level takes 3
+off it, and the floor is 30. So clearing trials is never forced and always worth
+it: the fast road to layer 2 rather than a wall in front of it.
+
+**A matriline reset clears everything layer 1 gave the line** — the jelly, all
+thirteen adaptations — and hands back only what the matriline tree has bought the
+right to inherit. That is what the tree's first purchases are for; without them a
+second matriline replays four and a half hours of finished content. The reset
+re-grants the inherited adaptations by **id**, so `automationUnlocked()` keeps
+working unchanged. `autoShed` is the exception, because it has no adaptation id
+of its own — it reads `flightsTaken` — so `autoShedUnlocked()` asks
+`inheritedPrestige()` as well.
+
+**`refoundColony()` must keep `game.matriline`.** It is the layer above the
+colony and above the flight. Without it the reset wiped the species it had just
+committed to, along with the tree that paid for the inheritance — and every
+symptom looked like a different bug: the species would not commit, the shed was
+not inherited, the garden never widened, and all six species measured identically.
+One missing line in the surviving set.
+
+**Every species has an active half and a passive half, and they are not the same
+kind of thing.** The active rewrites a mechanic and runs only while that species
+is being played. The passive is a plain modifier and pays at full strength for
+ever once the species is finished, chosen or not — so no matriline is wasted and
+no choice is regretted. Matriline upgrades lift the **bonus** part of a passive
+rather than the whole figure, so ×1.5 at scale 2 is ×2.0 and an unfinished
+species is always exactly 1. Both halves apply inside trials: a trial suppresses
+what the lineage *bought* and keeps what the colony *is*, and in layer 2 the
+species is what the colony is.
+
+**The six, and what each was measured at.** One hour, matched automation, against
+a generic colony that reaches about 1.5e5 food/s:
+
+| species | active | measured |
+|---|---|---|
+| **Atta** | foragers bring leaves; only the garden turns them into food, and nurses widen it | peaks ×1.59 of the generic best at **20% nurses**, ×0.01 at the generic 5% |
+| **Solenopsis** | polygyne — cap ×1.5, +2 brood, a lost raid costs ×1.7 | 1,650 ants |
+| **Camponotus** | protein per egg halved, excavator cap ×1.5, founders fade at half speed | 1,787 ants |
+| **Eciton** | nomadic — excavators dig nothing, cap 1,400 flat, raids at ×0.4 the interval, wins capture | 1,400 ants, 18 wins |
+| **Myrmecocystus** | food banked only in living ants, 800 each | 1,666 ants, the store sitting full |
+| **Polyergus** | dulosis — only soldiers can be laid; every worker is captured brood | 337 ants, 9 wins |
+
+**Atta's garden is one term in `foodPenalty()`, and the comparison is in ants
+rather than in food.** A food-denominated throttle would have to read
+`foodPerSecond`, which reads the penalty, which reads the throttle. `GARDEN_YIELD`
+is 2 and `GARDEN_PER_NURSE` is 4, both measured: at yield 3 she peaks at ×4.73
+of the generic best, which is a buff rather than a rewrite; at 1.6 she peaks at
+×0.24 and is never worth playing; at 2 she peaks at ×1.59 with a fifth of the
+colony nursing. **The response is that sharp because it compounds** — half the
+rate in the first ten minutes is a fraction of the colony an hour later — so the
+bottleneck line has a `garden` case, and it has to: without the colony saying
+which way the constraint runs, the cliff is a trap rather than a puzzle.
+
+**Three cap-bypass bugs, all the same shape, all found by measurement.** An ant
+added outside the laying path does not meet the cap check. Eciton's captures
+walked her column to 859 ants against a nomadic cap of 500, so captures are
+clamped to the room left. Polyergus then could not grow at all — 30 ants in a
+nest built for 30, winning every raid — because dulosis means no excavator can
+ever be laid and nothing raised the cap; so a quarter of every capture is
+somebody else's diggers, exempt from the room check for the same reason a laid
+excavator is. And that made her exponential: each captured digger raised the cap,
+which raised the next capture, measured at **107,233 ants at four hours** against
+about 6,600 for every other species. `CAPTURE_DIGGER_CAP` is 4, so the nest grows
+by a fixed amount per raid **won** and the growth is linear in raids, which is
+what dulosis should be.
+
+**Under dulosis the soldier is priced on the forager curve.** She is not an army
+raised on top of a workforce, she *is* the workforce and the only egg the queen
+can lay. At 200 × n^1.6 the colony reached 21 ants in an hour and then spiralled
+into losing every raid, which is the one thing this species cannot survive.
+`eggPrice()` stays the single source for the curve; `eggCurve()` only chooses
+which one, and `game` is an optional trailing argument so nothing that does not
+care has to pass it.
+
+**Eciton's nomadic cap must clear the flight gate.** At 500 she could never reach
+1,000 live ants, so she could never take a nuptial flight, so she could never
+earn Haplotype or finish herself by flying. It is 1,400.
+
+**Trial clears are recorded per species**, in `game.challenges[species][trial]`
+and `stats.bestTrial[species][trial]`, so an Atta mastery pays only while the
+line is Atta. `stats.challengeLevels` stays a single global lifetime count,
+because the achievement track reads it and **a track must never lose a tier
+because the line changed species**. Save v8 folds every existing clear under the
+generic key, which is exactly right: the first run is common ants and that is
+what those clears were earned as.
+
+**This only works because 0.1.8.0 made food-measured trial targets scale with the
+food mastery held.** A species starting its trials from nothing meets the same
+trial a mastered one does; before that change, a species-scoped reset would have
+made Sealed Nest and the Nanitic Line unclearable all over again.
+
+**Finishing a species takes 20 points and there are three roads to it** — 2 for a
+trial level cleared as it, 1 for a nuptial flight as it, 4 for each of its own
+two adaptations. Trials are the fast road (10 levels finishes it), flights the
+patient one (20 of them), and the branch can never be the whole answer because
+there are only two nodes. A player who dislikes one road is never stuck on it.
+
+**Haplotype is paid on what the matriline did, not on the colony standing** — the
+same reason the flight reads live population rather than the peak: a figure that
+survives the reset can be collected against twice. `4 × flights^0.7 × (1 + trial
+levels / 8)`, measured at 6.5 for a thin matriline and 88.8 for a deep one
+against a tree costing 199.
+
 
 ## Playtest feedback — 23 August 2026
 

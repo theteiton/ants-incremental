@@ -1,4 +1,5 @@
 import { PRESTIGE_UPGRADES, prestigeUpgradeOwned } from "./prestige.js";
+import { currentSpecies } from "./species.js";
 
 // A challenge founds a colony under conditions that should kill it. The
 // requirement never moves -- every level of every trial asks for the same
@@ -350,9 +351,15 @@ export function challengeActive(game) {
   return !!activeChallenge(game);
 }
 
-export function challengeLevel(game, id) {
-  const cleared = (game.challenges && game.challenges[id]) || 0;
-  return cleared;
+// Trial clears are recorded per species. Playing as Atta re-earns the ladders
+// as Atta, and an Atta mastery pays only while the line is Atta -- which is what
+// makes a matriline a fresh run of the whole game rather than a fresh colony.
+// Everything cleared before layer 2 existed belongs to the generic line, which
+// is exactly right: the first run is generic ants.
+export function challengeLevel(game, id, speciesId) {
+  const key = speciesId || currentSpecies(game);
+  const mine = (game.challenges && game.challenges[key]) || {};
+  return mine[id] || 0;
 }
 
 // how many levels of every trial the colony has behind it, which is what the
@@ -497,9 +504,10 @@ export function challengeReward(game) {
 // The deepest level ever reached in one particular trial. Read from a lifetime
 // stat as well as the colony, because cleared levels live on the colony and a
 // deeper reset would otherwise take an achievement back.
-export function bestTrialLevel(game, id) {
-  const stat = (game.stats && game.stats.bestTrial && game.stats.bestTrial[id]) || 0;
-  return Math.max(stat, challengeLevel(game, id));
+export function bestTrialLevel(game, id, speciesId) {
+  const key = speciesId || currentSpecies(game);
+  const best = (game.stats && game.stats.bestTrial && game.stats.bestTrial[key]) || {};
+  return Math.max(best[id] || 0, challengeLevel(game, id, key));
 }
 
 // The achievement half, paid per trial on that trial's deepest level. Each one

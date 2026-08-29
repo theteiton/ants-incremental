@@ -9,6 +9,10 @@ import {
   bigForagerThreshold,
   broodCapacity,
   capPerExcavator,
+  foodCap,
+  offlineCapSeconds,
+  gardenBringing,
+  gardenCapacity,
   upgradeCurrency,
   affordableBatch,
   eggBatchCost,
@@ -74,6 +78,13 @@ import {
   sterileActive,
   CHALLENGE_TARGET
 } from "./challenges.js";
+import {
+  GENERIC, SPECIES, currentSpecies, speciesById, checkSpeciesFinished,
+  matrilineReady, matrilineJellyNeeded, matrilineVisible, matrilineCount,
+  haplotypeEarned, haplotype, jellyBanked, jellyKept, inheritedPrestige,
+  matrilineUpgradeById, matrilineUpgradeOwned, LINEAGE_COST,
+  speciesProteinCostMult, passiveFeedFree, dulosis, gardenActive
+} from "./matriline.js";
 import { discoverLibrary } from "./library.js";
 import {
   automationUnlocked,
@@ -97,6 +108,16 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
+export { GENERIC, SPECIES, SPECIES_TARGET, currentSpecies, playingSpecies, speciesById,
+  speciesName, speciesFinished, speciesPoints, speciesComplete, speciesTrialLevels,
+  speciesFlights, speciesBranch, speciesBranchOwned,
+  MATRILINE_UPGRADES, matrilineUpgradeById, matrilineUpgradeOwned, matrilineUpgradesIn,
+  matrilineReady, matrilineVisible, matrilineCount, matrilineJellyNeeded,
+  matrilineFlights, matrilineTrialLevels, haplotype, haplotypeEarned, jellyBanked,
+  lineageComplete, passiveScale, gardenActive, LINEAGE_COST,
+  passiveCombat, passiveProtein, passiveHunt, passiveSalvage, passiveFeedFree,
+  passiveOfflineHours, dulosis, nomadic } from "./matriline.js";
+export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
 export { challengeTarget, challengeTargetAmount, targetKind, challengeProgress, TARGET_KINDS,
   challengeFailed, challengeFailKind, FAIL_KINDS,
   callowActive, callowCrowding, masteryNanitic,
@@ -168,7 +189,11 @@ function blankGame() {
     rallyTime: 0,
     rallyCooldown: 0,
     challenge: null,
+    // per species now: challenges[speciesId][trialId]. Everything cleared
+    // before layer 2 existed belongs to the generic line, which migrate() does.
     challenges: {},
+    matriline: { haplotype: 0, haplotypeTotal: 0, resets: 0, species: null,
+      finished: [], upgrades: [], flights: 0, trialLevels: 0 },
     wings: 0,
     wingStrip: 0,
     queenName: "",
@@ -187,7 +212,7 @@ function blankGame() {
     peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
-      trained: 0, trainingDeaths: 0 },
+      trained: 0, trainingDeaths: 0, speciesFlights: {} },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -236,7 +261,11 @@ export function startRally() {
 
 // every automation is gated the same way: unlocked by prestige, then switchable
 export function autoShedUnlocked() {
-  return automationUnlocked(game, "autoShed");
+  // Inherited Instinct carries it through a matriline reset. autoShed is the
+  // one automation with no adaptation id of its own -- it reads flightsTaken --
+  // so it cannot be handed back by re-granting an id like the others are.
+  return automationUnlocked(game, "autoShed") ||
+    inheritedPrestige(game).indexOf("autoShed") >= 0;
 }
 
 export function automationOn(key) {
@@ -267,7 +296,7 @@ export function managedCaste() {
   const ratios = game.settings.ratios || {};
   let want = null;
   let worst = 0;
-  for (const id of layableCastes()) {
+  for (const id of layableCastes(game)) {
     const target = (ratios[id] || 0) / 100;
     if (target <= 0 || !isUnlocked(game, id)) continue;
     const deficit = target - casteStock(game, id) / Math.max(1, pop);
@@ -275,7 +304,7 @@ export function managedCaste() {
   }
   // with every share met the surplus goes to food, not to whatever caste
   // happened to be chosen last -- otherwise the ratios overshoot badly
-  return want || "forager";
+  return want || layableCastes(game)[0] || "forager";
 }
 
 // what the automation will lay next, which is not necessarily what the player
@@ -291,7 +320,11 @@ export function foodReserve() {
 
 export function autoCaste() {
   const caste = automationOn("autoRatio") ? managedCaste() : game.nextCaste;
-  return isUnlocked(game, caste) ? caste : "forager";
+  const fallback = layableCastes(game)[0] || "forager";
+  if (!isUnlocked(game, caste)) return fallback;
+  // under dulosis the queen lays nothing but soldiers, so a stale selection
+  // has to fall through to what she can actually lay
+  return layableCastes(game).indexOf(caste) >= 0 ? caste : fallback;
 }
 
 function runAutomation() {
@@ -316,6 +349,7 @@ function runAutomation() {
 
 export function setNextCaste(casteId) {
   if (!CASTES[casteId] || !CASTES[casteId].layable) return false;
+  if (layableCastes(game).indexOf(casteId) < 0) return false;
   if (!isUnlocked(game, casteId)) return false;
   game.nextCaste = casteId;
   return true;
@@ -375,6 +409,18 @@ export function colonyBottleneck() {
     return { key: "sealed", text: "The nest is full at " + populationCap(game) +
       " and nothing here widens it. What the ants you have produce is the whole game." };
   }
+  // Atta's whole shape, said out loud. Foragers bringing back more leaves than
+  // the garden can turn over is the binding constraint and nothing else can be
+  // read from the food rate, which just looks low.
+  if (gardenActive(game)) {
+    const bringing = gardenBringing(game);
+    const capacity = gardenCapacity(game);
+    if (bringing > capacity) {
+      return { key: "garden", text: "Garden-bound — the foragers bring back " +
+        (bringing / Math.max(1, capacity)).toFixed(1) + " times more leaves than the fungus " +
+        "can turn over, and the rest rots. Nurses widen the garden; more foragers do not." };
+    }
+  }
   if (full >= 60) {
     return { key: "brood", text: "Brood-bound — the chambers have been full " + full +
       "% of the last minute. More of them, from nurses or the founders while they last, " +
@@ -406,11 +452,19 @@ export function canLay(casteId) {
 function layOne(caste, stock) {
   const resource = game.emerged === 0 ? "reserves" : "food";
   const amount = game.emerged === 0
-    ? RESERVE_EGG_COST : eggPrice(caste, stock + 1);
+    ? RESERVE_EGG_COST : eggPrice(caste, stock + 1, game);
   if (game[resource] < amount) return false;
   game[resource] -= amount;
-  const fed = game.settings.feedBrood !== false && game.protein >= EGG_PROTEIN_COST;
-  if (fed) game.protein -= EGG_PROTEIN_COST;
+  // Camponotus recycles nitrogen so an egg costs less protein, and Atta's
+  // Gongylidia feeds a share of them for nothing at all.
+  const proteinCost = EGG_PROTEIN_COST * speciesProteinCostMult(game);
+  // only roll when a species has actually banked the passive: an unconditional
+  // Math.random() per egg walks the shared stream and moves every big-forager
+  // roll in the game with it
+  const freeShare = passiveFeedFree(game);
+  const free = freeShare > 0 && Math.random() < freeShare;
+  const fed = game.settings.feedBrood !== false && (free || game.protein >= proteinCost);
+  if (fed && !free) game.protein -= proteinCost;
   game.eggs.push({ caste, progress: 0, fed });
   return true;
 }
@@ -446,7 +500,7 @@ export function affordableEggs(casteId) {
   if (game.emerged === 0) {
     return Math.min(slots, Math.floor(game.reserves / RESERVE_EGG_COST));
   }
-  return affordableBatch(caste, casteStock(game, caste), game.food, slots);
+  return affordableBatch(caste, casteStock(game, caste), game.food, slots, game);
 }
 
 // The brood is strict FIFO, so a misclick of "lay max" can bury a caste you
@@ -640,6 +694,16 @@ export function doFlight() {
   game.prestige.royalJellyTotal = Math.round((game.prestige.royalJellyTotal + earned) * 100) / 100;
   game.prestige.flightsTaken += 1;
   game.best.jelly = Math.max(game.best.jelly || 0, earned);
+  // both counters feed layer 2: the matriline's own total is what Haplotype is
+  // paid on, and the per-species total is one of the three roads to finishing a
+  // species. The per-species one is a lifetime stat, so a species half-finished
+  // in one matriline keeps its progress into the next.
+  const m = game.matriline || (game.matriline = { flights: 0 });
+  m.flights = (m.flights || 0) + 1;
+  const flown = Object.assign({}, game.stats.speciesFlights || {});
+  const line = currentSpecies(game);
+  flown[line] = (flown[line] || 0) + 1;
+  game.stats.speciesFlights = flown;
 
   refoundColony();
   return earned;
@@ -665,7 +729,11 @@ function refoundColony(extra) {
     seen: game.seen,
     library: game.library,
     queenName: game.queenName,
-    challenges: game.challenges
+    challenges: game.challenges,
+    // The matriline outlives every colony AND every flight -- it is the layer
+    // above them. Without this the reset wiped the species it had just
+    // committed to, along with the whole tree that paid for the inheritance.
+    matriline: game.matriline
   };
   Object.assign(game, blankGame());
   Object.assign(game, surviving, extra || {});
@@ -706,14 +774,67 @@ export function challengeCount() {
 export function completeChallenge() {
   if (!challengeMet()) return false;
   const id = activeChallenge(game).id;
+  const line = currentSpecies(game);
   const cleared = Object.assign({}, game.challenges);
-  cleared[id] = (cleared[id] || 0) + 1;
+  const mine = Object.assign({}, cleared[line] || {});
+  mine[id] = (mine[id] || 0) + 1;
+  cleared[line] = mine;
   game.challenges = cleared;
+  // the lifetime count stays global: the achievement track reads it, and a
+  // track must never lose a tier because the line changed species
   game.stats.challengeLevels = (game.stats.challengeLevels || 0) + 1;
   const best = Object.assign({}, game.stats.bestTrial || {});
-  best[id] = Math.max(best[id] || 0, cleared[id]);
+  const bestMine = Object.assign({}, best[line] || {});
+  bestMine[id] = Math.max(bestMine[id] || 0, mine[id]);
+  best[line] = bestMine;
   game.stats.bestTrial = best;
+  const m = game.matriline || (game.matriline = { trialLevels: 0 });
+  m.trialLevels = (m.trialLevels || 0) + 1;
   refoundColony({ challenge: null });
+  return true;
+}
+
+// ------------------------------------------------------------- layer 2
+//
+// The matriline reset clears everything layer 1 gave the line -- the jelly, the
+// whole lineage, the lot -- and hands back only what the matriline tree has
+// bought the right to inherit. That is what makes the tree's first purchases
+// worth making: without them a second matriline replays four and a half hours
+// of content the player has already finished.
+export function doMatrilineReset(speciesId) {
+  if (!matrilineReady(game)) return 0;
+  const earned = haplotypeEarned(game);
+  const banked = jellyBanked(game);
+  // at most the price of the whole lineage, so Retained Royalty can hand you
+  // the tree and never more than the tree
+  const keep = Math.min(LINEAGE_COST, Math.round(banked * jellyKept(game) * 10) / 10);
+  const inherited = inheritedPrestige(game);
+  const m = game.matriline;
+
+  m.haplotype = Math.round((m.haplotype + earned) * 100) / 100;
+  m.haplotypeTotal = Math.round((m.haplotypeTotal + earned) * 100) / 100;
+  m.resets += 1;
+  m.species = speciesById(speciesId) ? speciesId : null;
+  m.flights = 0;
+  m.trialLevels = 0;
+
+  refoundColony({ challenge: null });
+  game.prestige = {
+    royalJelly: keep,
+    royalJellyTotal: keep,
+    flightsTaken: 0,
+    upgrades: inherited.filter(id => id !== "autoShed")
+  };
+  return earned;
+}
+
+export function buyMatrilineUpgrade(id) {
+  const upgrade = matrilineUpgradeById(id);
+  if (!upgrade || matrilineUpgradeOwned(game, id)) return false;
+  const m = game.matriline;
+  if (!m || m.haplotype < upgrade.cost) return false;
+  m.haplotype = Math.round((m.haplotype - upgrade.cost) * 100) / 100;
+  m.upgrades = m.upgrades.concat([id]);
   return true;
 }
 
@@ -805,6 +926,11 @@ export function tick(dt) {
   const earned = (foodPerSecond(game) - wingRate) * dt + wingRate * wingSeconds;
   game.food += earned;
   game.stats.foodEarned += earned;
+  // Myrmecocystus holds its store in the bodies of living ants. What the colony
+  // gathered it gathered -- the ladders count it -- but what it cannot hang up
+  // it loses, so growing the nest is the only way to save.
+  const holds = foodCap(game);
+  if (holds > 0 && game.food > holds) game.food = holds;
   // what THIS colony has gathered, which resets with it -- a trial that is
   // about sustaining output cannot be measured on a lifetime total
   if (game.run) game.run.foodEarned = (game.run.foodEarned || 0) + earned;
@@ -912,8 +1038,11 @@ export function tick(dt) {
     }
   }
 
-  if (!isUnlocked(game, game.nextCaste)) game.nextCaste = "forager";
+  if (!isUnlocked(game, game.nextCaste) || layableCastes(game).indexOf(game.nextCaste) < 0) {
+    game.nextCaste = layableCastes(game)[0] || "forager";
+  }
   checkAchievements();
+  checkSpeciesFinished(game);
   discoverLibrary(game);
 }
 
@@ -930,7 +1059,8 @@ export function load() {
   }
   recountAchievements();
 
-  const elapsed = Math.min(Math.max(0, (Date.now() - game.lastSave) / 1000), OFFLINE_CAP);
+  const elapsed = Math.min(Math.max(0, (Date.now() - game.lastSave) / 1000),
+    offlineCapSeconds(game));
   const before = { food: game.stats.foodEarned, protein: game.stats.proteinEarned,
     hatched: game.stats.eggsHatched, won: game.raidsWon, lost: game.raidsLost };
   const step = Math.max(1, elapsed / 600);

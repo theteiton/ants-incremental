@@ -1,6 +1,10 @@
-import { effectTotal, foodPerSecond, globalFoodMultiplier, population, runPeakCount,
+import { capPerExcavator, effectTotal, foodPerSecond, globalFoodMultiplier, population, populationCap, runPeakCount,
   SOLDIER_RANKS, RANK_IDS, rankOf, soldierCount } from "./ants.js";
 import { prestigeSoldierMult } from "./prestige.js";
+import {
+  passiveCombat, passiveProtein, passiveHunt, passiveSalvage,
+  speciesHuntMult, speciesLossMult, speciesRaidIntervalMult, speciesCapture, dulosis
+} from "./matriline.js";
 import { masterySoldier, bestTrialLevel, siegeActive, siegeThreatScale, challengeFailed,
   SIEGE_UNLOCK, SIEGE_INTERVAL, SIEGE_REFERENCE, SIEGE_BASE, SIEGE_LOSS_CAP,
   SIEGE_RAMP } from "./challenges.js";
@@ -98,7 +102,7 @@ export function combatPerCaste(game, caste) {
 export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
-  return power;
+  return power * passiveCombat(game);
 }
 
 export function raidsSeen(game) {
@@ -139,7 +143,8 @@ export function huntingSoldiers(game) {
 export function huntRate(game) {
   if (!hunting(game)) return 0;
   return huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
-    (1 + effectTotal(game, "proteinYield"));
+    (1 + effectTotal(game, "proteinYield")) *
+    passiveHunt(game) * speciesHuntMult(game);
 }
 
 
@@ -350,17 +355,30 @@ export function proteinPurchaseCost(game, n) {
 
 export function raidRewards(game, power) {
   return {
-    protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER * (1 + effectTotal(game, "proteinYield")))),
+    protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
+      (1 + effectTotal(game, "proteinYield")) * passiveProtein(game))),
     food: power * FOOD_PER_POWER * globalFoodMultiplier(game)
   };
 }
 
+// Polyergus grows only by raiding, so she has to be raided early -- gated at
+// 256 with nothing but soldiers layable, the colony could never reach the gate
+// that was the only way to get workers.
+export const DULOSIS_UNLOCK = 16;
+// the least a won raid brings home, so a small colony can still get started
+export const CAPTURE_FLOOR = 4;
+// the share of a capture that is somebody else's diggers
+export const CAPTURE_DIGGERS = 0.25;
+export const CAPTURE_DIGGER_CAP = 4;
+
 export function raidUnlockAt(game) {
-  return siegeActive(game) ? SIEGE_UNLOCK : RAID_UNLOCK;
+  if (siegeActive(game)) return SIEGE_UNLOCK;
+  return dulosis(game) ? DULOSIS_UNLOCK : RAID_UNLOCK;
 }
 
 export function raidInterval(game) {
-  return siegeActive(game) ? SIEGE_INTERVAL : RAID_INTERVAL;
+  const base = siegeActive(game) ? SIEGE_INTERVAL : RAID_INTERVAL;
+  return base * speciesRaidIntervalMult(game);
 }
 
 export function raidsUnlocked(game) {
@@ -443,6 +461,44 @@ function killAnts(game, toll) {
   return dead;
 }
 
+// A raid you win is a raid you took something from. Eciton carries brood home
+// with the column; Polyergus has no other way to grow at all, which is what
+// makes dulosis a rewrite rather than a debuff. It compounds with the colony,
+// so it is growth rather than a trickle.
+function captureBrood(game) {
+  const share = speciesCapture(game);
+  if (share <= 0) return 0;
+  // A floor as well as a share, because a share of a tiny colony is nothing and
+  // Polyergus has no other way to grow at all -- measured, 21 ants after an
+  // hour and a death spiral, because two captures a raid could not build an
+  // army fast enough to keep winning them.
+  const want = Math.max(CAPTURE_FLOOR, Math.floor(population(game) * share));
+  // A raided nest is a whole nest, so what comes back includes its diggers --
+  // and it has to. Under dulosis no excavator can ever be laid, so without
+  // captured ones the cap sits at its base for ever: measured, 30 ants in a
+  // nest built for 30, winning every raid and unable to grow by a single ant.
+  // They are exempt from the room check for the same reason a laid excavator
+  // is: she digs the chamber she will occupy. Where digging raises nothing --
+  // a nomadic column -- none are taken and the whole capture is clamped.
+  // Capped flat, and that cap is what keeps this species bounded. A share of
+  // the colony compounds: each captured digger raises the cap, which raises the
+  // next capture, which raises the cap -- measured, 107,233 ants at four hours
+  // against about 6,600 for every other species. Capped, the nest grows by a
+  // fixed amount per raid WON, which is exactly what dulosis should be: she
+  // grows by raiding and by nothing else, so the growth is linear in raids.
+  const diggers = capPerExcavator(game) > 0
+    ? Math.min(CAPTURE_DIGGER_CAP, Math.max(1, Math.round(want * CAPTURE_DIGGERS))) : 0;
+  // and a ceiling on the rest: the column carries what it can carry. Without it
+  // Eciton walked its own captures past the nomadic cap -- 859 ants in a column
+  // built for 500 -- which is the cap bypass again in a new coat.
+  const room = Math.max(0, populationCap(game) - population(game));
+  const rest = Math.max(0, Math.min(want - diggers, room));
+  if (diggers <= 0 && rest <= 0) return 0;
+  game.ants.excavator += diggers;
+  game.ants.forager += rest;
+  return diggers + rest;
+}
+
 export function resolveRaid(game) {
   const power = monsterPower(game);
   const defence = combatPower(game);
@@ -459,17 +515,18 @@ export function resolveRaid(game) {
     game.stats.raidsWonTotal = (game.stats.raidsWonTotal || 0) + 1;
     const fallen = killSoldiers(game, winToll(game, defence, power));
     const promoted = promoteVeterans(game);
+    const captured = captureBrood(game);
     game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food,
-      dead: fallen, promoted, monster: game.monster };
+      dead: fallen, promoted, captured, monster: game.monster };
     rollMonster(game);
     return game.lastRaid;
   }
 
   const shortfall = Math.min(1, (power - defence) / power);
   const cap = siegeActive(game) ? SIEGE_LOSS_CAP : LOSS_CAP;
-  const toll = Math.max(1, Math.floor(population(game) * cap * shortfall));
+  const toll = Math.max(1, Math.floor(population(game) * cap * shortfall * speciesLossMult(game)));
   const dead = killAnts(game, toll);
-  const salvage = Math.round(reward.protein * (defence / power));
+  const salvage = Math.round(reward.protein * (defence / power) * passiveSalvage(game));
   game.protein += salvage;
   game.stats.proteinEarned = (game.stats.proteinEarned || 0) + salvage;
   game.raidsLost++;

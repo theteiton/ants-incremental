@@ -1,8 +1,8 @@
 import { RAID_INTERVAL } from "./raids.js";
 
-export const SAVE_KEY = "ants_save_v7";
-export const LEGACY_SAVE_KEYS = ["ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 7;
+export const SAVE_KEY = "ants_save_v8";
+export const LEGACY_SAVE_KEYS = ["ants_save_v7", "ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_VERSION = 8;
 export const LOCK_KEY = "ants_lock";
 
 // the tab the player most recently opened owns the save; older tabs go quiet
@@ -116,6 +116,20 @@ export function migrate(data) {
     data.lossStreak = 0;
     data.version = 7;
   }
+  if (data.version === 7) {
+    // Trial clears became per-species. Everything a save already holds was
+    // earned as generic ants -- the first run is generic ants, and that is the
+    // whole reason the layer works -- so it all moves under that one key rather
+    // than being lost or spread.
+    const cleared = (data.challenges && typeof data.challenges === "object") ? data.challenges : {};
+    data.challenges = { generic: Object.assign({}, cleared) };
+    if (data.stats && data.stats.bestTrial && typeof data.stats.bestTrial === "object") {
+      data.stats.bestTrial = { generic: Object.assign({}, data.stats.bestTrial) };
+    }
+    data.matriline = { haplotype: 0, haplotypeTotal: 0, resets: 0, species: null,
+      finished: [], upgrades: [], flights: 0, trialLevels: 0 };
+    data.version = 8;
+  }
   return data;
 }
 
@@ -225,6 +239,17 @@ export function applySave(game, fresh, data) {
     : { peakPopulation: data.peakPopulation || 0,
         peakCastes: Object.assign({}, data.peakCastes || {}),
         peakStrength: data.peakStrength || 0, foodEarned: 0, broodFull: 0 };
+  const savedMat = (data.matriline && typeof data.matriline === "object") ? data.matriline : {};
+  game.matriline = {
+    haplotype: savedMat.haplotype || 0,
+    haplotypeTotal: savedMat.haplotypeTotal || 0,
+    resets: savedMat.resets || 0,
+    species: savedMat.species || null,
+    finished: Array.isArray(savedMat.finished) ? savedMat.finished.slice() : [],
+    upgrades: Array.isArray(savedMat.upgrades) ? savedMat.upgrades.slice() : [],
+    flights: savedMat.flights || 0,
+    trialLevels: savedMat.trialLevels || 0
+  };
   const savedPrestige = data.prestige || {};
   game.prestige = {
     royalJelly: savedPrestige.royalJelly || 0,
