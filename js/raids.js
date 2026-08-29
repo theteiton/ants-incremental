@@ -163,9 +163,17 @@ export const RAID_DIFFICULTIES = [
   { id: "hunted", name: "Hunted",
     note: "Uncapped, and what you have learned about fighting is known to whatever is coming. Everything Hardened Line pays you, it brings with it.",
     capWins: false, seesMastery: 1, exponent: MONSTER_EXPONENT },
+  // Hunted sees what Hardened Line taught you once; Relentless sees it and
+  // half again. At seesMastery 1 a fully mastered colony held a 5.18x margin
+  // and went 119W/0L over twelve hours -- the hardest setting in the game had
+  // never actually lost a raid, which makes it a label rather than a choice. At
+  // 1.5 the same colony sits at 0.95x and goes 112W/3L: it wins most of them
+  // and is genuinely broken into now and then. At 1.75 it collapses to 2W/3L.
+  // The exponent scales with how mastered you are, so a colony that has just
+  // cleared the siege once still enters at a 1.20x margin and 78W/0L.
   { id: "relentless", name: "Relentless",
-    note: "As Hunted, and a larger nest draws far worse than it used to. There is no arrangement of ants that wins this comfortably.",
-    capWins: false, seesMastery: 1, exponent: 1.12 }
+    note: "As Hunted, and a larger nest draws far worse than it used to. There is no arrangement of ants that wins this comfortably — a colony that has mastered the trials will lose raids here.",
+    capWins: false, seesMastery: 1.5, exponent: 1.12 }
 ];
 
 export function raidDifficulty(game) {

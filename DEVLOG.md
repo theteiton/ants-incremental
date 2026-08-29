@@ -13,6 +13,65 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.1.8.0 — 29 August 2026
+
+**Trials you can actually reach, and a colony that says what it is short of.**
+
+Six things, all of them from laddering every trial under a fixed policy and then
+reading the result with Amdahl's Law in hand: a multiplier on a fraction *f* of
+the work is worth at most 1/(1−f) overall, however large it is.
+
+**Drought was gating three other trials and nothing said so.** Deep Cisterns is
+the one mastery with *f* = 1 — it multiplies everything — so five levels of it is
+×32 on every food figure in the game, and three of the six trials are measured in
+food. Measured: with nothing else cleared, Sealed Nest could not clear level 1 at
+any level of play (411/s against 2,500) and the Nanitic Line could not clear level
+5 (a 32,798 ceiling against a 38,000 target); with Drought mastered, both cleared
+in twenty to thirty *seconds* a level. There was no window in which either was a
+trial. A food-measured target now scales with the food mastery held, which makes
+them mastery-neutral, and the bases were recalibrated against a colony holding
+nothing: 2,500 → 400 and 38,000 → 28,000. Sealed Nest now runs 2.0 / 4.0 / 12.2 /
+38.0 / 36.0 minutes.
+
+**The excavator dig-out rule was an unbounded cap bypass inside Sealed Nest.**
+She is allowed past the cap because digging raises it, so everywhere else the
+exemption closes behind itself. Sealed Nest sets that gain to zero and it never
+closed — 1,631 ants against a cap of 30, and `managedCaste()` digging every tick
+because the nest is permanently tight, so Standing Orders spent the trial laying
+diggers that widened nothing. `capPerExcavator()` is the single source now and
+both sites read it. The ordinary run is untouched, to the tenth of a minute.
+
+**Sterile was decided by whether Nest Memory was switched off.** It spent an
+allowance of two on the founders' food line, worth nothing two hours in, and
+nothing refunds a level. It does not run inside Sterile any more. The trial is
+now a genuine decision and a hard one: a player buying by gain-per-cost *right
+now* still fails levels 4 and 5, because at minute two the founders' line really
+is the best buy and worthless by minute sixty. Buying only the lines that keep
+paying gives 26.6 / 26.2 / 32.6 / 84.1 / 277.4 minutes.
+
+**The colony says what is binding.** A line under the brood names it — full nest,
+full chambers, or no food for the next egg. This is the practical half of
+Amdahl: an upgrade aimed anywhere but the binding constraint buys almost
+nothing, which is why the "+150%" forager line delivers about +44%. The
+saturation figure is sampled after the automation tops the brood up and *before*
+the hatch loop; read afterwards the brood is always one egg short and never
+reports as bound at all.
+
+**An adaptation level that cannot pay says so.** `nanitic_food` can be pushed to
+level 12, and each extended level costs millions of protein to move the rate by
+×1.000003 — four founders against twenty thousand foragers. Only caste-scoped
+food lines are tested; the first attempt compared every rate and greyed out
+`protein_yield`, which pays in something the food rate cannot see.
+
+**Relentless had never lost a raid.** 5.18× margin, 119W/0L over twelve hours on a
+mastered colony — a label rather than a choice. The attacker now brings half
+again as much of what Hardened Line taught you: 0.95× and 112W/3L. Swept at 1.25
+(no change, 119W/0L) and 1.75 (collapse, 2W/3L). It scales with how mastered the
+colony is, so a nest that has only just cleared the siege still enters at 1.20×.
+
+Also: Sterile's card called its own reward "nothing else" while being the only
+mastery that raises the max level of every line there is.
+
 ## 0.1.7.1 — 28 August 2026
 
 **Saying that four trials shipped, and laddering all six to see what happens.**

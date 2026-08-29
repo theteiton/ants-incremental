@@ -8,6 +8,7 @@ import {
   BASE_POPULATION_CAP,
   bigForagerThreshold,
   broodCapacity,
+  capPerExcavator,
   upgradeCurrency,
   affordableBatch,
   eggBatchCost,
@@ -70,6 +71,7 @@ import {
   challengeTarget,
   challengeTargetMet,
   challengeProgress,
+  sterileActive,
   CHALLENGE_TARGET
 } from "./challenges.js";
 import { discoverLibrary } from "./library.js";
@@ -95,7 +97,7 @@ import {
 } from "./save.js";
 
 export { claimSave, holdsSave, SAVE_KEY, SAVE_VERSION, LEGACY_SAVE_KEYS, LOCK_KEY } from "./save.js";
-export { challengeTarget, targetKind, challengeProgress, TARGET_KINDS,
+export { challengeTarget, challengeTargetAmount, targetKind, challengeProgress, TARGET_KINDS,
   challengeFailed, challengeFailKind, FAIL_KINDS,
   callowActive, callowCrowding, masteryNanitic,
   CALLOW_CROWDING, CALLOW_SCALE, CALLOW_TARGET_FOOD,
@@ -113,6 +115,10 @@ export { CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP, CHALLENGE_TARGE
 export { PRESTIGE_UPGRADES, PRESTIGE_UNLOCK, AUTOMATIONS, royalJellyEarned, prestigeUpgradeOwned, jellyPerHour, automationUnlocked } from "./prestige.js";
 
 export const QUEEN_RESERVES = 100;
+// How far back the bottleneck readout looks. A single frame's answer flickers
+// between full and not-full every time an egg hatches; a minute of it is what
+// the player actually experiences.
+export const BOTTLENECK_WINDOW = 60;
 export const OFFLINE_CAP = 8 * 3600;
 
 // what the last return from being away was worth, for the summary line
@@ -176,7 +182,7 @@ function blankGame() {
     seen: { upgrades: 0, tracks: null, library: 0, updates: "" },
     library: {},
     runTime: 0,
-    run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0, foodEarned: 0 },
+    run: { peakPopulation: 0, peakCastes: {}, peakStrength: 0, foodEarned: 0, broodFull: 0 },
     best: { population: 0, jelly: 0, timeTo1000: 0 },
     peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
@@ -234,6 +240,12 @@ export function autoShedUnlocked() {
 }
 
 export function automationOn(key) {
+  // Sterile is about which few adaptations the colony holds, and Nest Memory
+  // spends the whole allowance on whatever is cheapest the moment it can --
+  // measured, both of an allowance of two on nanitic_food, worth nothing two
+  // hours in, and nothing gives a level back. The trial was decided by whether
+  // the player thought to switch it off, which is not a decision it announced.
+  if (key === "autoBuy" && sterileActive(game)) return false;
   return automationUnlocked(game, key) && game.settings[key] !== false;
 }
 
@@ -247,7 +259,11 @@ export function autoShedOn() {
 export function managedCaste() {
   const cap = populationCap(game);
   const pop = population(game);
-  if (cap - pop < Math.max(8, pop * 0.12) && isUnlocked(game, "excavator")) return "excavator";
+  // ...and never where digging cannot help. Under Sealed Nest the nest is
+  // permanently tight, so this was true every tick and Standing Orders spent
+  // the whole trial laying diggers that widened nothing.
+  if (cap - pop < Math.max(8, pop * 0.12) && isUnlocked(game, "excavator") &&
+      capPerExcavator(game) > 0) return "excavator";
   const ratios = game.settings.ratios || {};
   let want = null;
   let worst = 0;
@@ -313,11 +329,67 @@ export function broodSlots(casteId) {
   const space = broodSpace();
   if (space > 0) return space;
   if ((casteId || game.nextCaste) !== "excavator") return 0;
+  // She is allowed past the cap only because digging raises it, so the
+  // exemption closes behind itself. Sealed Nest sets that gain to nothing and
+  // it never closed: measured, 1,631 ants against a cap of 30, every one of
+  // them an excavator producing no food in a trial scored on a food rate.
+  if (capPerExcavator(game) <= 0) return 0;
   let digging = 0;
   for (const egg of game.eggs) if (egg.caste === "excavator") digging++;
   // a colony that tended three eggs could only ever dig three chambers out,
   // however many nurses it had; the brood is the real limit
   return Math.max(0, Math.max(EXCAVATOR_OVERFLOW, broodCapacity(game)) - digging);
+}
+
+// What the colony is actually short of, in the order the constraints bind. A
+// multiplier on a fraction f of the work is worth at most 1/(1-f) overall, so an
+// upgrade aimed anywhere but the binding constraint buys almost nothing -- which
+// is why the "+150%" forager line delivers about +44%, and why the first ten
+// minutes of a run cannot be bought out of at any price.
+// Sampled straight after the brood has been topped up and BEFORE anything
+// hatches, which is the only moment the brood is as full as it is going to get
+// -- read after the hatch loop it is always one egg short and never reports as
+// bound at all. Brood-bound means the chambers are full, the cap has room, and
+// the colony can pay for another egg: full chambers with an empty bank is being
+// short of food, not short of chambers.
+function sampleBottleneck(dt) {
+  const run = game.run || (game.run = {});
+  const cost = eggCost(game, autoCaste());
+  const bound = game.eggs.length >= broodCapacity(game) &&
+    broodSpace() > 0 && game[cost.resource] >= cost.amount ? 1 : 0;
+  const weight = Math.min(1, dt / BOTTLENECK_WINDOW);
+  run.broodFull = (run.broodFull || 0) * (1 - weight) + bound * weight;
+}
+
+export function colonyBottleneck() {
+  if (!game.wingsShed || game.emerged === 0) return null;
+  const run = game.run || {};
+  const caste = autoCaste();
+  const cost = eggCost(game, caste);
+  const full = Math.round(Math.min(1, run.broodFull || 0) * 100);
+  if (broodSpace() <= 0 && capPerExcavator(game) > 0) {
+    return { key: "cap", text: "The nest is full — " + population(game) + " ants in a cap of " +
+      populationCap(game) + ". Only excavators can be laid until it is widened." };
+  }
+  if (broodSpace() <= 0) {
+    return { key: "sealed", text: "The nest is full at " + populationCap(game) +
+      " and nothing here widens it. What the ants you have produce is the whole game." };
+  }
+  if (full >= 60) {
+    return { key: "brood", text: "Brood-bound — the chambers have been full " + full +
+      "% of the last minute. More of them, from nurses or the founders while they last, " +
+      "grows the colony faster than more food does." };
+  }
+  if (game[cost.resource] < cost.amount) {
+    return { key: "food", text: "Food-bound — the brood has room and the next egg costs " +
+      fmtAmount(cost.amount) + " " + cost.resource + ". Anything that raises the food rate pays here." };
+  }
+  return { key: "none", text: "Nothing is holding the colony back — there is room in the " +
+    "brood and food for the next egg. Whatever you lay now is what you get." };
+}
+
+function fmtAmount(n) {
+  return n >= 1000 ? Math.round(n).toLocaleString("en-US") : n.toFixed(0);
 }
 
 export function canLay(casteId) {
@@ -758,6 +830,7 @@ export function tick(dt) {
   // before, which is exactly what the flight is meant to sell.
   if (autoShedOn() && stripReady()) stripWing();
   runAutomation();
+  sampleBottleneck(dt);
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);

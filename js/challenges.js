@@ -17,11 +17,11 @@ export const TARGET_KINDS = {
   // a colony that is not allowed to grow cannot be asked for a headcount, so
   // the sealed nest is asked to make what little it has produce instead
   foodRate: { noun: "food a second", verb: "Reach", gerund: "reaching",
-    of: "from a nest that cannot widen", rate: true },
+    of: "from a nest that cannot widen", rate: true, scalesWithFood: true },
   // a trial about holding output up over time cannot be measured on a rate,
   // which a handful of ants meets in the first minute
   runFood: { noun: "food", verb: "Gather", gerund: "gathering",
-    of: "with this one colony" }
+    of: "with this one colony", scalesWithFood: true }
 };
 
 // A trial can be LOST as well as won. Declared per trial so the next ones can
@@ -51,6 +51,26 @@ export function challengeTarget(challenge) {
 
 export function targetKind(challenge) {
   return TARGET_KINDS[challengeTarget(challenge).kind] || TARGET_KINDS.population;
+}
+
+// What a trial is actually asking for right now. A food-measured target has to
+// move with the food masteries the colony holds, or it is not a target at all.
+// Deep Cisterns pays x2 food a level and multiplies EVERYTHING, so five levels
+// of Drought is x32 on every food figure in the game -- measured, that cleared
+// Sealed Nest and the Nanitic Line in twenty to thirty seconds a level, while a
+// colony that had not cleared Drought could not clear either of them at any
+// level of play. There was no window in which either was a trial: impossible
+// before Drought, a formality after. Scaling the ask by the same figure makes
+// them mastery-neutral, so what they measure is what THIS colony manages under
+// the debuff rather than what a previous trial handed it.
+//
+// Only the food-measured kinds scale. A headcount is bounded by the cap and a
+// raid count by the clock, and neither moves with a food multiplier.
+export function challengeTargetAmount(game, challenge) {
+  const target = challengeTarget(challenge);
+  const kind = TARGET_KINDS[target.kind];
+  return kind && kind.scalesWithFood
+    ? target.amount * masteryFood(game) : target.amount;
 }
 
 // the debuff for the level being attempted, and the permanent reward held from
@@ -140,7 +160,21 @@ export const BARREN_SCALE = 0.42;
 // 0.38 the last levels became impossible rather than slow; at 0.40 with a 2,500
 // target every level is reachable and the ramp is in how long it takes.
 export const SEALED_SCALE = 0.40;
-export const SEALED_TARGET_RATE = 2500;
+// Measured against a colony holding no other mastery and buying its adaptations
+// by hand. Swept at 200 / 250 / 300 / 350 / 400 / 450 / 500 across all five
+// attempts: below 350 every attempt clears in two minutes, at 450 the last two
+// run past two hours, and 400 gives 2.0 / 4.0 / 12.2 / 38.0 / 36.0 minutes --
+// a real ramp with nothing out of reach. It is multiplied by whatever food
+// mastery the colony holds -- see challengeTargetAmount -- so a Drought-
+// mastered player meets the same trial rather than a formality. The old 2,500
+// was calibrated on a colony that already held Drought, and measured, no
+// first-time player could reach even the first level of it.
+//
+// The ramp is two-step rather than five: attempts one to three sit at 2-12
+// minutes and four and five at about 37. That is SEALED_SCALE at 0.40 against
+// a x2 cap mastery, which leaves the nest at 0.8^level -- a deliberately gentle
+// shrink. Steepening it is the lever if a five-step ramp is wanted.
+export const SEALED_TARGET_RATE = 400;
 
 // Sterile. The colony may hold only so many bought adaptation levels at once,
 // and that allowance falls to nothing by the last attempt. Unlike the others
@@ -177,7 +211,12 @@ export const STERILE_ALLOWANCE = [10, 7, 4, 2, 0];
 // crowding.
 export const CALLOW_CROWDING = 0.012;
 export const CALLOW_SCALE = 2.15;
-export const CALLOW_TARGET_FOOD = 38000;
+// Measured ceilings with no other mastery held: 215K / 155K / 100K / 59.7K /
+// 32.8K. 28,000 is an eighth of the first attempt's and seven eighths of the
+// last -- the shape this trial was always meant to have, which the old 38,000
+// missed by asking for more than the last attempt could ever gather. Scaled by
+// the colony's food mastery, as SEALED_TARGET_RATE is.
+export const CALLOW_TARGET_FOOD = 28000;
 export const CHALLENGE_BASE_DEBUFF = 0.25;
 export const CHALLENGE_LEVEL_SCALE = 0.36;
 export const CHALLENGE_REWARD_STEP = 1.1;
@@ -262,7 +301,7 @@ export const CHALLENGES = [
     open: true,
     kind: "sterile",
     flavour: "Nothing the colony learns takes hold. Every generation begins from instinct alone.",
-    debuff: "The colony can hold only a few bought adaptation levels at once, and fewer with every attempt \u2014 none at all on the last.",
+    debuff: "The colony can hold only a few bought adaptation levels at once, and fewer with every attempt \u2014 none at all on the last. Nest Memory does not run here: which few you hold is yours to decide, and nothing gives a level back.",
     // it denies you adaptations, so it gives adaptations back
     mastery: { type: "upgrades", step: 1.25, levels: 1, name: "Learned by Heart",
       desc: "What the colony kept when nothing else took hold. Every level raises the max of every upgrade line by one, and makes every level you buy a quarter stronger." },
@@ -509,5 +548,5 @@ export function challengeProgress(game, values) {
 export function challengeTargetMet(game, values) {
   const challenge = activeChallenge(game);
   if (!challenge || challengeFailed(game)) return false;
-  return challengeProgress(game, values) >= challengeTarget(challenge).amount;
+  return challengeProgress(game, values) >= challengeTargetAmount(game, challenge);
 }

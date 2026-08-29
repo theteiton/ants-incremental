@@ -53,6 +53,7 @@ import {
   broodSlots,
   destroyEggRange,
   broodSpace,
+  colonyBottleneck,
   buyPrestigeUpgrade,
   canLay,
   doFlight,
@@ -94,6 +95,7 @@ import {
   CALLOW_SCALE,
   callowCrowding,
   challengeTarget,
+  challengeTargetAmount,
   targetKind,
   challengeCount,
   challengeFailed,
@@ -446,6 +448,21 @@ function renderSlots(eggs, slots, tended) {
   el("slotOverflow").textContent = slots > SLOT_LIMIT
     ? "and " + fmt(slots - SLOT_LIMIT) + " more slots working out of sight"
     : "";
+  renderBottleneck();
+}
+
+// What the colony is short of, said out loud. It is the one thing the game
+// always knew and never told anyone: an upgrade aimed anywhere but the binding
+// constraint is a multiplier on a fraction, and buys almost nothing.
+function renderBottleneck() {
+  const box = el("broodBottleneck");
+  const state = colonyBottleneck();
+  box.hidden = !state;
+  if (!state) return;
+  box.textContent = state.text;
+  for (const key of ["cap", "sealed", "brood", "food", "none"]) {
+    box.classList.toggle("is-" + key, state.key === key);
+  }
 }
 
 // Three numbers in the stats bar are all a player needs while a fight is
@@ -1276,10 +1293,16 @@ function trialDetail(challenge) {
   TRIAL_KEEPS.forEach(line => lines.push("  · " + line));
   lines.push("");
   lines.push("TO CLEAR IT");
-  const target = challengeTarget(challenge);
   const kind = targetKind(challenge);
-  lines.push("  · " + kind.verb + " " + fmt(target.amount) + " " + kind.noun + " " + kind.of +
+  lines.push("  · " + kind.verb + " " + fmt(challengeTargetAmount(game, challenge)) + " " +
+    kind.noun + " " + kind.of +
     (mine ? " — you have " + fmt(challengeCount()) : ""));
+  // a food-measured ask moves with the food masteries held, or a mastered
+  // colony would be meeting a target tuned for one that had nothing
+  if (kind.scalesWithFood) {
+    lines.push("  · That figure rises with every food mastery you hold, so what " +
+      "this trial asks is always what this colony manages under the debuff.");
+  }
   lines.push("");
   lines.push("IF YOU CLEAR IT");
   const m = challenge.mastery;
@@ -1399,7 +1422,7 @@ function renderChallenges() {
   note.hidden = !running;
   if (running) {
     const rk = targetKind(running);
-    const rt = challengeTarget(running);
+    const rt = { amount: challengeTargetAmount(game, running) };
     const lost = challengeFailed(game);
     const lostRule = challengeFailKind(running);
     note.textContent = lost
@@ -1432,7 +1455,7 @@ function renderChallenges() {
       : mastered ? "Every level survived. Nothing here is left to prove."
       : challengeDebuffText(challenge, level);
     const tKind = targetKind(challenge);
-    const tAmount = challengeTarget(challenge).amount;
+    const tAmount = challengeTargetAmount(game, challenge);
     ui.target.textContent = challenge.open && !mastered
       ? "Clear it by " + tKind.gerund + " " + fmt(tAmount) + " " + tKind.noun + "." +
         (mine ? " You have " + fmt(challengeCount()) + "." : "")
@@ -1897,6 +1920,17 @@ function buildReadoutHelp() {
     note: () => game.wingsShed
       ? "She will never fly again. Everything the colony becomes comes out of her."
       : "She has landed and shed nothing yet. The first click is hers.",
+    warn: false });
+  watch(el("broodBottleneck"), {
+    title: "What the colony is short of",
+    body: "The one constraint actually holding growth back right now.",
+    note: () => "Every upgrade is a multiplier on some part of the work, so one " +
+      "aimed anywhere but the binding constraint buys almost nothing — the " +
+      "\"+150%\" forager line delivers about +44% overall because foragers are " +
+      "only part of the food. This line names the part that is binding. The " +
+      "brood is a throughput limit rather than a speed one, so a colony whose " +
+      "chambers are full cannot be bought out of it at any price; a colony with " +
+      "room and no food can.",
     warn: false });
   watch(el("broodPanel"), {
     title: "The brood", body: "Eggs develop here, a few at a time.",

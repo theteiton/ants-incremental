@@ -437,7 +437,83 @@ Gyroth and amsel both reached 1K+ ants. Done since: four nanitics, achievement d
 
 ---
 
-## Measured 28 August 2026 — the trial ladder
+**A trial cannot be gated behind another trial by accident.** Deep Cisterns pays
+×2 food a level and multiplies *everything*, so a mastered Drought is ×32 on
+every food figure in the game — and three of the six trials are measured in
+food. Measured, that made Sealed Nest and the Nanitic Line clear in twenty to
+thirty *seconds* a level, while a colony that had not cleared Drought could not
+clear Sealed Nest level 1 at any level of play (411/s against a 2,500 target) nor
+the Nanitic Line's level 5 (a 32,798 ceiling against a 38,000 target). There was
+no window in which either was a trial. **A food-measured target now scales with
+`masteryFood(game)`**, which makes those trials mastery-neutral: what they ask is
+what this colony manages under its own debuff, not what a previous trial handed
+it. Only the food-measured kinds scale — a headcount is bounded by the cap and a
+raid count by the clock, and neither moves with a food multiplier. The bases were
+recalibrated against a colony holding nothing: `SEALED_TARGET_RATE` 2,500 → 400
+and `CALLOW_TARGET_FOOD` 38,000 → 28,000. Measured after, with a player buying by
+value: Sealed Nest 2.0 / 4.0 / 12.2 / 38.0 / 36.0m, Sterile 26.6 / 26.2 / 32.6 /
+84.1 / 277.4m, Endless Siege at 60% soldiers 23.1–23.5m a level, Barren Brood
+26–62m, the Nanitic Line still the short one at 1.6–2.5m. Sealed Nest's ramp is
+two-step rather than five because `SEALED_SCALE` 0.40 against a ×2 cap mastery
+leaves the nest at 0.8^level; steepening that is the lever if five steps are
+wanted.
+
+**An excavator may only dig past the cap where digging raises it.** `broodSlots()`
+lets excavator eggs exceed the cap because she digs the chamber she will occupy,
+and outside a trial the exemption closes behind itself since each one raises the
+cap. Sealed Nest sets that gain to nothing, so it never closed — measured, 1,631
+ants against a cap of 30, every one of them producing no food in the one trial
+scored on a food rate. `capPerExcavator()` is now the single source for that
+figure, and both `broodSlots()` and `managedCaste()` read it: the dig-out
+exemption is refused when it is zero, and Standing Orders stops choosing
+excavators when digging cannot help. Outside a trial nothing moved — the ordinary
+run still paces at 1.2 / 3.1 / 7.1 / 22.8 / 41.4 / 60.9 / 87.9 minutes.
+
+**Nest Memory does not run inside Sterile.** The trial is about which few
+adaptation levels the colony holds, and the automation spent the whole allowance
+on whatever was cheapest the moment it could — measured, both of an allowance of
+two on `nanitic_food`, worth nothing two hours in, and nothing gives a level
+back. Sterile was decided by whether the player thought to switch it off, which
+it never said. With it off the trial is a real decision: a player buying by
+gain-per-cost *right now* still falls for it (74.8 / 100.5 / 218.6m and then two
+failures), because at minute two the founders' line genuinely is the best buy and
+worthless by minute sixty; a player who buys only the lines that keep paying gets
+26.6 / 26.2 / 32.6 / 84.1 / 277.4m. `automationOn()` stays the single gate.
+
+**The colony says what is actually holding it back.** A line under the brood names
+the one binding constraint — a full nest, full chambers, or no food for the next
+egg — because every upgrade is a multiplier on some fraction of the work and one
+aimed anywhere else buys almost nothing. That is Amdahl's bound, and the game had
+always known the answer without saying it: the "+150%" forager line delivers
+about +44% overall. Brood saturation is a sixty-second rolling figure in
+`run.broodFull`, **sampled after `runAutomation()` and before the hatch loop** —
+read after hatching the brood is always one egg short and never reports as bound
+at all. Brood-bound means full chambers *and* cap room *and* the food for another
+egg; full chambers with an empty bank is being short of food.
+
+**An adaptation level that cannot pay says so.** Past its designed rungs,
+`nanitic_food` can be pushed to level 12 and every extended level costs millions
+of protein to move the colony's rate by ×1.000003 — four founders cannot be more
+than a rounding error against twenty thousand foragers, and clearing Sterile
+makes it worse by raising the cap on every line at once. A card is greyed and
+says so when an *extended* level of a **caste-scoped food line** moves the rate by
+under 0.1%. Only `casteFlat`, `casteFood` and `casteMult` are tested: a line
+paying in cap, brood, combat strength or raid protein moves nothing the food rate
+can see, and reading its flat ×1.000000 as spent greyed out `protein_yield`,
+which was working perfectly. `globalFood` is excluded for the opposite reason —
+it multiplies all of the work, so its bound is infinite.
+
+**Relentless can be lost.** A fully mastered colony held a 5.18× margin and went
+119W/0L over twelve hours, so the hardest setting in the game had never once lost
+a raid — a label rather than a choice. `seesMastery` goes 1 → 1.5, so the attacker
+brings half again as much of what Hardened Line taught you. Swept: at 1.25 the
+margin is 2.19× and still 119W/0L, at 1.5 it is 0.95× and 112W/3L, at 1.75 the
+colony collapses to 2W/3L. Because the term scales with how mastered the colony
+is, one that has only just cleared the siege still enters at 1.20× and 78W/0L.
+
+---
+
+## Measured 28 August 2026 — the trial ladder, before the fixes above
 
 Every trial laddered from level 1 to 5 under one fixed policy, driven by the
 game's own automation so the real code paths run. Nothing below is fixed yet.
@@ -472,6 +548,9 @@ which is worth nothing two hours in: 445 ants at three hours, never clears. The
 same colony with those two levels spent by hand on the forager line clears in
 **91.6 minutes**. Nothing gives an upgrade level back, so the allocation is
 permanent for that run, and the trial never says the choice was made.
+
+**Everything above this line was fixed in 0.1.8.0.** What follows was sound at
+the time and still is.
 
 **What was measured and is sound.** Forty-eight hours of a fully mastered colony
 under Unchecked: no NaN, no negative resource, no runaway — level 35, 479W/0L,

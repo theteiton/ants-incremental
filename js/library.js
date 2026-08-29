@@ -292,6 +292,18 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.1.8.0", name: "Trials you can actually reach, and a colony that says what it is short of",
+    changes: [
+      "The trials no longer have a secret order. Deep Cisterns doubles all food per level, and three trials are measured in food — so five levels of Drought made Sealed Nest and the Nanitic Line clear in half a minute, while a colony that had not cleared Drought could not clear either of them at all. A food-measured target now rises with the food masteries you hold, so every trial asks what this colony manages under its own debuff.",
+      "Sealed Nest and the Nanitic Line were both unreachable on a first attempt and are now a real ladder. Sealed Nest runs about 2, 4, 12, 38 and 36 minutes across its five attempts; the Nanitic Line stays the short one.",
+      "Excavators no longer dig past a cap they cannot raise. Inside Sealed Nest the dig-out rule never closed behind itself, so a colony could hold 1,631 ants in a nest built for 30 — and Standing Orders spent the whole trial laying diggers that widened nothing.",
+      "Nest Memory does not run inside Sterile. It spent the whole allowance on whatever was cheapest, which was worth nothing an hour later, and no adaptation level can be given back. Which few you hold is the trial.",
+      "Under the brood, the colony now says what is actually holding it back — chambers, food, or a full nest. An upgrade aimed anywhere else is a multiplier on a fraction, and buys almost nothing.",
+      "An adaptation level that cannot pay says so. Pushed past its designed rungs, the founders' food line was costing millions of protein to move the colony's rate by three parts in a million, because four founders cannot matter against twenty thousand foragers.",
+      "Relentless lives up to its name. A colony that had mastered the trials had never once lost a raid on the hardest setting; the attacker now sees half again as much of what Hardened Line taught you, and a mastered nest is broken into now and then.",
+      "Sterile's card said its reward was “nothing else”. It is the only mastery that raises the max level of every adaptation line there is."
+    ] },
+
   { version: "0.1.7.0", name: "Every trial playable, and a library",
     changes: [
       "All six trials are open. Sealed Nest, Barren Brood, Sterile and the Nanitic Line join Drought and the Endless Siege, and each still gives back exactly the thing it took away.",

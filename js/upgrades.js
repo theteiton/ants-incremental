@@ -447,6 +447,42 @@ function formulaLines(upgrade, probe) {
   return [];
 }
 
+// Amdahl's bound, applied to an upgrade line. A multiplier on a fraction f of
+// the colony's work is worth at most 1/(1-f) overall, however large it is -- so
+// a line whose caste has faded to nothing buys nothing, at any price. Measured,
+// nanitic_food can be pushed to level 12 and each extended level costs millions
+// of protein to move the colony's rate by x1.000003, because four founders
+// cannot be more than a rounding error against twenty thousand foragers.
+// Clearing Sterile makes it worse, since it raises the cap on every line at
+// once, including the ones that have nothing left to give.
+//
+// Only EXTENDED levels are marked. A defined level is part of the designed
+// ladder and is left alone whatever the current rates say.
+const SPENT_GAIN = 1.001;
+// Only a caste-scoped FOOD line can run out this way, and only those are
+// tested. A line paying in cap, brood, combat strength or raid protein moves
+// nothing the food rate can see, and reading its flat x1.000000 as "spent"
+// would grey out lines that are working perfectly -- protein_yield was the one
+// that caught this. globalFood is excluded for the opposite reason: it
+// multiplies all of the work, so its bound is infinite and it never runs out.
+const SPENT_TYPES = { casteFlat: 1, casteFood: 1, casteMult: 1 };
+
+function levelIsSpent(line) {
+  if (!SPENT_TYPES[line.effect && line.effect.type]) return false;
+  if (upgradeLevel(game, line) < line.levels.length) return false;
+  const before = foodPerSecond(game);
+  if (before <= 0) return false;
+  return foodPerSecond(probeWith(line)) / before < SPENT_GAIN;
+}
+
+function spentText(line) {
+  const caste = line.effect && line.effect.caste;
+  return caste
+    ? "Nothing left to gain — " + (CASTES[caste] ? CASTES[caste].name.toLowerCase() : caste) +
+      "s are too small a share of the colony for another level to show."
+    : "Nothing left to gain — another level does not move any rate the colony has.";
+}
+
 function previewUpgrade(upgrade) {
   const probe = probeWith(upgrade);
   const type = upgrade.effect.type;
@@ -649,7 +685,10 @@ export function renderUpgrades() {
           ? "Clear another level of the trial that pays in " + upgrade.mastery + " to raise this cap."
           : "")
       : upgradeLockText(game, upgrade);
-    ui.effect.textContent = isOwned || !isOpen ? "" : previewUpgrade(upgrade);
+    const spent = !isOwned && isOpen && levelIsSpent(upgrade);
+    ui.card.classList.toggle("spent", spent);
+    ui.effect.textContent = isOwned || !isOpen ? ""
+      : spent ? spentText(upgrade) : previewUpgrade(upgrade);
     ui.formula.textContent = isOwned || !isOpen
       ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || "");
   });

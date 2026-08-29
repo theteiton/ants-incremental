@@ -744,12 +744,19 @@ export function foodPerSecond(game) {
   return rate + bigForagerOutput(game) + wingYield(game);
 }
 
+// What one excavator adds to the cap. Sealed Nest sets it to nothing -- the soil
+// sets like stone and diggers widen it not at all -- and the dig-out rule has to
+// read this rather than assume it: an excavator is only allowed past the cap
+// because she raises it, and where she does not, the exemption never closes.
+export function capPerExcavator(game) {
+  if (sealedActive(game)) return 0;
+  return CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
+}
+
 export function populationCap(game) {
-  const perExcavator = sealedActive(game)
-    ? 0   // the soil sets like stone; diggers widen nothing
-    : CAP_PER_EXCAVATOR + sumEffect(game, "excavatorCap") + prestigeExcavatorCap(game);
   const base = (BASE_POPULATION_CAP + prestigeBaseCap(game)) * sealedCapScale(game);
-  return Math.max(1, Math.floor((base + perExcavator * game.ants.excavator) * masteryCap(game)));
+  return Math.max(1, Math.floor(
+    (base + capPerExcavator(game) * game.ants.excavator) * masteryCap(game)));
 }
 
 export function hatchRate(game) {

@@ -217,11 +217,14 @@ export function applySave(game, fresh, data) {
     ? { peakPopulation: savedRun.peakPopulation || 0,
         peakCastes: Object.assign({}, savedRun.peakCastes || {}),
         peakStrength: savedRun.peakStrength || 0,
-        foodEarned: savedRun.foodEarned || 0 }
+        foodEarned: savedRun.foodEarned || 0,
+        // the rolling brood-saturation figure the bottleneck line reads. A save
+        // that predates it starts at zero and settles within a minute of play.
+        broodFull: savedRun.broodFull || 0 }
     // a save written before the split earned its gates already; keep them
     : { peakPopulation: data.peakPopulation || 0,
         peakCastes: Object.assign({}, data.peakCastes || {}),
-        peakStrength: data.peakStrength || 0, foodEarned: 0 };
+        peakStrength: data.peakStrength || 0, foodEarned: 0, broodFull: 0 };
   const savedPrestige = data.prestige || {};
   game.prestige = {
     royalJelly: savedPrestige.royalJelly || 0,
