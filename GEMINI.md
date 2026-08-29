@@ -47,6 +47,17 @@ Claude Code and Gemini/Antigravity both work in here. Take the work you are bett
 
 **Whoever ships updates Current state in the same commit, in both files.** `CLAUDE.md` and `GEMINI.md` differ only in the title, the agent-specific block above, and which of the two the layout listing marks as "this file". Everything else is byte-identical on purpose: edit one, edit the other.
 
+
+---
+
+## Three documents, three jobs
+
+`CLAUDE.md` and `GEMINI.md` hold what is **settled** — the design canon, the
+measured numbers behind it, and the invariants that break if a constant moves.
+`DEVLOG.md` holds what **shipped**, newest first. `ROADMAP.md` holds what is
+**planned and still arguable**; nothing in it is canon until it lands, and when
+it does it moves into these two files and comes out of the roadmap.
+
 ---
 
 ## Hard constraints
@@ -82,6 +93,8 @@ js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
 CLAUDE.md           instructions for Claude
 GEMINI.md           this file (instructions for Gemini)
+ROADMAP.md          what is planned and not yet settled
+DEVLOG.md           every release, newest first
 README.md
 ```
 

@@ -2,9 +2,11 @@
 
 Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
-- **epoch** — stays `0` until the game is finished. **1.0.0.0** is the release
-  where the last planned prestige layer ships, somewhere around the fifth or
-  sixth. Everything before that is the run-up to it.
+- **epoch** — stays `0` until the game leaves beta. **1.0.0.0** is the release
+  where every system in the game is finished, documented and balanced. It used
+  to mean "the last planned prestige layer ships"; the game is open-ended now,
+  with layers shipping until they stop being worth building, so that definition
+  would never have fired. See `ROADMAP.md`.
 - **layer** — which prestige layer the work belongs to. `0` is the founding
   game before any prestige existed, `1` is the Nuptial Flight and everything
   built on it, and the Matriline will be `2`.
