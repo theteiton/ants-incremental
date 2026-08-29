@@ -632,6 +632,39 @@ moment the markup nests differently. The box has its own id.
 
 ---
 
+**The whole game is 7.6 hours of active play, measured end to end.** One policy
+from the first click to all six species finished, identical across three seeds:
+0.78h to the first 1,000 ants, 1.44h to a complete Royal Lineage across five
+flights, 6.67h with every trial mastered, and **7.6h with all six species
+finished**. Not two days, and not the 27 hours the per-trial table implies.
+
+**Per-trial times measured one trial at a time do not add up to a playthrough.**
+Each of those was taken from a colony holding no other mastery, so they compose
+into a number nothing experiences. Inside one run the masteries compound and the
+back half of the ladder collapses: Drought 117 minutes for five levels, Endless
+Siege 115, Barren Brood 78 — then **the Nanitic Line in 1.4 minutes, Sealed Nest
+in 0.5, and Sterile in 2.4, for five levels each**. Any figure quoted for a trial
+has to say what the colony was holding when it was taken.
+
+**A trial's target scales with one mastery; the colony entering it has grown by
+everything.** 0.1.8.0 made the food-measured targets scale with `masteryFood`,
+which fixed the case where Drought made them impossible-then-trivial — but it
+under-shot, because by the fourth trial the colony also holds an achievement
+level worth ×4.07 food, every upgrade line bought out, and the cap and brood
+masteries. Sealed Nest is scaled and still clears in half a minute. **The general
+fix is to ask for a fraction of what this colony would produce undebuffed**,
+which is self-scaling against every source at once rather than against one of
+them.
+
+**Layer 2 is 0.9 hours against a 40-hour budget, because a mastered colony flies
+in about a minute.** Finishing a species is twenty points and a nuptial flight is
+worth one, so twelve flights is twelve minutes; two branch nodes cover eight
+points more. The point costs were priced as though a flight were an event. Any
+layer-2 length has to be built on something that takes real time, and in this
+game the only thing that does is a trial.
+
+---
+
 ## Playtest feedback — 23 August 2026
 
 From the itch.io comments: CoolRadGamer, Akami and sir_pinski.

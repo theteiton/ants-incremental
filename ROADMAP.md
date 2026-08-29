@@ -13,12 +13,21 @@ Last updated 29 August 2026, against 0.2.1.0.
 
 Layers 0, 1 and 2 are built.
 
+Measured as one playthrough under a single policy, identical across three seeds:
+
 | | measured |
 |---|---|
-| first run to 1,000 ants | 60.9m idle, 47.7m rallying |
-| the Royal Lineage, all 13 adaptations | about 4.9 hours across 2 flights |
-| all six trials, every level | about 22.3 hours |
-| **layer 0 + layer 1, end to end** | **about 27 hours** |
+| first colony to 1,000 ants | 0.78h |
+| the Royal Lineage complete, 5 flights | 1.44h |
+| every trial mastered | 6.67h |
+| **all six species finished — the whole game** | **7.6h** |
+
+**The 27-hour figure this file used to carry was wrong.** It added up per-trial
+times each measured from a colony holding no other mastery, and those do not
+compose: inside one run the masteries compound and the back half of the ladder
+collapses — Drought 117 minutes for five levels, the Endless Siege 115, Barren
+Brood 78, then the Nanitic Line in 1.4 minutes, Sealed Nest in 0.5 and Sterile in
+2.4.
 
 Per-level trial times, which are the unit everything below is sized in: Drought
 96.7 / 86.4 / 96.0 / 96.2 / 114.3m, Sterile 60.6 / 89.6 / 192.5 / 310.7 / 270.6m,
@@ -122,6 +131,18 @@ was meant as one.
 ---
 
 ## Open decisions
+
+1. **Layer 2 is 0.9 hours against the 40 you asked for.** Finishing a species is
+   twenty points, a nuptial flight is worth one, and a mastered colony flies in
+   about a minute — so twelve flights is twelve minutes and two branch nodes
+   cover eight points more. The costs were priced as though a flight were an
+   event. Any real length has to be built on something that takes time, and the
+   only thing in this game that does is a trial.
+2. **A trial's target scales with one mastery while the colony has grown by
+   everything.** Sealed Nest's target rises with `masteryFood` and it still
+   clears in half a minute, because the colony also holds an achievement level
+   worth ×4.07 food and every upgrade line bought out. Asking for a fraction of
+   what the colony would produce undebuffed is self-scaling against all of it.
 
 1. **Do the species passives still need re-aiming?** 0.2.1.0 answered the
    symptom rather than the cause: the Instincts tree now carries the
