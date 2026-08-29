@@ -54,6 +54,7 @@ import {
   destroyEggRange,
   broodSpace,
   colonyBottleneck,
+  markAwaySeen,
   GENERIC,
   SPECIES,
   SPECIES_TARGET,
@@ -1013,6 +1014,8 @@ function renderAway() {
   const box = el("awayNote");
   box.hidden = !away;
   if (!away) return;
+  // shown once, on the first frame after loading
+  openAwayReport(away);
   const bits = ["+" + fmt(away.food) + " food"];
   if (away.protein > 0.5) bits.push("+" + fmt(away.protein) + " protein");
   if (away.hatched > 0) bits.push(fmt(away.hatched) + " hatched");
@@ -1814,6 +1817,137 @@ function renderMatriline() {
   }
 }
 
+// ------------------------------------------------------- the away report
+//
+// The colony kept working while nobody was watching, and the one-line note that
+// used to say so could not say the thing that matters most: how much of the
+// absence actually counted. Away for thirty hours against an eight hour cap is
+// twenty-two hours the colony did not work, and the line read "while you were
+// away -- 8h" as though that were the whole story.
+//
+// The catch-up itself is NOT animated. load() applies it in one pass before any
+// of this runs, so the colony is already in its final state and what is animated
+// is only the reveal -- the clock sweeping the absence and the figures counting
+// up to numbers that are already true. Deferring the real ticks across frames
+// would let the player lay an egg halfway through and land somewhere the instant
+// path never would.
+const AWAY_MODAL_MIN = 300;        // five minutes; a tab-switch should not nag
+const AWAY_SWEEP_MS = 1600;
+const awayRows = [];
+let awayAnim = null;
+
+function buildAwayReport() {
+  const list = el("awayRows");
+  for (let i = 0; i < 6; i++) {
+    const row = document.createElement("div");
+    row.className = "away-row";
+    row.innerHTML = '<span class="away-label"></span><b class="away-value"></b>';
+    list.appendChild(row);
+    awayRows.push({ row, label: row.querySelector(".away-label"), value: row.querySelector(".away-value") });
+  }
+  el("awayClose").onclick = closeAwayReport;
+  el("awaySkip").onclick = () => { finishAwaySweep(); };
+  el("awayModal").onclick = event => {
+    if (event.target === el("awayModal")) closeAwayReport();
+  };
+}
+
+function awayFigures(away) {
+  const rows = [];
+  rows.push(["Food gathered", () => "+" + fmt(away.food)]);
+  if (away.protein > 0.5) rows.push(["Protein rendered", () => "+" + fmt(away.protein)]);
+  if (away.hatched > 0) rows.push(["Ants hatched", () => fmt(away.hatched)]);
+  const grew = away.popAfter - away.popBefore;
+  if (grew !== 0) {
+    rows.push(["The colony", () => fmt(away.popBefore) + " \u2192 " + fmt(away.popAfter) +
+      " ants (" + (grew > 0 ? "+" : "") + fmt(grew) + ")"]);
+  }
+  if (away.won > 0 || away.lost > 0) {
+    rows.push(["Raids", () => away.won + " won, " + away.lost + " lost"]);
+  }
+  return rows.slice(0, awayRows.length);
+}
+
+function openAwayReport(away) {
+  if (!away || away.seen) return;
+  markAwaySeen();
+  if (game.settings.awayReport === false || away.seconds < AWAY_MODAL_MIN) return;
+  const figures = awayFigures(away);
+  el("awaySpan").textContent = "The colony worked for " + fmtTime(away.seconds) +
+    (away.capped ? " of the " + fmtTime(away.requested) + " you were gone." : ".");
+  el("awayCapNote").hidden = !away.capped;
+  if (away.capped) {
+    el("awayCapNote").textContent = "The nest can only carry on for " + fmtTime(away.cap) +
+      " unwatched, so " + fmtTime(away.requested - away.seconds) + " of that went unworked. " +
+      "Crop Reserve and Full Crop both lengthen it.";
+  }
+  el("awayBottleneck").textContent = away.hiding
+    ? "She went to ground while you were gone \u2014 there are no soldiers, so nothing is attacking and foraging is halved."
+    : (colonyBottleneck() || {}).text || "";
+  awayRows.forEach((ui, i) => {
+    const figure = figures[i];
+    ui.row.hidden = !figure;
+    if (figure) { ui.label.textContent = figure[0]; ui.value.textContent = ""; }
+  });
+  el("awayModal").hidden = false;
+  startAwaySweep(away, figures);
+}
+
+function startAwaySweep(away, figures) {
+  const began = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  awayAnim = { away, figures, began, done: false };
+  el("awaySkip").hidden = false;
+  stepAwaySweep();
+}
+
+// eased so it rushes through the middle of the absence and settles at the end,
+// which is what "time speeding up" actually feels like
+function stepAwaySweep() {
+  if (!awayAnim || awayAnim.done) return;
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const t = Math.min(1, (now - awayAnim.began) / AWAY_SWEEP_MS);
+  const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  paintAwaySweep(eased);
+  if (t >= 1) { finishAwaySweep(); return; }
+  requestAnimationFrame(stepAwaySweep);
+}
+
+function paintAwaySweep(share) {
+  const away = awayAnim.away;
+  el("awayBar").style.width = (share * 100).toFixed(1) + "%";
+  el("awayClock").textContent = fmtTime(away.seconds * share);
+  awayAnim.figures.forEach((figure, i) => {
+    const ui = awayRows[i];
+    if (!ui) return;
+    // the last row of each is a string rather than a number, so the sweep only
+    // scales the ones that count
+    ui.value.textContent = share >= 1 ? figure[1]() : partialFigure(figure, share);
+  });
+}
+
+function partialFigure(figure, share) {
+  const full = figure[1]();
+  // count up anything that is a single figure; leave composed lines to the end
+  const single = /^\+?[\d.]+[KMBTQSOND]*$/.test(full.replace(/,/g, ""));
+  if (!single) return full;
+  const sign = full.startsWith("+") ? "+" : "";
+  const value = parseAmount(full.replace(/^\+/, ""));
+  return Number.isFinite(value) ? sign + fmt(value * share) : full;
+}
+
+function finishAwaySweep() {
+  if (!awayAnim) return;
+  awayAnim.done = true;
+  paintAwaySweep(1);
+  el("awaySkip").hidden = true;
+  awayAnim = null;
+}
+
+function closeAwayReport() {
+  finishAwaySweep();
+  el("awayModal").hidden = true;
+}
+
 // --------------------------------------------------- the brood chamber window
 
 // The queue is strict FIFO and it is laid in batches, so a 600-egg queue is a
@@ -2208,7 +2342,10 @@ document.addEventListener("keydown", event => {
   if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
   if (key === "e") { event.preventDefault(); openInspectModal(); }
-  else if (key === "escape") el("inspectModal").hidden = true;
+  else if (key === "escape") {
+    if (!el("awayModal").hidden) closeAwayReport();
+    else el("inspectModal").hidden = true;
+  }
 });
 
 buildReadoutHelp();
@@ -2224,6 +2361,7 @@ buildRaidDifficulty();
 buildLibrary();
 buildUpdates();
 buildMatriline();
+buildAwayReport();
 setInstinctBuyer(id => { if (buyInstinct(id)) render(); });
 buildLibraryTabs();
 buildCombatTabs();

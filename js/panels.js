@@ -440,6 +440,10 @@ export function buildSettings(handlers) {
   // The panel following the scroll is what makes hover-to-inspect work without
   // moving the mouse, but it also means a panel that never leaves the screen.
   // Asked for as a choice rather than a default either way.
+  el("setAwayReport").onchange = event => {
+    setSetting("awayReport", event.target.checked);
+    handlers.refresh();
+  };
   el("setStickyInspector").onchange = event => {
     setSetting("stickyInspector", event.target.checked);
     handlers.applyLayout();
@@ -521,6 +525,11 @@ export function renderSettings() {
   el("setExile").checked = !!game.settings.exileEnabled;
   el("setTheme").value = game.settings.theme || "dark";
   el("setNotation").value = game.settings.notation || "suffix";
+  const report = game.settings.awayReport !== false;
+  el("setAwayReport").checked = report;
+  el("awayReportNote").textContent = report
+    ? "A window on your return, for absences over five minutes, showing what the colony did."
+    : "Off. The line under the header still says what was gathered.";
   const sticky = game.settings.stickyInspector !== false;
   el("setStickyInspector").checked = sticky;
   el("stickyInspectorNote").textContent = sticky

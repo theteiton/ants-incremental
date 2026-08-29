@@ -297,6 +297,8 @@
       <h2>Colony rules</h2>
       <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
       <p class="dim" id="exileStatus"></p>
+      <label class="toggle row-toggle"><input type="checkbox" id="setAwayReport"> Report what happened while you were away</label>
+      <p class="dim" id="awayReportNote"></p>
 
       <h2>Her majesty</h2>
       <label class="field">Queen's name
@@ -385,6 +387,22 @@
       <button id="saveClose">Close</button>
       <button id="saveCopy">Copy</button>
       <button id="saveLoad" class="danger">Load this save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="awayModal" hidden>
+  <div class="modal-box away-box">
+    <h2 id="awayTitle">While you were away</h2>
+    <p class="dim" id="awaySpan"></p>
+    <span class="bar away-bar"><i id="awayBar"></i></span>
+    <p class="away-clock" id="awayClock"></p>
+    <div id="awayRows"></div>
+    <p class="away-warn" id="awayCapNote" hidden></p>
+    <p class="dim" id="awayBottleneck"></p>
+    <div class="modal-actions">
+      <button id="awaySkip">Skip</button>
+      <button id="awayClose">Back to the colony</button>
     </div>
   </div>
 </div>

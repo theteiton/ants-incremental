@@ -208,7 +208,7 @@ function blankGame() {
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
       autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
-      stickyInspector: true,
+      stickyInspector: true, awayReport: true,
       broodScope: "waiting", broodDirection: "back", layAmount: 10,
       notation: "suffix", raidDifficulty: "sheltered",
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
@@ -664,6 +664,11 @@ export function queenTitle() {
   return game.queenName ? "Queen " + game.queenName : "The queen";
 }
 
+// the report is shown once per return; the frame loop must not reopen it
+export function markAwaySeen() {
+  if (lastAway) lastAway.seen = true;
+}
+
 export function markSeen(key, count) {
   game.seen[key] = count;
 }
@@ -1101,20 +1106,28 @@ export function load() {
   }
   recountAchievements();
 
-  const elapsed = Math.min(Math.max(0, (Date.now() - game.lastSave) / 1000),
-    offlineCapSeconds(game));
+  // What the clock says, and what the colony was actually paid for. The report
+  // needs both: away for thirty hours against an eight hour cap means
+  // twenty-two hours the colony did not work, and the old one-line note said
+  // "while you were away -- 8h" and never mentioned it.
+  const cap = offlineCapSeconds(game);
+  const requested = Math.max(0, (Date.now() - game.lastSave) / 1000);
+  const elapsed = Math.min(requested, cap);
   const before = { food: game.stats.foodEarned, protein: game.stats.proteinEarned,
-    hatched: game.stats.eggsHatched, won: game.raidsWon, lost: game.raidsLost };
+    hatched: game.stats.eggsHatched, won: game.raidsWon, lost: game.raidsLost,
+    population: population(game), jelly: (game.prestige && game.prestige.royalJelly) || 0 };
   const step = Math.max(1, elapsed / 600);
   for (let done = 0; done < elapsed; done += step) {
     tick(Math.min(step, elapsed - done));
   }
   if (elapsed >= 60) {
-    lastAway = { seconds: elapsed,
+    lastAway = { seconds: elapsed, requested, cap, capped: requested > cap + 1,
       food: game.stats.foodEarned - before.food,
       protein: game.stats.proteinEarned - before.protein,
       hatched: game.stats.eggsHatched - before.hatched,
-      won: game.raidsWon - before.won, lost: game.raidsLost - before.lost };
+      won: game.raidsWon - before.won, lost: game.raidsLost - before.lost,
+      popBefore: before.population, popAfter: population(game),
+      hiding: !!game.hiding, seen: false };
   }
   return elapsed;
 }

@@ -330,6 +330,14 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.2.0", name: "What happened while you were away",
+    changes: [
+      "Coming back after a while now opens a report: how long the colony worked, what it gathered and rendered, how many hatched, how the nest grew, and what it fought. The clock sweeps the whole absence rather than dropping the numbers on you at once.",
+      "It tells you what the offline cap cost. Away for thirty hours against an eight-hour cap means twenty-two hours the colony did not work \u2014 the old line said \u201cwhile you were away \u2014 8h\u201d and never mentioned the rest. Crop Reserve and Full Crop are both named as the things that lengthen it.",
+      "It says what the colony is short of now, and if she went to ground while you were gone it says that instead.",
+      "Absences under five minutes still get the one-line note, and the whole thing has a switch in Settings under Colony rules."
+    ] },
+
   { version: "0.2.1.0", name: "What the line keeps",
     changes: [
       "A trial mastery is earned once and kept by every line. Clearing a trial unlocks its bonus and nothing else, so becoming a new species never costs you the food, the strength or the room the matriline had already learned \u2014 it only starts the ladders again.",

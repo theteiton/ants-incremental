@@ -663,6 +663,34 @@ game the only thing that does is a trial.
 
 ---
 
+**Coming back is a report, not a line.** The colony keeps working while nobody
+is watching, and the one-line note could not say the thing that matters most:
+**how much of the absence actually counted**. Away for thirty hours against an
+eight-hour cap is twenty-two hours the colony did not work, and the line read
+"while you were away — 8h" as though that were the whole story. The window says
+both figures, names what the cap cost, and names Crop Reserve and Full Crop as
+the two things that lengthen it.
+
+**The catch-up is not animated; the reveal is.** `load()` applies the whole
+absence in one pass before any of this runs, so the colony is already in its
+final state and what sweeps is the display — a clock running 0s to 8h over 1.6
+seconds and the figures counting up to numbers that are already true. Deferring
+the real ticks across frames would let the player lay an egg halfway through the
+catch-up and land somewhere the instant path never would, which is a divergence
+with no upside. **Anything that animates progress must animate a settled result.**
+
+**`lastAway` carries `requested` as well as `seconds`.** The first is the wall
+clock, the second is what the cap allowed; the pair is the whole point of the
+window. It also carries the population before and after, whether the colony went
+to ground, and a `seen` flag — the report is opened from `renderAway()`, which
+runs every frame, so without that it would reopen forever.
+
+**It is gated at five minutes and has a switch.** A tab-switch should not produce
+a modal, and a player who does not want one should not have to close it every
+session. Under five minutes the one-line note still says what was gathered.
+
+---
+
 ## Playtest feedback — 23 August 2026
 
 From the itch.io comments: CoolRadGamer, Akami and sir_pinski.

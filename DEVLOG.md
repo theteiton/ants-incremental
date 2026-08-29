@@ -15,6 +15,36 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.2.0 — 29 August 2026
+
+**What happened while you were away.**
+
+The colony kept working unwatched and the one-line note could not say the thing
+that matters most: **how much of the absence actually counted**. Away for thirty
+hours against an eight-hour cap is twenty-two hours the colony did not work, and
+the line read "while you were away — 8h" as though that were the whole story.
+
+The report says both figures, names what the cap cost, and names Crop Reserve and
+Full Crop as the two things that lengthen it. Under it: food gathered, protein
+rendered, ants hatched, the nest before and after, raids won and lost, and what
+the colony is short of now — or, if she went to ground while you were gone, that
+instead.
+
+**The catch-up is not animated; the reveal is.** `load()` applies the whole
+absence in one pass before any of this runs, so the colony is already in its
+final state and what sweeps is the display — a clock running 0s to 8h over 1.6
+seconds, eased so it rushes the middle and settles at the end, with the figures
+counting up to numbers that are already true. Deferring the real ticks across
+frames would let the player lay an egg halfway through the catch-up and land
+somewhere the instant path never would, which is a divergence with no upside.
+
+Measured on the real animation, driven frame by frame: 0s → 6h 0m across the
+sweep, landing exactly on the true figure. A Skip button jumps to the end.
+
+Gated at five minutes, with a switch in Settings under Colony rules — a
+tab-switch should not produce a modal, and under five minutes the one-line note
+still says what was gathered.
+
 ## 0.2.1.1 — 29 August 2026
 
 **Faster, and checked end to end.**
