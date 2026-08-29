@@ -117,6 +117,12 @@ export const LIBRARY = [
     done: game => game.stats.eggsHatched >= 10,
     full: "Three slots to begin with, plus one for each living founder and a quarter for each nurse. This is why nurses matter and why hatching speed alone never did: the brood is a throughput limit, not a speed limit. The queue is strict first-in-first-out, so a batch laid by mistake sits in front of everything behind it." },
 
+  { id: "offline", group: "colony", term: "Offline progress",
+    known: () => true,
+    short: "The colony carries on while the tab is shut — but only for so long, and it tells you how long when you come back.",
+    done: game => (game.stats.awayReturns || 0) > 0,
+    full: "Time away is fed through the same tick the game runs on, so nothing about it is a separate calculation. It is capped at eight hours: away for thirty against that cap is twenty-two hours the colony did not work, and the report on your return says exactly that rather than only what it gathered. Crop Reserve, banked by finishing Myrmecocystus, and the Full Crop instinct both lengthen the cap. A tab left open in the background is credited the same way and is not capped separately." },
+
   { id: "eggprice", group: "colony", term: "Egg price",
     known: () => true,
     short: "Each caste has its own rising price curve, counted from how many of that caste already exist.",

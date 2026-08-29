@@ -223,7 +223,7 @@ function blankGame() {
     peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
-      trained: 0, trainingDeaths: 0, speciesFlights: {} },
+      trained: 0, trainingDeaths: 0, speciesFlights: {}, awayReturns: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -1121,6 +1121,9 @@ export function load() {
     tick(Math.min(step, elapsed - done));
   }
   if (elapsed >= 60) {
+    // a persisted count, so the library can say whether this colony has ever
+    // actually come back to a working nest rather than guessing from playtime
+    game.stats.awayReturns = (game.stats.awayReturns || 0) + 1;
     lastAway = { seconds: elapsed, requested, cap, capped: requested > cap + 1,
       food: game.stats.foodEarned - before.food,
       protein: game.stats.proteinEarned - before.protein,

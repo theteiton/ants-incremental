@@ -45,6 +45,12 @@ Gated at five minutes, with a switch in Settings under Colony rules — a
 tab-switch should not produce a modal, and under five minutes the one-line note
 still says what was gathered.
 
+The library gained an **Offline progress** entry, which it had never had: what
+the cap is, that away time runs through the same tick as everything else, and
+that Crop Reserve and the Full Crop instinct both lengthen it. It expands once
+the colony has actually come back to a working nest, read from a new
+ counter rather than guessed from playtime.
+
 ## 0.2.1.1 — 29 August 2026
 
 **Faster, and checked end to end.**
