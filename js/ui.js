@@ -54,6 +54,7 @@ import {
   destroyEggRange,
   broodSpace,
   colonyBottleneck,
+  GENERIC,
   SPECIES,
   SPECIES_TARGET,
   MATRILINE_UPGRADES,
@@ -1440,7 +1441,17 @@ function renderChallenges() {
     "and its strength does not: no food multipliers, no extra cap, brood or reserves. Everything " +
     "earned on the Achievements tab still pays, and Colony and Combat upgrades are still bought " +
     "as normal. Point at a trial for the full list. Abandon whenever you like; you lose the colony " +
-    "and nothing else.";
+    "and nothing else." +
+    // Trial clears are per species now, so a new line starts these ladders from
+    // nothing -- and is not meant to climb all of them. Which masteries this
+    // line needs is the whole decision: the food ones or the fighting ones.
+    (currentSpecies(game) !== GENERIC
+      ? " This line is " + speciesName(currentSpecies(game)) + ", and a trial is cleared " +
+        "as the species that cleared it — none of these are carried over from another line, " +
+        "and none of them have to be climbed. Take the ones this colony is short of: Drought " +
+        "and the Nanitic Line pay food, the Endless Siege pays fighting strength, Sealed Nest " +
+        "pays room, Barren Brood pays chambers, and Sterile pays into every adaptation line."
+      : "");
 
   const note = el("challengeRunning");
   note.hidden = !running;

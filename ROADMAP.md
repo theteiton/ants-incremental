@@ -100,34 +100,39 @@ thing.
 
 ---
 
-## Sizing, and the conflict still in it
+## Sizing: settled
 
-The budget is **40 hours** for layer 2. Six species is six matriline runs, so
-about **6.5 hours per species**: roughly two hours of colony growth to the gate
-and four and a half hours of trials, which at a median half-hour a level is
-**nine levels**.
+**The colony trials are a menu, not a ladder.** A new species starts every layer-1
+ladder from nothing, and is not meant to climb all six. The player takes the ones
+that line is short of — Drought and the Nanitic Line pay food, the Endless Siege
+pays fighting strength, Sealed Nest pays room, Barren Brood pays chambers,
+Sterile pays into every adaptation line. Three of the nine at five levels is
+about 45 hours across six matrilines, which is the budget; a completionist can
+climb all 134 hours of them and a player who wants none of it can finish a
+species on flights alone.
 
-**This still does not fit six trials at five levels.** All six layer-1 ladders
-take 22.3 hours measured; six species of that is **134 hours**, 3.3× the budget.
-The mechanism shipped; the content decision has not been made.
+That is why finishing a species has three roads and why the trial road is only
+the fastest of them. The matriline trials, once built, are the ones expected of
+every line.
 
-| option | measured size | what it costs |
-|---|---|---|
-| **Three trials per species, five levels** (recommended) | ~45h | Each species opens three of the nine trials, chosen to fit what it is — Atta gets Drought and Barren Brood, Polyergus gets the Slave-Maker and Endless Siege. Real identity per species, closest to budget. |
-| Six trials per species, two levels | ~54h | Every species meets every trial, but each ladder is a stub and the deep levels — which is where the ramp lives — never happen. |
-| Four species, six trials, five levels | ~89h | Half the species, all the depth. |
-| Six species, six trials, five levels | ~134h | What "species-scoped" says literally. Genre-normal for an idle game; 3.3× what was asked for. |
-
-Until this is decided, every species can enter every trial, which is the
-134-hour option by default.
+The Trials tab now says this outright when a species is playing, because a
+ladder that reads as mandatory and takes 134 hours is a wall whether or not it
+was meant as one.
 
 ---
 
 ## Open decisions
 
-1. **The sizing conflict above.** Three trials per species at five levels is the
-   recommendation; it needs a yes, and it is the only thing blocking the layer
-   from being finished rather than merely built.
+1. **The species passives are worth almost nothing, and they are the whole
+   permanent reward of the layer.** Measured at three hours on a matched policy:
+   level 25 alone reaches 1,000 ants at 28.2m; level 25 with three species
+   finished takes 30.2m; with all six, 30.2m — identical. Every one of the six
+   pays into combat, protein, salvage or the offline cap, and **none of them
+   touches the growth loop**, which is what the whole game is. The rule that no
+   mastery may multiply all food was right, but it was over-applied: a passive
+   scoped to brood slots, population cap, hatch speed or egg price moves a large
+   fraction of the loop without being a global multiplier. This needs deciding
+   before more species or matriline trials are built on top of it.
 2. **Is Polyergus too strong?** Measured at 24 hours with every passive live and
    the whole tree bought: 55,211 ants and 4.08e6 food/s against about 24,000 and
    2.7e6 for the other four non-nomadic species. Growth is linear in raids won
