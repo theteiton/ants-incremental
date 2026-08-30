@@ -693,6 +693,111 @@ session. Under five minutes the one-line note still says what was gathered.
 
 ---
 
+**A matriline reset must not take an achievement tier back either.** The rule
+existed for the nuptial flight and was not carried up a layer: the flights track
+read `prestige.flightsTaken` and the royal jelly track read
+`prestige.royalJellyTotal`, and a matriline reset zeroes both. Measured on a
+colony with 30 flights and 160,000 jelly banked, a reset cost **25 tiers** — 8
+from one track and 17 from the other — which also shrinks the pool the Instincts
+are bought from. Both now read `stats.flightsEver` and `stats.jellyEver`, seeded
+on load so no existing save loses anything. **Any figure a layer resets is the
+wrong thing for a track to read.**
+
+**Retained Royalty keeps the money; the gate resets regardless.** It used to keep
+a share of the jelly capped at the price of the lineage, so a player holding
+160,000 kept 43 of it for a node costing ten Haplotype. It now keeps an uncapped
+share of the balance, and `royalJellyTotal` — the figure the next matriline's
+gate is measured against — resets to nothing instead. The two were the same field
+doing two jobs, which is why capping the one broke the other.
+
+**Haplotype counts the flights already taken.** `matriline.flights` duplicated
+`prestige.flightsTaken` — `doFlight()` incremented both and the reset zeroed both
+— except on a save that predates layer 2, where the matriline's copy started at
+zero and a player with thirty flights behind him was paid as though he had taken
+one. It reads the larger of the two.
+
+**The brood tally is counted once, not walked per call.** `broodCount()` is
+O(eggs) and `casteStock()` reaches it for every layable caste on every tick and
+every frame. Measured at a 208,000-egg queue: `pendingByCaste` 4.25ms a frame,
+`colonyBottleneck` 2.6ms, and one tick **13.4ms** — which is what made the brood
+details window unopenable at that size. A cached tally takes those to 0.003,
+0.004 and 1.19ms. **Invalidation is explicit** — `touchBrood()` from all six
+places that add or remove an egg — because inferring it from `eggs.length` is
+wrong: a lay and a hatch inside one tick return to the same length with different
+contents. Verified by walking the queue fresh and comparing, 3,424 times across
+laying, hatching, range destruction, a save round trip, a flight and a matriline
+reset.
+
+**The brood window lists the front of the queue, not all of it.** At 208,006 eggs
+in 2,080 batches it built 2,078 rows at 68ms a frame. It lists 40 and stops
+walking once it has them; the rest is a count.
+
+**A track counting whole things must not grow fractional rungs.** The trials
+ladder ran 30, then 43.77, 73.46, 141.77, which reads as broken on a number that
+can only ever be an integer. The softcap rounds up for tracks measured in levels
+or flights.
+
+**The library dot cleared in the wrong place.** `markSeen("library")` sat inside
+`renderLibrary()`, which only runs on the terms sub-tab — so a player who left
+the tab on *What changed* never cleared it, and it read as a badge that never
+goes away. It is marked when the tab is opened, whichever sub-tab is showing.
+
+**One name per species.** Both a Latin name and a common one meant two things to
+learn for one animal. The common name is the name; the Latin survives in the
+flavour line, where it reads as colour rather than as a second label. The header
+clock is *matriline age* for the same reason: the word was doing duty as both a
+clock and a prestige layer.
+
+---
+
+**A handler must read the live callback, not close over it.** Every instinct card
+was unclickable: `buildInstincts(onBuy)` captured the buyer as a parameter, and
+`buildAchievements()` runs during ui.js's module scope — before ui.js calls
+`setInstinctBuyer`, so what every card closed over was the initial no-op, for
+ever. It is the third click bug in this game and the third different cause: a
+detached node, a sticky header eating the pointer, and now a stale closure. When
+a control does nothing, check all three.
+
+**Feedback answered on 30 August 2026.** Gyroth, Feliza and Human of Humanity
+played 0.2.2.0. What their reports turned into:
+
+**A harder raid setting has to be worth choosing.** All four difficulties paid
+the same spoils, so the three hard ones were a dare with no other side to it —
+which is why the whole raid economy read as not worth the protein. Each carries a
+`spoils` multiplier now: ×1, ×1.5, ×2.5, ×4. A bigger thing through the door is a
+bigger thing to render.
+
+**The queue can be reordered, not only destroyed.** `promoteEggRange()` moves a
+batch to the front of the *waiting* part and never ahead of a tended egg: those
+have incubation paid into them, and reordering them would throw that away, which
+is the thing this exists to avoid. Measured on the reported case — a thousand
+foragers laid ahead of twenty nurses — the nurses move from position 1,006 to the
+front of the queue with the tally exact and the tended eggs untouched.
+
+**The opening says one thing at a time.** A playtester called the game
+overwhelming as soon as the wings came off, which it was: seven tabs and no
+instruction. `tutorialStep()` is state-driven rather than a script, so it
+survives a reload and any order the player does things in, and it **retires
+itself** once soldiers unlock rather than becoming furniture. Its second step is
+where nanitics come from, which was the first thing three separate people asked.
+
+**The library is a page per category.** At 38 entries one scroll already meant
+hunting for the group you wanted, and it only grows.
+
+**Every tab opens with its `panel-head`.** The library opened with the sub-tab
+bar and buried its head a level deeper inside the terms panel, so it sat at a
+different height with a differently painted head than the tabs either side of
+it — which is what a playtester saw as the tab moving and changing colour when he
+clicked it. Structure first, then decoration: a tab that is built differently
+from its neighbours will look different from them.
+
+**The inspector is no longer pinned by default.** Sticky is what makes
+hover-to-inspect work without moving the mouse, and it is also a panel that never
+leaves the screen — reported as sitting over the brood. It stays a setting; the
+default is off.
+
+---
+
 ## Playtest feedback — 23 August 2026
 
 From the itch.io comments: CoolRadGamer, Akami and sir_pinski.

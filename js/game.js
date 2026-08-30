@@ -8,6 +8,9 @@ import {
   BASE_POPULATION_CAP,
   bigForagerThreshold,
   broodCapacity,
+  broodCount,
+  touchBrood,
+  NANITIC_GENERATION,
   capPerExcavator,
   foodCap,
   offlineCapSeconds,
@@ -77,6 +80,7 @@ import {
   challengeTargetMet,
   challengeProgress,
   sterileActive,
+  callowActive,
   CHALLENGE_TARGET
 } from "./challenges.js";
 import {
@@ -122,7 +126,7 @@ export { GENERIC, SPECIES, SPECIES_TARGET, currentSpecies, playingSpecies, speci
   passiveCombat, passiveProtein, passiveHunt, passiveSalvage, passiveFeedFree,
   passiveOfflineHours, dulosis, nomadic } from "./matriline.js";
 export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
-export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent,
+export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent, affordableInstincts,
   instinctBaseCap, instinctBrood, instinctCombat, instinctProtein, instinctHatch,
   instinctOfflineHours, instinctKeptFood } from "./instincts.js";
 export { speciesTrialLevel } from "./challenges.js";
@@ -208,7 +212,7 @@ function blankGame() {
     settings: { exileEnabled: true, hideLocked: false, hideOwned: false, theme: "dark",
       upgradeFilter: "all", upgradeSort: "default", feedBrood: true,
       autoShed: true, autoBuy: true, autoLay: true, autoRatio: true, foodReserve: 0,
-      stickyInspector: true, awayReport: true,
+      stickyInspector: false, awayReport: true, tutorial: true,
       broodScope: "waiting", broodDirection: "back", layAmount: 10,
       notation: "suffix", raidDifficulty: "sheltered",
       ratios: { forager: 0, excavator: 0, nurse: 5, soldier: 8 } },
@@ -223,7 +227,8 @@ function blankGame() {
     peakUpgrades: { all: 0, colony: 0, combat: 0, deepest: 0 },
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
-      trained: 0, trainingDeaths: 0, speciesFlights: {}, awayReturns: 0 },
+      trained: 0, trainingDeaths: 0, speciesFlights: {}, awayReturns: 0,
+      flightsEver: 0, jellyEver: 0 },
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
@@ -406,6 +411,55 @@ function sampleBottleneck(dt) {
   run.broodFull = (run.broodFull || 0) * (1 - weight) + bound * weight;
 }
 
+// The opening asks a player to read seven tabs before it has told them to do
+// anything. A playtester put it plainly: overwhelming as soon as the wings come
+// off. This names the ONE thing to do next, and only through the opening -- past
+// soldiers the milestone line and the bottleneck line take over, and it retires
+// itself rather than becoming furniture.
+//
+// It is state-driven rather than a script, so it survives a reload, an import
+// and any order the player does things in.
+export const TUTORIAL_STEPS = [
+  { id: "shed",
+    when: () => !game.wingsShed,
+    text: "She has landed and mated, and she will never fly again. Shedding her wings is the only thing she can do — and the 100 reserves it frees are the only ones she will ever have." },
+  { id: "lay",
+    when: () => game.emerged === 0 && game.eggs.length === 0,
+    text: "Lay an egg. Each costs 20 reserves, so there are five in her — and the first four hatch as nanitics whatever caste you choose. That is how you get them; they cannot be laid on purpose." },
+  { id: "strip",
+    when: () => game.wings > 0 && game.stats.foodEarned < 200,
+    text: "Strip a wing. It yields 80 food over ten seconds, and until the first workers emerge it is the only food there is." },
+  { id: "wait",
+    when: () => game.emerged > 0 && population(game) < 8,
+    text: "The founders work at six times a forager and fade by half every twenty minutes. The opening is a race to raise real workers before they are spent." },
+  { id: "excavator",
+    when: () => population(game) >= 8 && !isUnlocked(game, "excavator"),
+    text: "Keep laying. Excavators unlock at 16 ants, and they are what raises the cap you are about to hit." },
+  { id: "upgrades",
+    when: () => isUnlocked(game, "excavator") && levelsOwned(game, null) === 0,
+    text: "The Upgrades tab has something you can afford. Every one of them shows what it does to your rates right now, so you can see which is worth it." },
+  { id: "nurse",
+    when: () => population(game) >= 40 && !isUnlocked(game, "nurse"),
+    text: "Only a few eggs develop at once and the rest queue. Nurses widen that, and they unlock at 64 ants." },
+  { id: "soldier",
+    when: () => population(game) >= 200 && !isUnlocked(game, "soldier"),
+    text: "Something starts attacking at 256 ants. Soldiers unlock there too — lose your last one and the nest goes to ground rather than dying, but it halves your food until an army stands again." }
+];
+
+export function tutorialStep() {
+  if (game.settings.tutorial === false) return null;
+  if (isUnlocked(game, "soldier")) return null;      // the milestone line takes over
+  for (const step of TUTORIAL_STEPS) {
+    if (step.when()) return step;
+  }
+  return null;
+}
+
+export function dismissTutorial() {
+  game.settings.tutorial = false;
+  return true;
+}
+
 export function colonyBottleneck() {
   if (!game.wingsShed || game.emerged === 0) return null;
   const run = game.run || {};
@@ -483,6 +537,7 @@ function layOne(caste, stock) {
   const fed = game.settings.feedBrood !== false && (free || game.protein >= proteinCost);
   if (fed && !free) game.protein -= proteinCost;
   game.eggs.push({ caste, progress: 0, fed });
+  touchBrood();
   return true;
 }
 
@@ -533,13 +588,49 @@ export function destroyEggRange(from, to) {
   const taken = end - start + 1;
   if (!(taken > 0)) return 0;
   game.eggs.splice(start, taken);
+  touchBrood();
   game.stats.eggsCancelled = (game.stats.eggsCancelled || 0) + taken;
   return taken;
 }
 
 // what each caste has coming, read off the queue rather than stored -- the
 // emerging caste depends on queue position while the founders are still nanitic
+// Move a batch to the front of the waiting queue. The brood is strict FIFO, so
+// a player who laid a thousand foragers had to wait for all of them before a
+// nurse could develop -- and the only way out was destroying eggs, which refunds
+// nothing. This is the way out that costs nothing.
+//
+// It moves to the front of the WAITING part, never ahead of an egg already being
+// tended: those have incubation paid into them and reordering them would throw
+// that away, which is the thing this exists to avoid.
+export function promoteEggRange(from, to) {
+  const start = Math.max(0, Math.floor(from));
+  const end = Math.min(game.eggs.length - 1, Math.floor(to));
+  const taken = end - start + 1;
+  if (!(taken > 0)) return 0;
+  const tended = Math.min(broodCapacity(game), game.eggs.length);
+  if (start <= tended) return 0;              // already at the front, or tended
+  const moved = game.eggs.slice(start, end + 1);
+  const rest = game.eggs.slice(0, start).concat(game.eggs.slice(end + 1));
+  game.eggs = rest.slice(0, tended).concat(moved, rest.slice(tended));
+  touchBrood();
+  return taken;
+}
+
 export function pendingByCaste() {
+  // emergingCaste only differs from the laid caste while the founding four are
+  // still emerging, and inside the Nanitic Line. Past that it is the laid caste
+  // exactly, which the brood tally already has counted -- so an established
+  // colony does not walk its queue again. Measured at 208,000 eggs this call
+  // alone cost 4.25ms a frame.
+  if (game.emerged >= NANITIC_GENERATION && !callowActive(game)) {
+    const out = {};
+    for (const caste of Object.keys(CASTES)) {
+      const n = broodCount(game, caste);
+      if (n > 0) out[caste] = n;
+    }
+    return out;
+  }
   const out = {};
   for (let i = 0; i < game.eggs.length; i++) {
     const caste = emergingCaste(game, game.eggs[i], i);
@@ -694,6 +785,7 @@ export function importSave(text) {
 export function hardReset() {
   clearSaves();
   Object.assign(game, blankGame());
+  touchBrood();
   return true;
 }
 
@@ -715,6 +807,13 @@ export function doFlight() {
   game.prestige.royalJelly = Math.round((game.prestige.royalJelly + earned) * 100) / 100;
   game.prestige.royalJellyTotal = Math.round((game.prestige.royalJellyTotal + earned) * 100) / 100;
   game.prestige.flightsTaken += 1;
+  // Lifetime totals the achievement tracks read instead of the resettable
+  // fields. A matriline reset zeroes flightsTaken and royalJellyTotal, and
+  // measured that cost 25 tiers -- 8 from the flights track and 17 from royal
+  // jelly -- which also shrinks the pool the Instincts are bought from. A track
+  // must never lose a tier because a layer above it reset.
+  game.stats.flightsEver = (game.stats.flightsEver || 0) + 1;
+  game.stats.jellyEver = Math.round(((game.stats.jellyEver || 0) + earned) * 100) / 100;
   game.best.jelly = Math.max(game.best.jelly || 0, earned);
   // both counters feed layer 2: the matriline's own total is what Haplotype is
   // paid on, and the per-species total is one of the three roads to finishing a
@@ -761,6 +860,7 @@ function refoundColony(extra) {
   const keptFood = (game.food || 0) * instinctKeptFood(game);
   Object.assign(game, blankGame());
   Object.assign(game, surviving, extra || {});
+  touchBrood();
   // Living Memory: a daughter leaves with a full crop. Applied after the wipe
   // rather than carried in `surviving`, because it is a share of what was
   // standing and not a field that persists.
@@ -832,10 +932,14 @@ export function completeChallenge() {
 export function doMatrilineReset(speciesId) {
   if (!matrilineReady(game)) return 0;
   const earned = haplotypeEarned(game);
-  const banked = jellyBanked(game);
-  // at most the price of the whole lineage, so Retained Royalty can hand you
-  // the tree and never more than the tree
-  const keep = Math.min(LINEAGE_COST, Math.round(banked * jellyKept(game) * 10) / 10);
+  // Retained Royalty keeps a share of the JELLY IN HAND, uncapped. It used to
+  // be capped at the price of the lineage, which meant a player who had banked
+  // 160,000 kept 43 of it -- an insulting number for a node costing ten
+  // haplotype. What must not carry is royalJellyTotal: that is the figure the
+  // next matriline's gate is measured against, so it resets to nothing and the
+  // gate is genuinely re-earned. The achievement track reads stats.jellyEver
+  // instead, so zeroing it costs no tiers.
+  const keep = Math.round((game.prestige.royalJelly || 0) * jellyKept(game) * 10) / 10;
   const inherited = inheritedPrestige(game);
   const m = game.matriline;
 
@@ -849,7 +953,7 @@ export function doMatrilineReset(speciesId) {
   refoundColony({ challenge: null });
   game.prestige = {
     royalJelly: keep,
-    royalJellyTotal: keep,
+    royalJellyTotal: 0,
     flightsTaken: 0,
     upgrades: inherited.filter(id => id !== "autoShed")
   };
@@ -1027,6 +1131,7 @@ export function tick(dt) {
       game.emerged++;
       game.stats.eggsHatched++;
       game.eggs.splice(i, 1);
+      touchBrood();
     }
   }
 
@@ -1099,6 +1204,7 @@ export function load() {
   if (!data) return 0;
 
   applySave(game, blankGame(), data);
+  touchBrood();
   game.peakPopulation = Math.max(data.peakPopulation || 0, population(game));
   game.run.peakPopulation = Math.max(game.run.peakPopulation || 0, population(game));
   for (const id in game.ants) {

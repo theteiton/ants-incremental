@@ -82,8 +82,14 @@ export function haplotype(game) {
 export const HAPLO_SCALE = 4;
 export const HAPLO_EXPONENT = 0.7;
 
+// The flights this matriline has taken. It reads prestige.flightsTaken rather
+// than a counter of its own: doFlight() incremented both and doMatrilineReset()
+// zeroed both, so they were always the same number -- except for a save that
+// predates layer 2, where the matriline's copy started at zero and a player with
+// thirty flights behind him was paid as though he had taken one.
 export function matrilineFlights(game) {
-  return (game.matriline && game.matriline.flights) || 0;
+  return Math.max((game.matriline && game.matriline.flights) || 0,
+    (game.prestige && game.prestige.flightsTaken) || 0);
 }
 
 export function matrilineTrialLevels(game) {

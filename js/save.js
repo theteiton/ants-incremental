@@ -129,6 +129,13 @@ export function migrate(data) {
     data.matriline = { haplotype: 0, haplotypeTotal: 0, resets: 0, species: null,
       finished: [], upgrades: [], flights: 0, trialLevels: 0 };
     data.instincts = [];
+    // seed the lifetime counters the achievement tracks now read, so a save
+    // that predates them keeps every tier it had already earned
+    if (data.stats) {
+      const p = data.prestige || {};
+      data.stats.flightsEver = Math.max(data.stats.flightsEver || 0, p.flightsTaken || 0);
+      data.stats.jellyEver = Math.max(data.stats.jellyEver || 0, p.royalJellyTotal || 0);
+    }
     data.version = 8;
   }
   return data;
@@ -207,6 +214,10 @@ export function applySave(game, fresh, data) {
     library: seen.library || 0, updates: seen.updates || "" };
   game.library = Object.assign({}, data.library || {});
   game.instincts = Array.isArray(data.instincts) ? data.instincts.slice() : [];
+  // a save already on v8 never went through that migration, so seed here too
+  const sp = data.prestige || {};
+  game.stats.flightsEver = Math.max(game.stats.flightsEver || 0, sp.flightsTaken || 0);
+  game.stats.jellyEver = Math.max(game.stats.jellyEver || 0, sp.royalJellyTotal || 0);
   game.bigForagers = Array.isArray(data.bigForagers) ? data.bigForagers : [];
   game.eggs = Array.isArray(data.eggs) ? data.eggs : [];
   // an array here is a save that predates lines; migrate() has already turned

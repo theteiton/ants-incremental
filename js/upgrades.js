@@ -729,13 +729,13 @@ export function renderUpgrades() {
   if (showing === 0) {
     const filter = game.settings.upgradeFilter || "all";
     const reasons = [];
-    if (game.settings.hideOwned && owned > 0) reasons.push("Hide owned");
+    if (game.settings.hideOwned && owned > 0) reasons.push("Hide maxed");
     if (game.settings.hideLocked && locked > 0) reasons.push("Hide locked");
     if (owned === UPGRADES.length) {
       note.textContent = "Every adaptation the colony can reach is bought — " +
         levelsHeld + " levels across all " + UPGRADES.length +
         " lines. Clearing more of a trial raises the lines it pays into. " +
-        "Untick Hide owned to look back over what the colony has.";
+        "Untick Hide maxed to look back over what the colony has.";
     } else if (reasons.length) {
       note.textContent = "Nothing to show here: " + reasons.join(" and ") +
         (filter === "all" ? "" : " and the " + filter + " filter") +

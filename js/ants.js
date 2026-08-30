@@ -901,10 +901,32 @@ export function incubationTime(game) {
   return EGG_TIME / hatchRate(game);
 }
 
+// How many of each caste are queued. This is O(eggs), and casteStock() reaches
+// it for every layable caste on every tick and every frame -- so a colony with a
+// 208,000-egg queue was walking that queue a dozen times a frame and the tick
+// alone cost 13.4ms. The tally is counted once and reused until the brood
+// actually changes.
+//
+// Invalidation is explicit rather than inferred: touchBrood() is called from
+// every place that adds or removes an egg. Inferring it from eggs.length would
+// be wrong, because a lay and a hatch inside one tick return to the same length
+// with different contents.
+let broodTally = null;
+
+export function touchBrood() {
+  broodTally = null;
+}
+
+function broodCounts(game) {
+  if (broodTally) return broodTally;
+  const tally = {};
+  for (const egg of game.eggs) tally[egg.caste] = (tally[egg.caste] || 0) + 1;
+  broodTally = tally;
+  return tally;
+}
+
 export function broodCount(game, casteId) {
-  let n = 0;
-  for (const egg of game.eggs) if (egg.caste === casteId) n++;
-  return n;
+  return broodCounts(game)[casteId] || 0;
 }
 
 export function casteStock(game, casteId) {

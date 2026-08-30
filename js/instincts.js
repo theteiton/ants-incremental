@@ -64,6 +64,12 @@ export function instinctsSpent(game) {
   return spent;
 }
 
+// how many are affordable and not yet held, for the sub-tab dot
+export function affordableInstincts(game) {
+  const points = instinctPoints(game);
+  return INSTINCTS.filter(i => !instinctOwned(game, i.id) && i.cost <= points).length;
+}
+
 export function instinctPoints(game) {
   return Math.max(0, (game.achievementPoints || 0) - instinctsSpent(game));
 }

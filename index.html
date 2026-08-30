@@ -29,12 +29,17 @@
     <div class="readout-group">
       <div class="readout" id="readoutRoyalJelly" hidden><b id="valRoyalJelly">0</b><i>royal jelly</i></div>
       <div class="readout" id="readoutColonyAge"><b id="valTime">0s</b><i>colony age</i></div>
-      <div class="readout" id="readoutMatriline" hidden><b id="valMatriline">0s</b><i>matriline</i></div>
+      <div class="readout" id="readoutMatriline" hidden><b id="valMatriline">0s</b><i>matriline age</i></div>
     </div>
   </div>
 </header>
 
 <p class="away" id="awayNote" hidden></p>
+
+<div class="tutorial" id="tutorialBox" hidden>
+  <span id="tutorialText"></span>
+  <button id="tutorialSkip">Skip the guide</button>
+</div>
 
 <p class="takeover" id="takeover" hidden>
   This colony is open in another tab, which is the one being saved now.
@@ -120,7 +125,7 @@
       <span class="tally" id="upgradeTally"></span>
       <span class="dim" id="upgradeLocked"></span>
       <label class="toggle"><input type="checkbox" id="hideLocked"> Hide locked</label>
-      <label class="toggle"><input type="checkbox" id="hideOwned"> Hide owned</label>
+      <label class="toggle"><input type="checkbox" id="hideOwned"> Hide maxed</label>
       <label class="field inline">Sort
         <select id="upgradeSort">
           <option value="default">Default order</option>
@@ -274,13 +279,18 @@
   </section>
 
   <section class="panel tab" id="tab-library" hidden>
+    <!-- head first, then the sub-tabs, which is the order every other tab uses.
+         With the bar first and the head nested a level deeper inside the terms
+         panel, this tab sat at a different height with a differently painted
+         head than the ones on either side of it. -->
+    <div class="panel-head">
+      <span class="tally" id="libraryTally"></span>
+      <span class="dim" id="libraryHint"></span>
+    </div>
     <div class="subtabs" id="libraryTabs"></div>
 
     <div id="libraryPanel-terms">
-      <div class="panel-head">
-        <span class="tally" id="libraryTally"></span>
-        <span class="dim" id="libraryHint"></span>
-      </div>
+      <p class="dim" id="libraryEmpty" hidden>Nothing on this page has been met yet. Entries appear as the colony reaches the things they describe.</p>
       <div id="libraryList"></div>
     </div>
 
@@ -449,6 +459,7 @@
     <p class="brood-warn" id="broodWarn" hidden></p>
     <div class="modal-actions">
       <button id="broodClose">Keep them</button>
+      <button id="broodPromote">Move to the front</button>
       <button id="broodConfirm" class="danger">Destroy them</button>
     </div>
   </div>

@@ -324,7 +324,7 @@ export const CHALLENGES = [
     // founder better at all of it rather than at foraging alone -- she gathers,
     // she tends the brood, and a trial about founders should lift the whole ant.
     mastery: { type: "nanitic", step: 1.6, lifespan: true, name: "Long Burning",
-      desc: "What the colony learned from a generation that would not last. The first level means the founders never die of old age; every level makes each of them better at everything she does." },
+      desc: "What the colony learned from a generation that would not last. The first level means the founders never die of old age — they still fade as the queen's reserves run out, so an old founder is a living one rather than a useful one — and every level after makes each of them better at everything she does." },
     plan: ""
   }
 ];

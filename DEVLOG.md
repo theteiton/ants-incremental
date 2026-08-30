@@ -15,6 +15,99 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.3.0 — 30 August 2026
+
+**The first playtest of the Matriline, answered.**
+
+The rest of what Gyroth, Feliza and Human of Humanity reported. The two worst
+faults are in 0.2.2.1 below; these are the ones that needed building rather than
+repairing.
+
+**The queue can be reordered.** Pick a batch in the brood window and move it to
+the front of the waiting queue — never ahead of a tended egg, because those have
+incubation paid into them. Measured on the reported case, a thousand foragers
+laid ahead of twenty nurses: the nurses move from position 1,006 to the front,
+the tally stays exact and no tended egg shifts. Destroying was the only way out
+before, and it refunds nothing.
+
+**An opening guide.** One instruction at a time, state-driven so it survives a
+reload and any order things are done in, and it retires itself once soldiers
+unlock. Its second step is where nanitics come from, which three separate people
+asked inside their first ten minutes.
+
+**Harder raids pay for themselves.** All four difficulties stripped the same
+spoils, so the hard three were a dare with nothing on the other side — which is
+why the raid economy read as not worth the protein it costs. ×1, ×1.5, ×2.5, ×4.
+
+**The library is a page per category**, and the tab now opens with its head like
+every other tab does. It opened with the sub-tab bar instead, with the head
+nested a level deeper, which is why it appeared to move and change colour when
+clicked.
+
+**Every instinct card was unclickable.** `buildInstincts(onBuy)` captured the
+buyer as a parameter and `buildAchievements()` runs during ui.js's module scope,
+before ui.js sets it — so what every card closed over was the initial no-op. The
+Instincts page shipped in 0.2.1.0 and nothing on it could be bought. Found by
+being asked to explain how they are bought, which is the sort of question that is
+worth answering by reading the code rather than the intent.
+
+Also: one name per species rather than a Latin and a common one; **Hide maxed**
+instead of Hide owned; the inspector no longer pinned over the brood by default;
+dots on Tracks and Instincts; and Long Burning no longer implies a founder that
+never fades.
+
+## 0.2.2.1 — 30 August 2026
+
+**The first playtest of the Matriline.**
+
+Gyroth, Feliza and Human of Humanity played 0.2.2.0. Most of what follows is
+theirs; the two worst faults were things no one could have seen without playing
+a veteran save into the new layer.
+
+**A matriline reset was taking 25 achievement tiers back.** The rule that a reset
+must never cost a tier existed for the nuptial flight and was not carried up a
+layer: the flights track read `prestige.flightsTaken` and the royal jelly track
+read `prestige.royalJellyTotal`, and a matriline reset zeroes both. Measured on a
+colony with 30 flights and 160,000 jelly, that was 8 tiers from one track and 17
+from the other — which also shrinks the pool the Instincts are bought from. Both
+read lifetime counters now, seeded on load so no save loses anything.
+
+**"I don't like losing 160K royal jelly."** Retained Royalty kept a share capped
+at the price of the lineage, so 160,000 became 43 for a node costing ten
+Haplotype. The cap existed to stop the next matriline's gate being free — but the
+gate and the wallet were the same field doing two jobs. The wallet is kept
+uncapped; `royalJellyTotal`, which is what the gate measures, resets to nothing.
+
+**"The matriline doesn't record the flights I have gained before."** It did not:
+`matriline.flights` duplicated `prestige.flightsTaken`, and on a save that
+predates layer 2 it started at zero. Thirty flights paid 4 Haplotype where they
+should have paid 43.
+
+**"I can't look at the egg details at 208K."** Measured at 208,006 eggs in 2,080
+batches: 2,078 rows and 68ms a frame. But the rows were only half of it —
+`broodCount()` is O(eggs) and `casteStock()` reaches it for every layable caste
+every tick, so the tick alone cost 13.4ms at that size. The tally is counted once
+and invalidated explicitly by the six places that add or remove an egg, verified
+against a fresh walk 3,424 times. `pendingByCaste` 4.25 → 0.003ms,
+`colonyBottleneck` 2.6 → 0.004ms, one tick 13.4 → 1.19ms. The window lists the
+first 40 batches and stops walking once it has them.
+
+**"The library dot never goes away."** `markSeen("library")` sat inside
+`renderLibrary()`, which only runs on the terms sub-tab, so leaving the tab on
+*What changed* never cleared it.
+
+**"There is no way to go beyond 30."** There is — clears are per species now, so
+the ceiling is 210 — but the softcap was generating fractional rungs (43.77,
+73.46) on a count of whole trials, which reads as broken. Whole numbers now.
+
+**"You don't need two names, Solenopsis and Fire ant."** Agreed. The common name
+is the name; the Latin moved into the flavour line. And the header clock is
+*matriline age*, because the word was doing duty as both a clock and a layer.
+
+Also: **Hide owned** is **Hide maxed**, which is what it does, and the trials card
+no longer says "All for good" of a reward that is half permanent and half not —
+it says which half is which.
+
 ## 0.2.2.0 — 29 August 2026
 
 **What happened while you were away.**

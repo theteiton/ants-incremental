@@ -160,15 +160,20 @@ export function huntRate(game) {
 // It is unlocked by clearing the Endless Siege once: the trial that teaches the
 // colony to fight is the one that lets it ask for a real fight.
 export const RAID_DIFFICULTIES = [
+  // A harder setting used to pay nothing at all -- it was a difficulty dial with
+  // no reward on the other side of it, which is why a playtester called the
+  // whole raid economy not worth the protein. What comes through the door is
+  // bigger, so what it is worth stripping is bigger: the spoils scale with the
+  // setting, and that is the trade.
   { id: "sheltered", name: "Sheltered",
     note: "The default. An attacker grows five per cent with each raid you win, and stops growing after twenty-five of them.",
-    capWins: true, seesMastery: 0, exponent: MONSTER_EXPONENT },
+    capWins: true, seesMastery: 0, exponent: MONSTER_EXPONENT, spoils: 1 },
   { id: "unchecked", name: "Unchecked",
-    note: "The growth per win never stops. Every victory makes the next attacker larger, for as long as you keep winning.",
-    capWins: false, seesMastery: 0, exponent: MONSTER_EXPONENT },
+    note: "The growth per win never stops. Every victory makes the next attacker larger, for as long as you keep winning — and a larger corpse is worth more. Spoils × 1.5.",
+    capWins: false, seesMastery: 0, exponent: MONSTER_EXPONENT, spoils: 1.5 },
   { id: "hunted", name: "Hunted",
-    note: "Uncapped, and what you have learned about fighting is known to whatever is coming. Everything Hardened Line pays you, it brings with it.",
-    capWins: false, seesMastery: 1, exponent: MONSTER_EXPONENT },
+    note: "Uncapped, and what you have learned about fighting is known to whatever is coming. Everything Hardened Line pays you, it brings with it — and it is worth stripping for it. Spoils × 2.5.",
+    capWins: false, seesMastery: 1, exponent: MONSTER_EXPONENT, spoils: 2.5 },
   // Hunted sees what Hardened Line taught you once; Relentless sees it and
   // half again. At seesMastery 1 a fully mastered colony held a 5.18x margin
   // and went 119W/0L over twelve hours -- the hardest setting in the game had
@@ -179,7 +184,7 @@ export const RAID_DIFFICULTIES = [
   // cleared the siege once still enters at a 1.20x margin and 78W/0L.
   { id: "relentless", name: "Relentless",
     note: "As Hunted, and a larger nest draws far worse than it used to. There is no arrangement of ants that wins this comfortably — a colony that has mastered the trials will lose raids here.",
-    capWins: false, seesMastery: 1.5, exponent: 1.12 }
+    capWins: false, seesMastery: 1.5, exponent: 1.12, spoils: 4 }
 ];
 
 export function raidDifficulty(game) {
@@ -354,11 +359,19 @@ export function proteinPurchaseCost(game, n) {
   return exchangeReady(game) ? n * foodPerProtein(game) / EXCHANGE_RETURN : Infinity;
 }
 
+// what the chosen difficulty is worth stripping, so a harder setting is a trade
+// rather than a dare
+export function raidSpoils(game) {
+  return raidDifficulty(game).spoils || 1;
+}
+
 export function raidRewards(game, power) {
+  const spoils = raidSpoils(game);
   return {
     protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
-      (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) * instinctProtein(game))),
-    food: power * FOOD_PER_POWER * globalFoodMultiplier(game)
+      (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) *
+      instinctProtein(game) * spoils)),
+    food: power * FOOD_PER_POWER * globalFoodMultiplier(game) * spoils
   };
 }
 

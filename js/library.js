@@ -248,9 +248,9 @@ export const LIBRARY = [
 
   { id: "instinct", group: "matriline", term: "Instinct",
     known: game => (game.achievementPoints || 0) > 8,
-    short: "What achievement tiers buy. Every tier the line has ever earned is a point, and points buy instincts.",
+    short: "Permanent traits bought with achievement tiers. Nothing here unlocks on its own \u2014 you spend the points by clicking.",
     done: game => (game.instincts || []).length > 0,
-    full: "Spending never lowers your achievement level \u2014 the level is what the tiers scored, and this is what they can be traded for besides. Nothing here is ever lost: an instinct is held through a nuptial flight, a matriline and a trial alike, which makes it the only thing in the game that only ever grows. Four of the eight move the growth loop \u2014 population cap, brood chambers, hatch speed \u2014 which is the part of the game every other permanent reward turned out not to touch." },
+    full: "Every tier the line has ever earned is one point, and all eight instincts draw on the same pool, so buying one leaves fewer for the others. Spending never lowers your achievement level \u2014 the level is what the tiers scored, and this is what the same tiers can be spent on besides. Nothing here is ever lost: an instinct is held through a nuptial flight, a matriline and a trial alike, which makes it the only thing in the game that only ever grows. Four of the eight move the growth loop \u2014 population cap, brood chambers, hatch speed \u2014 which is the part of the game every other permanent reward turned out not to touch." },
 
   { id: "haplotype", group: "matriline", term: "Haplotype",
     known: game => matrilineVisible(game),
@@ -336,6 +336,19 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.3.0", name: "The first playtest of the Matriline",
+    changes: [
+      "A matriline reset was quietly taking achievement tiers back \u2014 25 of them on a line with thirty flights and a lot of jelly behind it. It never should have, and it does not now. Nothing you had earned is gone.",
+      "Retained Royalty keeps your royal jelly instead of 43 of it. What resets is only the figure the next matriline is gated on, which was the same number doing two jobs.",
+      "The flights you took before the Matriline existed now count towards it. Thirty of them paid four Haplotype; they pay forty-three.",
+      "The brood chamber can be opened at any size, and a queue you have laid can be reordered rather than only destroyed \u2014 pick a batch and move it to the front. A thousand foragers no longer bury the nurses behind them.",
+      "An opening guide, one instruction at a time, which retires itself once soldiers unlock. It answers where nanitics come from, which was the first thing everybody asked.",
+      "The library is a page per category rather than one long scroll, and its dot clears whichever page you are on.",
+      "Harder raid settings are worth choosing: Unchecked, Hunted and Relentless now strip \u00d71.5, \u00d72.5 and \u00d74 the spoils. A bigger thing through the door is a bigger thing to render.",
+      "Each species has one name instead of two. Fire ant, not Solenopsis and Fire ant \u2014 the Latin is in the flavour where it belongs.",
+      "Hide owned is Hide maxed, which is what it does. The panel no longer sits over the brood by default. Tracks and Instincts carry a dot when something is waiting on them."
+    ] },
+
   { version: "0.2.2.0", name: "What happened while you were away",
     changes: [
       "Coming back after a while now opens a report: how long the colony worked, what it gathered and rendered, how many hatched, how the nest grew, and what it fought. The clock sweeps the whole absence rather than dropping the numbers on you at once.",

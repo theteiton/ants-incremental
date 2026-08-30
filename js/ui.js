@@ -52,8 +52,11 @@ import {
   automationUnlocked,
   broodSlots,
   destroyEggRange,
+  promoteEggRange,
   broodSpace,
   colonyBottleneck,
+  tutorialStep,
+  dismissTutorial,
   markAwaySeen,
   GENERIC,
   SPECIES,
@@ -70,6 +73,7 @@ import {
   matrilineUpgradeOwned,
   buyMatrilineUpgrade,
   buyInstinct,
+  affordableInstincts,
   doMatrilineReset,
   matrilineReady,
   matrilineVisible,
@@ -776,22 +780,37 @@ function buildLibrary() {
 
 // Library holds two things you read rather than press: what the words mean, and
 // what has changed since you were last here.
-const LIBRARY_TABS = [
-  { id: "terms", name: "Terms" },
-  { id: "updates", name: "What changed" }
-];
-let libraryTab = "terms";
+// One page per category rather than one scroll through all of them. At 38
+// entries the single list already needed scrolling to reach the group you
+// wanted, and it only grows.
+const LIBRARY_TABS = LIBRARY_GROUPS.map(g => ({ id: g.id, name: g.name }))
+  .concat([{ id: "updates", name: "What changed" }]);
+let libraryTab = LIBRARY_TABS[0].id;
 
 function selectLibraryTab(name) {
   libraryTab = name;
-  LIBRARY_TABS.forEach(tab => {
-    el("libraryPanel-" + tab.id).hidden = tab.id !== name;
-  });
+  el("libraryPanel-terms").hidden = name === "updates";
+  el("libraryPanel-updates").hidden = name !== "updates";
   for (const button of el("libraryTabs").children) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
   if (name === "updates") markSeen("updates", latestVersion());
   render();
+}
+
+// Sub-tab bars were plain buttons, so there was nowhere for a dot to go -- and
+// a player had no way to see that a track had moved or that an instinct had
+// become affordable without opening each page.
+function markSubTab(bar, id, count) {
+  const node = el(bar);
+  if (!node) return;
+  for (const button of node.children) {
+    if (button.dataset.tab !== id) continue;
+    const badge = button.children[0];
+    if (!badge) continue;
+    badge.hidden = !(count > 0);
+    badge.textContent = count > 9 ? "9+" : String(count || "");
+  }
 }
 
 function buildLibraryTabs() {
@@ -802,7 +821,7 @@ function buildLibraryTabs() {
     button.onclick = () => selectLibraryTab(tab.id);
     el("libraryTabs").appendChild(button);
   });
-  selectLibraryTab("terms");
+  selectLibraryTab(LIBRARY_TABS[0].id);
 }
 
 function buildUpdates() {
@@ -842,10 +861,11 @@ function renderLibrary() {
       ? " — the rest fill in as the colony does them" : "");
   LIBRARY_GROUPS.forEach(group => {
     let shown = 0;
+    const onThisPage = group.id === libraryTab;
     LIBRARY.filter(e => e.group === group.id).forEach(entry => {
       const ui = libraryRows[entry.id];
       const at = entryState(game, entry);
-      ui.row.hidden = at < 1;
+      ui.row.hidden = at < 1 || !onThisPage;
       if (at >= 1) shown++;
       ui.row.classList.toggle("full", at >= 2);
       ui.text.textContent = entry.short;
@@ -853,9 +873,11 @@ function renderLibrary() {
       if (at >= 2) ui.more.textContent = entry.full;
     });
     const any = LIBRARY.find(e => e.group === group.id);
-    if (any) libraryRows[any.id].section.hidden = shown === 0;
+    if (any) libraryRows[any.id].section.hidden = shown === 0 || !onThisPage;
   });
-  markSeen("library", counts.known);
+  // a page with nothing discovered on it yet says so, rather than being blank
+  const here = LIBRARY.filter(e => e.group === libraryTab && entryState(game, e) >= 1).length;
+  el("libraryEmpty").hidden = here > 0;
 }
 
 // Opt-in difficulty rather than a nerf: what clearing a trial pays is earned,
@@ -963,7 +985,10 @@ function renderRaid() {
         "Raise an army that can hold " + fmt(threat) + " and the nest opens again; " +
         "you field " + fmt(defence) + " now."
       : "Foraging is half what it was — the workers keep to cover and will not range far. " +
-        "Lay a soldier and the colony opens up again; the next attack is a full six minutes away.";
+        "Lay a soldier and the colony opens up again; the next attack is a full six minutes away. " +
+        "Foragers, excavators and nurses can be armed by the Combat adaptations and they do fight — " +
+        "but only a soldier keeps the nest open. With none of them the colony shuts regardless of " +
+        "how much strength the rest of it has.";
     return;
   }
 
@@ -1007,6 +1032,12 @@ function affordablePrestigeUpgrades() {
     if (!prestigeUpgradeOwned(game, upgrade) && p.royalJelly >= upgrade.cost) ready++;
   }
   return ready;
+}
+
+function renderTutorial() {
+  const step = tutorialStep();
+  el("tutorialBox").hidden = !step;
+  if (step) el("tutorialText").textContent = step.text;
 }
 
 function renderAway() {
@@ -1502,9 +1533,11 @@ function renderChallenges() {
         (mine ? " You have " + fmt(challengeCount()) + "." : "")
       : "";
     ui.reward.textContent = challenge.open && !mastered
-      ? "Each level pays × " + CHALLENGE_REWARD_STEP + " food, " + challenge.mastery.name +
-        " pays × " + challenge.mastery.step + " " + challenge.mastery.type + ", and " +
-        masteryLineText(challenge.mastery.type) + ". All for good."
+      ? challenge.mastery.name + " pays × " + challenge.mastery.step + " " +
+        challenge.mastery.type + " and " + masteryLineText(challenge.mastery.type) +
+        " — kept for good, by every species the line ever becomes. Each level also " +
+        "pays × " + CHALLENGE_REWARD_STEP + " food to the colony holding it, which is " +
+        "the half that starts again when the line changes species."
       : "";
     ui.button.hidden = !challenge.open || mastered;
     ui.button.disabled = !challenge.open || mastered || (!!running && !mine);
@@ -1584,6 +1617,7 @@ function render() {
   el("tabButton-library").hidden = !libraryUnlocked(game);
   el("takeover").hidden = holdsSave();
   renderAway();
+  renderTutorial();
   renderBadges();
   renderInspector();
   renderQueen();
@@ -1594,12 +1628,23 @@ function render() {
   renderRaid();
   if (activeTab === "ants") renderAnts();
   else if (activeTab === "upgrades") renderUpgrades();
-  else if (activeTab === "achievements") { renderAchievements(game); renderInstincts(game); }
+  else if (activeTab === "achievements") {
+    renderAchievements(game);
+    renderInstincts(game);
+    // a sub-tab can say that something is waiting on it, which is the whole
+    // point of a dot -- a track that moved, or an instinct you can now afford
+    markSubTab("achievementTabs", "tracks", newTrackCount(game));
+    markSubTab("achievementTabs", "instincts", affordableInstincts(game));
+  }
   else if (activeTab === "combat") renderFighters();
   else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "matriline") renderMatriline();
   else if (activeTab === "challenges") renderChallenges();
   else if (activeTab === "library") {
+    // marked here rather than inside renderLibrary(), which only runs on the
+    // terms sub-tab -- a player who left it on What changed never cleared the
+    // dot at all, and it read as a badge that never goes away
+    markSeen("library", libraryCounts(game).known);
     if (libraryTab === "terms") renderLibrary(); else renderUpdates();
   }
   else if (activeTab === "settings") {
@@ -1644,7 +1689,7 @@ function buildMatriline() {
   for (const s of SPECIES) {
     const card = document.createElement("section");
     card.className = "species-card";
-    card.innerHTML = '<div class="species-head"><b></b><span class="species-common"></span>' +
+    card.innerHTML = '<div class="species-head"><b></b>' +
       '<span class="species-state"></span></div>' +
       '<p class="species-flavour"></p>' +
       '<p class="species-active"></p>' +
@@ -1654,7 +1699,6 @@ function buildMatriline() {
     speciesCards[s.id] = {
       card,
       name: card.querySelector("b"),
-      common: card.querySelector(".species-common"),
       state: card.querySelector(".species-state"),
       flavour: card.querySelector(".species-flavour"),
       active: card.querySelector(".species-active"),
@@ -1662,7 +1706,7 @@ function buildMatriline() {
       progress: card.querySelector(".species-progress")
     };
     watch(card, {
-      title: s.name + " — " + s.common,
+      title: s.name,
       body: s.flavour,
       note: () => "WHILE YOU ARE PLAYING IT\n  · " + s.activeText +
         "\n\nONCE IT IS FINISHED, FOR GOOD\n  · " + s.passiveName + " — " + s.passiveText +
@@ -1781,7 +1825,6 @@ function renderMatriline() {
     const playing = line === s.id;
     const points = speciesPoints(game, s.id);
     ui.name.textContent = s.name;
-    ui.common.textContent = s.common;
     ui.state.textContent = playing ? "you are this" : finished ? "finished" : "not yet finished";
     ui.card.classList.toggle("playing", playing);
     ui.card.classList.toggle("finished", finished);
@@ -1959,6 +2002,9 @@ function closeAwayReport() {
 // while the window is open and raw indices would slide onto different eggs
 // underneath the player.
 let broodPick = null;   // { list: "tended" | "waiting", index }
+// how many queued batches the window lists at once. The queue is FIFO, so the
+// front is what a player is deciding about; beyond this it is a count.
+const WAITING_RUN_LIMIT = 40;
 
 function broodScope() {
   return game.settings.broodScope === "all" ? "all" : "waiting";
@@ -1972,13 +2018,19 @@ function tendedCount() {
   return Math.min(game.eggs.length, broodCapacity(game));
 }
 
-function waitingRuns() {
+// Stops as soon as it has one more run than the window will list. Walking all
+// 208,000 eggs every frame to build 2,080 runs and then showing 40 of them was
+// most of what made the window unopenable at that size -- capping the rows cut
+// it from 68ms a frame to 26, and stopping the walk cuts it to under one.
+function waitingRuns(limit) {
   const runs = [];
+  const stopAt = limit ? limit + 1 : Infinity;
   for (let i = tendedCount(); i < game.eggs.length; i++) {
     const caste = emergingCaste(game, game.eggs[i], i);
     const last = runs[runs.length - 1];
-    if (last && last.caste === caste) last.to = i;
-    else runs.push({ caste, from: i, to: i });
+    if (last && last.caste === caste) { last.to = i; continue; }
+    if (runs.length >= stopAt) break;
+    runs.push({ caste, from: i, to: i });
   }
   return runs;
 }
@@ -1993,7 +2045,9 @@ function resolvePick() {
   if (broodPick.list === "tended") {
     return broodPick.index < tendedCount() ? { from: broodPick.index, to: broodPick.index } : null;
   }
-  const run = waitingRuns()[broodPick.index];
+  // only ever as far as the row that was picked, which can never be past the
+  // window's limit -- this runs every frame while the dialog is open
+  const run = waitingRuns(broodPick.index + 1)[broodPick.index];
   return run ? { from: run.from, to: run.to } : null;
 }
 
@@ -2076,10 +2130,19 @@ function updateBroodDialog() {
     note: eggSecondsLeft(egg, i).toFixed(0) + "s"
   })));
 
-  const runs = waitingRuns();
+  // This window redraws every frame, and a queue built out of many small
+  // batches is many runs: measured at 208,006 eggs in 2,080 batches it built
+  // 2,078 rows and cost 68ms a frame, which is four frames' budget for one
+  // panel and is why the details could not be opened at that size. Only the
+  // front of the queue is listed -- it is strict FIFO, so the front is the part
+  // that matters, and the rest is a count.
+  const allRuns = waitingRuns(WAITING_RUN_LIMIT);
+  const more = allRuns.length > WAITING_RUN_LIMIT;
+  const runs = more ? allRuns.slice(0, WAITING_RUN_LIMIT) : allRuns;
   el("broodWaitingHead").textContent = "Waiting — " + fmt(waiting) +
-    (runs.length > 1 ? " in " + runs.length + " batches" : "");
-  el("broodWaitingEmpty").hidden = runs.length > 0;
+    (more ? " — the first " + runs.length + " batches of it"
+          : allRuns.length > 1 ? " in " + allRuns.length + " batches" : "");
+  el("broodWaitingEmpty").hidden = allRuns.length > 0;
   fillRows(el("broodWaitingList"), runs.map((run, i) => ({
     list: "waiting", index: i, locked: false,
     picked: !!broodPick && broodPick.list === "waiting" && broodPick.index === i,
@@ -2112,12 +2175,21 @@ function updateBroodDialog() {
       ", the furthest " + Math.round(best * 100) + "% grown. That incubation is lost.";
   }
   el("broodConfirm").disabled = !range;
+  // promoting takes the picked batch alone, whichever way the destroy direction
+  // is pointing -- the two are different questions
+  const promotePick = resolvePick();
+  const frontAt = tendedCount();
+  const canPromote = !!promotePick && promotePick.from > frontAt;
+  el("broodPromote").disabled = !canPromote;
+  el("broodPromote").textContent = canPromote
+    ? "Move these " + fmt(promotePick.to - promotePick.from + 1) + " to the front"
+    : promotePick && promotePick.from <= frontAt ? "Already at the front" : "Move to the front";
 }
 
 function openBroodDialog() {
   if (game.eggs.length === 0) return;
   // opens on the eggs waiting for a slot, which is what the old button did
-  const runs = waitingRuns();
+  const runs = waitingRuns(1);
   broodPick = runs.length ? { list: "waiting", index: 0 } : { list: "tended", index: 0 };
   updateBroodDialog();
   el("broodModal").hidden = false;
@@ -2139,6 +2211,16 @@ el("broodDirection").onchange = event => {
   setSetting("broodDirection", event.target.value);
   updateBroodDialog();
 };
+el("tutorialSkip").onclick = () => { dismissTutorial(); render(); };
+
+el("broodPromote").onclick = () => {
+  const pick = resolvePick();
+  if (pick) promoteEggRange(pick.from, pick.to);
+  broodPick = null;
+  updateBroodDialog();
+  render();
+};
+
 el("broodConfirm").onclick = () => {
   const range = broodRange();
   if (range) destroyEggRange(range.from, range.to);

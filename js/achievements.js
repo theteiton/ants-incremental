@@ -11,7 +11,7 @@ import {
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch } from "./panels.js";
 
-import { INSTINCTS, instinctOwned, instinctPoints } from "./instincts.js";
+import { INSTINCTS, instinctOwned, instinctPoints, instinctsSpent } from "./instincts.js";
 
 const el = id => document.getElementById(id);
 
@@ -269,7 +269,9 @@ export const ACHIEVEMENT_TRACKS = [
   // back from anyone who had already gone past.
   { id: "flights", name: "Nuptial flights", unit: "flights",
     desc: "Times the queen has taken wing and founded a new colony.",
-    value: g => (g.prestige && g.prestige.flightsTaken) || 0,
+    // lifetime, because a matriline reset zeroes flightsTaken
+    value: g => Math.max((g.stats && g.stats.flightsEver) || 0,
+      (g.prestige && g.prestige.flightsTaken) || 0),
     thresholds: ladder(1, 50, 1.68) },
 
   { id: "trials", name: "Trials cleared", unit: "levels",
@@ -279,7 +281,10 @@ export const ACHIEVEMENT_TRACKS = [
 
   { id: "royal_jelly", name: "Royal jelly gathered", unit: "royal jelly",
     desc: "Total royal jelly earned across all flights.",
-    value: g => (g.prestige && g.prestige.royalJellyTotal) || 0,
+    // lifetime, because a matriline reset zeroes royalJellyTotal -- that figure
+    // is the gate for the next matriline and is meant to reset
+    value: g => Math.max((g.stats && g.stats.jellyEver) || 0,
+      (g.prestige && g.prestige.royalJellyTotal) || 0),
     thresholds: ladder(1, 250, 1.9) },
 
   // ---- what nothing else was watching -----------------------------------
@@ -356,6 +361,15 @@ registerAchievementCap(MAX_ACHIEVEMENT_LEVEL);
 // it, ten extra rungs cost about a million times the activity.
 export const SOFTCAP_STEP = 1.15;
 
+// A track counting whole things -- trials cleared, flights taken -- must not
+// grow fractional rungs past its designed top. Measured, the trials track ran
+// 30, then 43.77, 73.46, 141.77, which reads as broken on a number that can
+// only ever be an integer.
+function roundRung(track, value) {
+  return track.unit === "levels" || track.unit === "flights" || track.integer
+    ? Math.ceil(value) : value;
+}
+
 const stepCache = new Map();
 
 function trackStep(track) {
@@ -374,7 +388,7 @@ export function thresholdAt(track, tier) {
   const past = tier - th.length;
   // each extra rung is SOFTCAP_STEP further apart than the one before it
   const stretch = Math.pow(SOFTCAP_STEP, (past * (past - 1)) / 2);
-  return th[th.length - 1] * Math.pow(trackStep(track), past) * stretch;
+  return roundRung(track, th[th.length - 1] * Math.pow(trackStep(track), past) * stretch);
 }
 
 export function trackTier(game, track) {
@@ -566,13 +580,17 @@ export function buildAchievements(game) {
     const button = document.createElement("button");
     button.textContent = tab.name;
     button.dataset.tab = tab.id;
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.hidden = true;
+    button.appendChild(badge);
     button.onclick = () => selectAchievementTab(tab.id);
     el("achievementTabs").appendChild(button);
   });
   BONUS_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
   TRIAL_BOXES.forEach(entry => buildBox(el("bonusList"), entry, game));
   UNLOCK_BOXES.forEach(entry => buildBox(el("unlockList"), entry, game));
-  buildInstincts(onBuyInstinct);
+  buildInstincts();
   selectAchievementTab("tracks");
   buildTracks(game);
 }
@@ -633,7 +651,12 @@ const instinctCards = {};
 // Tiers finally buy something. Cards are built once and never reparented -- a
 // node detached between mousedown and mouseup never receives its click, which is
 // what once made upgrades unbuyable.
-function buildInstincts(onBuy) {
+// Takes no callback: the handler has to read the live onBuyInstinct rather than
+// close over whatever it was at build time. buildAchievements() runs during
+// ui.js's module scope, BEFORE ui.js calls setInstinctBuyer, so a captured
+// parameter is the initial no-op for ever -- every instinct card was
+// unclickable, which is the same shape as the two upgrade-click bugs before it.
+function buildInstincts() {
   const list = el("instinctList");
   if (!list || list.children.length) return;
   for (const instinct of INSTINCTS) {
@@ -641,31 +664,57 @@ function buildInstincts(onBuy) {
     card.className = "upgrade instinct";
     card.innerHTML = '<div class="upgrade-head"><b></b><span class="upgrade-level"></span></div>' +
       '<span class="upgrade-desc"></span><span class="upgrade-cost"></span>';
-    card.addEventListener("click", () => onBuy(instinct.id));
+    card.addEventListener("click", () => onBuyInstinct(instinct.id));
     list.appendChild(card);
     instinctCards[instinct.id] = { card, name: card.querySelector("b"),
       level: card.querySelector(".upgrade-level"), desc: card.querySelector(".upgrade-desc"),
       cost: card.querySelector(".upgrade-cost") };
+    watch(card, {
+      title: instinct.name,
+      body: instinct.desc,
+      note: () => "HOW THIS IS BOUGHT\n" +
+        "  \u00b7 It costs " + instinct.cost + " points and you buy it by clicking it. " +
+        "Nothing here unlocks by itself.\n" +
+        "  \u00b7 A point is an achievement tier. All eight instincts spend from the same pool, " +
+        "so buying one leaves fewer for the others.\n" +
+        "  \u00b7 Spending never lowers your achievement level \u2014 the tiers still count towards it.\n\n" +
+        "WHAT IT COSTS YOU\n" +
+        "  \u00b7 " + instinct.cost + " of the " + instinctPoints(game) + " points you have left.\n\n" +
+        "WHAT IT PAYS\n" +
+        "  \u00b7 " + instinct.desc + "\n" +
+        "  \u00b7 Held for good: through a nuptial flight, a matriline and a trial alike.",
+      warn: false });
   }
 }
 
 export function renderInstincts(game) {
   const available = instinctPoints(game);
+  const earned = game.achievementPoints || 0;
+  const spent = instinctsSpent(game);
   el("instinctIntro").textContent =
-    "Every tier the colony has ever earned is a point, and these are what points buy. " +
-    "Spending never lowers your achievement level \u2014 the level is what the tiers scored, and " +
-    "this is what they can be traded for. Nothing here is ever lost: an instinct is held " +
-    "through a nuptial flight, a matriline and a trial alike. " +
-    available + " of " + (game.achievementPoints || 0) + " points unspent.";
+    "Nothing here unlocks on its own \u2014 you buy each one, by clicking it. Every achievement " +
+    "tier the colony has ever earned is one point, and all eight instincts draw on the same " +
+    "pool, so buying one leaves fewer for the rest. Spending never lowers your achievement " +
+    "level: the level is what the tiers scored, and this is what the same tiers can be spent " +
+    "on besides. Nothing bought here is ever lost \u2014 an instinct is held through a nuptial " +
+    "flight, a matriline and a trial alike. " +
+    "You have earned " + earned + " points, spent " + spent + ", and have " + available +
+    " left.";
   for (const instinct of INSTINCTS) {
     const ui = instinctCards[instinct.id];
     if (!ui) continue;
     const owned = instinctOwned(game, instinct.id);
     const afford = available >= instinct.cost;
     ui.name.textContent = instinct.name;
-    ui.level.textContent = owned ? "held" : "";
+    ui.level.textContent = owned ? "held" : "not bought";
     ui.desc.textContent = instinct.desc;
-    ui.cost.textContent = owned ? "held" : instinct.cost + " points";
+    // never a bare number: a bare number beside a card reads as the level it
+    // unlocks at rather than the price it costs
+    ui.cost.textContent = owned
+      ? "held for good"
+      : afford
+      ? "Click to buy \u2014 " + instinct.cost + " points"
+      : instinct.cost + " points, " + (instinct.cost - available) + " more needed";
     ui.cost.classList.toggle("affordable", !owned && afford);
     ui.cost.classList.toggle("owned-tag", owned);
     ui.card.classList.toggle("owned", owned);
