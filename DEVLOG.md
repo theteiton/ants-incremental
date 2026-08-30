@@ -17,7 +17,7 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ## 0.2.4.0 — 30 August 2026
 
-**An assistant, and the library working again.**
+**An assistant, dots that say how many, and the library working again.**
 
 **Pressing a library category did nothing.** Paginating it by category left the
 render dispatch still testing `libraryTab === "terms"` — and `libraryTab` holds a
@@ -49,8 +49,6 @@ margin at all. The Matriline tab showed it worst with three of them, but it was
 the rule rather than the tab, so the fix is on `.panel h2` and every panel gets
 it — seven headings across Combat, Achievements, Nuptial, Matriline and Settings.
 The sixteen that are the first thing in their container still sit flush.
-
-## 0.2.3.1 — 30 August 2026
 
 **The Achievements tab was writing 440 DOM nodes a frame.**
 
