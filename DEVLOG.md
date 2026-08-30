@@ -34,6 +34,11 @@ flying and resetting a matriline stay yours, and so does shedding her wings,
 which is the one deliberate first click the game opens on. There is a switch for
 it in Settings.
 
+**The assistant stands in the queen's panel**, rather than in a bar under the
+header above both columns. Everything she points at — the wings, the rally, the
+milestone — is in that panel already, so she was the one thing furthest from what
+she was talking about. She spans its full width, under the queen and her text.
+
 **The milestone line covers every layer.** It ended at 1,000 ants and then said
 deeper milestones were being built for the beta, which two layers later was not
 true. It now names the Royal Lineage, the Matriline's jelly gate, the species

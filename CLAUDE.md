@@ -758,6 +758,13 @@ shortcut for a click you were going to make, so the rule that nothing lays an eg
 or buys an upgrade on your behalf still holds. Shedding her wings has no button
 either: it is the one deliberate first click the game opens on.
 
+**The assistant stands in the queen's panel.** It sat under the header, above
+both columns, which put the one thing telling you what to do next furthest from
+the things it was telling you to do — the wings, the rally and the milestone are
+all in that panel. It is a full-width third flex child of `.queen-panel`, so it
+spans the panel under both the sprite and the text column rather than being
+squeezed into the narrow half beside the queen.
+
 **The milestone line covers every layer now.** It stopped at 1,000 ants and then
 said deeper milestones were being built for the beta, which stopped being true
 two layers ago. Past the flight it names the Royal Lineage, then the Matriline's
