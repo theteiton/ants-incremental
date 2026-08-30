@@ -750,6 +750,77 @@ clock and a prestige layer.
 
 ---
 
+**The opening guide became a standing assistant.** It used to retire at
+soldiers; now it hands over from explaining to pointing, and where the next thing
+is one safe click it offers to make it. **It never acts on its own and never
+offers anything irreversible** — exiling, destroying eggs, taking the flight and
+beginning a matriline are all left to the player, because an assistant that does
+those is exactly the automated mistake the game refuses to make. The button is a
+shortcut for a click you were going to make, so the rule that nothing lays an egg
+or buys an upgrade on your behalf still holds. Shedding her wings has no button
+either: it is the one deliberate first click the game opens on.
+
+**The milestone line covers every layer now.** It stopped at 1,000 ants and then
+said deeper milestones were being built for the beta, which stopped being true
+two layers ago. Past the flight it names the Royal Lineage, then the Matriline's
+jelly gate, then the species being played and how far off finishing her it is,
+then how many of the six are banked.
+
+**`libraryTab` holds a group id, so nothing may test it against `"terms"`.**
+Paginating the library by category left the render dispatch checking for the old
+value, so `renderLibrary()` never ran and pressing a category did nothing at all
+— the panel was visible and simply never updated. A tab whose identifier changes
+meaning has to be swept for every place that compared against the old one.
+
+**`.panel h2` carried no top margin at all**, so every heading after the first in
+every panel landed flush against whatever grid or paragraph came before it. The
+Matriline tab showed it worst with three of them, but it was the rule and not the
+tab — the fix belongs on `.panel h2`, not on `#tab-matriline`. Seven headings
+gain the space: Who fights, Unlocked by the flight, Royal Lineage Adaptations,
+The species, Matriline adaptations, Her majesty and Appearance. The other sixteen
+are the first thing in their container and still sit flush, and so does any
+heading following the panel head or the sub-tab bar, both of which carry their
+own bottom margin. **Scoping a fix to the tab it was noticed on leaves the same
+bug everywhere else.**
+
+**A render that runs every frame must not write a value that has not changed.**
+The Achievements tab set the className of all **317 pips** and about forty text
+nodes on every frame whether or not any of them differed — 440 unconditional DOM
+writes, 26,400 a second at 60fps, each one a style invalidation in a browser.
+That is what made buying an instinct feel like it stuck. `setText`, `setClass`
+and `setWidth` in `panels.js` skip the write when the value is the same, and the
+same treatment is applied to the Matriline, Trials, Library, Upgrades, Units,
+Prestige and Brood renders. On a still frame the count is now zero.
+
+**This is not a cost the harness can measure.** A property write is free in node;
+what it costs is style and layout in a real browser. The write *count* is
+measurable and the fix is the standard one, but the improvement has to be
+confirmed by playing it.
+
+**The number goes inside the dot.** `.badge` was a 7px circle with no font size
+and no way to centre anything, so a count written into it spilled out below the
+baseline — which is not an argument against putting it there, only against the
+sizing. It is a 14px flex-centred circle now, growing to a pill for a second
+digit, clamped at 99+, and `:empty` falls back to the plain 7px dot for anything
+with nothing to count. Same footprint as the dot, and it says how many.
+
+**A tab dot that has a count should show it.** Upgrades, Achievements, Prestige,
+Library and Matriline all computed a number and then threw it away to draw a bare
+dot. One `setBadge()` decides what every one of them says, so they cannot drift.
+
+**The head says what there is to spend.** The spendable figure only existed on the
+Instincts page, so a player on any other sub-tab could not see what they were
+holding. The Achievements head reads *"137 tiers earned · 129 points to spend on
+instincts (8 spent) · 340 XP to level 22"*.
+
+**Fuzzing found nothing, which is worth recording.** 24,000 random actions driven
+through the real click handlers — laying, exiling, destroying, promoting,
+flighting, entering and abandoning trials, matriline resets, buying every kind of
+upgrade, switching tabs mid-action — with the invariants checked every 200 steps:
+no exception, no negative or NaN resource, no population past its cap, no brood
+tally drift, no overspent instinct pool, and the colony still exported and
+imported afterwards.
+
 **A handler must read the live callback, not close over it.** Every instinct card
 was unclickable: `buildInstincts(onBuy)` captured the buyer as a parameter, and
 `buildAchievements()` runs during ui.js's module scope — before ui.js calls

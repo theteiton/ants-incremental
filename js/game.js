@@ -425,10 +425,12 @@ export const TUTORIAL_STEPS = [
     text: "She has landed and mated, and she will never fly again. Shedding her wings is the only thing she can do — and the 100 reserves it frees are the only ones she will ever have." },
   { id: "lay",
     when: () => game.emerged === 0 && game.eggs.length === 0,
-    text: "Lay an egg. Each costs 20 reserves, so there are five in her — and the first four hatch as nanitics whatever caste you choose. That is how you get them; they cannot be laid on purpose." },
+    text: "Lay an egg. Each costs 20 reserves, so there are five in her — and the first four hatch as nanitics whatever caste you choose. That is how you get them; they cannot be laid on purpose.",
+    act: () => layEgg(game.nextCaste), label: "Lay an egg" },
   { id: "strip",
     when: () => game.wings > 0 && game.stats.foodEarned < 200,
-    text: "Strip a wing. It yields 80 food over ten seconds, and until the first workers emerge it is the only food there is." },
+    text: "Strip a wing. It yields 80 food over ten seconds, and until the first workers emerge it is the only food there is.",
+    act: () => stripWing(), label: "Strip a wing" },
   { id: "wait",
     when: () => game.emerged > 0 && population(game) < 8,
     text: "The founders work at six times a forager and fade by half every twenty minutes. The opening is a race to raise real workers before they are spent." },
@@ -446,13 +448,98 @@ export const TUTORIAL_STEPS = [
     text: "Something starts attacking at 256 ants. Soldiers unlock there too — lose your last one and the nest goes to ground rather than dying, but it halves your food until an army stands again." }
 ];
 
+// Past the opening the assistant keeps going, but it stops explaining and starts
+// pointing: the next single thing worth doing, and where that thing is one safe
+// click it offers to make it. Nothing here is irreversible -- exiling, destroying
+// eggs, flying and resetting a matriline are all left to the player, because an
+// assistant that does those is the automated mistake the game refuses to make.
+export const ASSISTANT_STEPS = [
+  { id: "strip_more",
+    when: () => stripReady() && game.wings > 0,
+    text: () => "There is still a wing to strip \u2014 80 food over ten seconds.",
+    act: () => stripWing(), label: "Strip a wing" },
+  { id: "rally",
+    when: () => rallyReady() && population(game) >= 20,
+    text: () => "The foragers can be rallied: triple food for thirty seconds, then a rest.",
+    act: () => startRally(), label: "Rally them" },
+  { id: "buy",
+    when: () => bestAffordableUpgrade() !== null,
+    text: () => {
+      const line = bestAffordableUpgrade();
+      return "You can afford " + line.name + ", and it is the best value on the board right now.";
+    },
+    act: () => { const line = bestAffordableUpgrade(); return line ? buyUpgrade(line.id) : false; },
+    label: () => {
+      const line = bestAffordableUpgrade();
+      return line ? "Buy " + line.name : "Buy it";
+    } },
+  { id: "dig",
+    when: () => broodSpace() <= 0 && capPerExcavator(game) > 0 && isUnlocked(game, "excavator"),
+    text: () => "The nest is full. Only excavators can be laid now, and each one digs the room for more.",
+    act: () => layEgg("excavator"), label: "Lay an excavator" },
+  { id: "lay_on",
+    when: () => canLay(autoCaste()) && game.eggs.length < broodCapacity(game),
+    text: () => "There is room in the brood and food for another egg.",
+    act: () => layEgg(autoCaste()), label: () => "Lay a " + (CASTES[autoCaste()] || {}).name },
+  { id: "flight",
+    when: () => flightReady(),
+    text: () => "She can take the nuptial flight whenever you are ready. The colony begins again, " +
+      "and what it keeps is on the Nuptial tab.",
+    act: null },
+  { id: "matriline",
+    when: () => matrilineReady(game) && currentSpecies(game) === GENERIC,
+    text: () => "The Matriline is open. Beginning one commits the line to a species for the whole run.",
+    act: null }
+];
+
+// the affordable upgrade with the most gain per unit of cost, which is what the
+// suggestion is worth only if it is honest
+function bestAffordableUpgrade() {
+  let best = null;
+  const rate = foodPerSecond(game);
+  for (const line of UPGRADES) {
+    if (upgradeMaxed(game, line) || !upgradeUnlocked(game, line)) continue;
+    const cost = nextLevelCost(game, line);
+    if (!cost || game.food < cost.food || game.protein < cost.protein) continue;
+    const levels = Object.assign({}, game.upgrades);
+    levels[line.id] = upgradeLevel(game, line) + 1;
+    const probe = Object.assign({}, game, { upgrades: levels });
+    const gain = (foodPerSecond(probe) - rate) +
+      (populationCap(probe) - populationCap(game)) * 0.5 +
+      (broodCapacity(probe) - broodCapacity(game)) * 20;
+    const price = Math.max(1, cost.food + cost.protein * 1000);
+    if (gain > 0 && (!best || gain / price > best.value)) best = { line, value: gain / price };
+  }
+  return best ? best.line : null;
+}
+
 export function tutorialStep() {
   if (game.settings.tutorial === false) return null;
-  if (isUnlocked(game, "soldier")) return null;      // the milestone line takes over
-  for (const step of TUTORIAL_STEPS) {
-    if (step.when()) return step;
+  // the opening explains; after it the assistant points
+  if (!isUnlocked(game, "soldier")) {
+    for (const step of TUTORIAL_STEPS) {
+      if (!step.when()) continue;
+      return { id: step.id, text: step.text, act: step.act || null,
+        label: step.act ? step.label : null };
+    }
+    return null;
+  }
+  for (const step of ASSISTANT_STEPS) {
+    if (!step.when()) continue;
+    return {
+      id: step.id,
+      text: typeof step.text === "function" ? step.text() : step.text,
+      act: step.act || null,
+      label: step.act ? (typeof step.label === "function" ? step.label() : step.label) : null
+    };
   }
   return null;
+}
+
+export function doAssistantStep() {
+  const step = tutorialStep();
+  if (!step || !step.act) return false;
+  return !!step.act();
 }
 
 export function dismissTutorial() {

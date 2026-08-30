@@ -15,6 +15,74 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.4.0 — 30 August 2026
+
+**An assistant, and the library working again.**
+
+**Pressing a library category did nothing.** Paginating it by category left the
+render dispatch still testing `libraryTab === "terms"` — and `libraryTab` holds a
+group id now, so `renderLibrary()` never ran once. The panel was there and never
+updated. Mine, from the release before this one.
+
+**The guide is a standing assistant.** It used to retire once soldiers unlocked;
+it now hands over from explaining the opening to pointing at the next thing worth
+doing, with a small ant standing in the box. Where that thing is one safe click
+it offers to make it: strip a wing, lay an egg, rally the foragers, buy the
+best-value adaptation you can afford, dig out when the nest is full. It never
+acts on its own, and it never offers anything irreversible — exiling, destroying,
+flying and resetting a matriline stay yours, and so does shedding her wings,
+which is the one deliberate first click the game opens on. There is a switch for
+it in Settings.
+
+**The milestone line covers every layer.** It ended at 1,000 ants and then said
+deeper milestones were being built for the beta, which two layers later was not
+true. It now names the Royal Lineage, the Matriline's jelly gate, the species
+being played and how far off finishing her, and how many of the six are banked.
+
+Also: headings had no air above them anywhere, because `.panel h2` carried no top
+margin at all. The Matriline tab showed it worst with three of them, but it was
+the rule rather than the tab, so the fix is on `.panel h2` and every panel gets
+it — seven headings across Combat, Achievements, Nuptial, Matriline and Settings.
+The sixteen that are the first thing in their container still sit flush.
+
+## 0.2.3.1 — 30 August 2026
+
+**The Achievements tab was writing 440 DOM nodes a frame.**
+
+Buying an instinct felt like it stuck, and the maths was not the reason: all 23
+tracks cost 3.6µs together and `checkAchievements` 7.8µs. What was slow was the
+drawing. `renderAchievements` set the className of every one of the 317 pips and
+about forty text nodes on every frame, changed or not — 440 unconditional writes,
+26,400 a second, each a style invalidation in a browser.
+
+`setText`, `setClass` and `setWidth` skip a write when the value has not moved.
+On a still frame the tab now writes nothing at all. The same treatment went to
+the Matriline, which was the next worst at roughly 212 writes a frame across six
+species cards and thirty-four tree nodes, and to the Trials, Library, Upgrades,
+Units, Prestige and Brood renders.
+
+Worth being straight about: node cannot measure this. A property write is free
+here and expensive in a browser. The write count is real and the fix is the
+standard one, but whether it feels better is something only playing it will say.
+
+**The number goes inside the dot.** `.badge` was a 7px circle with no font size
+and nothing to centre against, so a count written into it spilled out below the
+baseline. That is an argument about sizing, not about where the number belongs:
+it is a 14px flex-centred circle now, growing to a pill for a second digit and
+clamped at 99+, with `:empty` falling back to the plain dot. Same footprint,
+and it says how many — so Upgrades, Achievements, Prestige, Library and Matriline
+now show the counts they were already computing and discarding.
+
+**The Achievements head says what there is to spend.** The spendable figure only
+appeared on the Instincts page, so from any other sub-tab there was no way to
+know what you were holding.
+
+**And a fuzz run**, which is a kind of test this game did not have: 24,000 random
+actions through the real click handlers, in orders nobody would choose, with the
+invariants checked every 200 steps. Nothing threw, nothing went negative or NaN,
+no population passed its cap, the brood tally never drifted, the instinct pool
+was never overspent, and the colony still saved and reloaded at the end.
+
 ## 0.2.3.0 — 30 August 2026
 
 **The first playtest of the Matriline, answered.**

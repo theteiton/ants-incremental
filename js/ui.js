@@ -57,6 +57,7 @@ import {
   colonyBottleneck,
   tutorialStep,
   dismissTutorial,
+  doAssistantStep,
   markAwaySeen,
   GENERIC,
   SPECIES,
@@ -173,6 +174,9 @@ import {
   renderInspector,
   renderSettings,
   setInspect,
+  setText,
+  setClass,
+  setWidth,
   watch
 } from "./panels.js";
 import {
@@ -319,19 +323,54 @@ function renderWings() {
       fmt(WING_FOOD) + " food each, over " + WING_STRIP_TIME + "s.";
 }
 
-function renderMilestone() {
-  const box = el("queenMilestone");
-  box.hidden = !game.wingsShed;
-  if (box.hidden) return;
+// What the colony is growing towards, all the way up rather than stopping at
+// the flight. It used to end at 1,000 ants and say deeper milestones were being
+// built for the beta, which stopped being true two layers ago.
+function milestoneText() {
   // reads the run high-water mark, the same figure the gates themselves read,
   // so a lost raid never walks the milestone backwards
   const reach = runPeakCount(game, "population");
   const next = MILESTONES.find(milestone => reach < milestone.at);
-  box.textContent = next
-    ? "Next milestone at " + fmt(next.at) + " ants — " + next.text +
-      " " + fmt(reach) + " so far, " + fmt(next.at - reach) + " to go."
-    : "Every milestone this colony has is behind her, the last being the Nuptial Flight at " +
-      fmt(PRESTIGE_UNLOCK) + " ants. Deeper ones are being built for the beta.";
+  if (next) {
+    return "Next milestone at " + fmt(next.at) + " ants — " + next.text +
+      " " + fmt(reach) + " so far, " + fmt(next.at - reach) + " to go.";
+  }
+  const lineage = PRESTIGE_UPGRADES.filter(u => prestigeUpgradeOwned(game, u)).length;
+  if (lineage < PRESTIGE_UPGRADES.length) {
+    return "The flight is open. Next is the Royal Lineage — " + lineage + " of " +
+      PRESTIGE_UPGRADES.length + " adaptations bought, and the last of them opens the Trials.";
+  }
+  if (!matrilineVisible(game) || !matrilineReady(game)) {
+    const need = matrilineJellyNeeded(game);
+    const have = jellyBanked(game);
+    return "The lineage is complete. Next is the Matriline, at " + fmt(need) +
+      " Royal Jelly gathered in all — " + fmt(have) + " so far. Every trial level the line " +
+      "masters takes three off that figure.";
+  }
+  const line = currentSpecies(game);
+  if (line === GENERIC) {
+    return "The Matriline is open. Begin one, and the line commits to a species for the whole run.";
+  }
+  const done = SPECIES.filter(s => speciesFinished(game, s.id)).length;
+  const points = speciesPoints(game, line);
+  if (points < SPECIES_TARGET) {
+    return "This line is " + speciesName(line) + " — " + points + " of " + SPECIES_TARGET +
+      " points towards finishing her, and " + done + " of " + SPECIES.length +
+      " species finished. A trial level as her is worth two, a flight one.";
+  }
+  if (done < SPECIES.length) {
+    return speciesName(line) + " is finished — " + done + " of " + SPECIES.length +
+      " species banked. Begin another matriline to commit to the next one.";
+  }
+  return "Every species is finished and every milestone this line has is behind her. " +
+    "Deeper layers are being built for the beta.";
+}
+
+function renderMilestone() {
+  const box = el("queenMilestone");
+  box.hidden = !game.wingsShed;
+  if (box.hidden) return;
+  setText(box, milestoneText());
 }
 
 function renderRally() {
@@ -393,9 +432,9 @@ function renderBrood() {
     const unlocked = isUnlocked(game, id);
     button.disabled = !unlocked;
     button.classList.toggle("selected", game.nextCaste === id);
-    button.textContent = unlocked
+    setText(button, unlocked
       ? CASTES[id].name
-      : CASTES[id].name + " — " + CASTES[id].unlockAt + " ants";
+      : CASTES[id].name + " — " + CASTES[id].unlockAt + " ants");
   });
 
   const autoRow = el("autoLayRow");
@@ -447,8 +486,8 @@ function renderBrood() {
   }
   const detailsButton = el("btnBroodDetails");
   detailsButton.hidden = eggs.length === 0;
-  detailsButton.textContent = "See details (" + fmt(eggs.length) + " eggs" +
-    (waiting > 0 ? ", " + fmt(waiting) + " waiting)" : ")");
+  setText(detailsButton, "See details (" + fmt(eggs.length) + " eggs" +
+    (waiting > 0 ? ", " + fmt(waiting) + " waiting)" : ")"));
   if (!el("broodModal").hidden) updateBroodDialog();
 
   renderSlots(eggs, slots, tended);
@@ -714,11 +753,11 @@ function renderUnits() {
     const ui = rankRows[rank.id];
     const held = game.ants[rank.id] || 0;
     const next = SOLDIER_RANKS[index + 1];
-    ui.name.textContent = CASTES[rank.id].name;
-    ui.role.textContent = CASTES[rank.id].role;
-    ui.stat.textContent = fmt(combatPerRank(game, rank.id)) + " each" +
-      (rank.hunt > 0 ? " · hunts at " + fmt(rank.hunt * 100) + "%" : " · never hunts");
-    ui.count.textContent = fmt(held);
+    setText(ui.name, CASTES[rank.id].name);
+    setText(ui.role, CASTES[rank.id].role);
+    setText(ui.stat, fmt(combatPerRank(game, rank.id)) + " each" +
+      (rank.hunt > 0 ? " · hunts at " + fmt(rank.hunt * 100) + "%" : " · never hunts"));
+    setText(ui.count, fmt(held));
     ui.row.classList.toggle("locked", held <= 0);
 
     ui.button.hidden = !next;
@@ -726,9 +765,9 @@ function renderUnits() {
     if (!next) return;
     const can = Math.min(n, trainableCount(index));
     ui.button.disabled = can <= 0;
-    ui.button.textContent = "Train " + fmt(can) + " → " + CASTES[next.id].name;
-    ui.note.textContent = fmt(next.cost) + " protein each · " +
-      Math.round(next.loss * 100) + "% die";
+    setText(ui.button, "Train " + fmt(can) + " → " + CASTES[next.id].name);
+    setText(ui.note, fmt(next.cost) + " protein each · " +
+      Math.round(next.loss * 100) + "% die");
   });
 
   const record = [];
@@ -809,7 +848,7 @@ function markSubTab(bar, id, count) {
     const badge = button.children[0];
     if (!badge) continue;
     badge.hidden = !(count > 0);
-    badge.textContent = count > 9 ? "9+" : String(count || "");
+    setText(badge, count > 0 ? (count > 99 ? "99+" : String(count)) : "");
   }
 }
 
@@ -868,9 +907,9 @@ function renderLibrary() {
       ui.row.hidden = at < 1 || !onThisPage;
       if (at >= 1) shown++;
       ui.row.classList.toggle("full", at >= 2);
-      ui.text.textContent = entry.short;
+      setText(ui.text, entry.short);
       ui.more.hidden = at < 2;
-      if (at >= 2) ui.more.textContent = entry.full;
+      if (at >= 2) setText(ui.more, entry.full);
     });
     const any = LIBRARY.find(e => e.group === group.id);
     if (any) libraryRows[any.id].section.hidden = shown === 0 || !onThisPage;
@@ -1034,10 +1073,24 @@ function affordablePrestigeUpgrades() {
   return ready;
 }
 
+// A small ant stands in the box and says the next thing worth doing. Where that
+// thing is one safe click she offers to make it -- a shortcut for a click you
+// were going to make, never an action taken on your behalf, and never anything
+// irreversible.
+let assistantAnt = null;
+
 function renderTutorial() {
   const step = tutorialStep();
   el("tutorialBox").hidden = !step;
-  if (step) el("tutorialText").textContent = step.text;
+  if (!step) return;
+  if (!assistantAnt) {
+    assistantAnt = spriteFor("forager", 2);
+    el("tutorialAnt").appendChild(assistantAnt);
+  }
+  setText(el("tutorialText"), step.text);
+  const button = el("tutorialDo");
+  button.hidden = !step.act;
+  if (step.act) setText(button, step.label);
 }
 
 function renderAway() {
@@ -1117,17 +1170,28 @@ function renderFormulas() {
   });
 }
 
+// one place decides what a tab dot says, so they cannot drift apart
+function setBadge(id, count) {
+  const node = el(id);
+  if (!node) return;
+  node.hidden = !(count > 0);
+  setText(node, count > 0 ? (count > 99 ? "99+" : String(count)) : "");
+}
+
 function renderBadges() {
   const upgrades = upgradeBadge();
   const achievements = newTrackCount(game);
   const prestige = affordablePrestigeUpgrades();
-  el("badge-upgrades").hidden = activeTab === "upgrades" || upgrades <= 0;
-  el("badge-achievements").hidden = activeTab === "achievements" || achievements <= 0;
-  el("badge-prestige").hidden = activeTab === "prestige" || prestige <= 0;
-  // the dot covers both halves of the tab: new words to read, or a new release
+  // The counts were computed and then thrown away -- a bare dot says something
+  // is there, a number says how much, and it costs no more room now that the
+  // digit sits inside the dot rather than beside it.
   const unread = libraryUnread(game) + (updatesUnread(game) ? 1 : 0);
-  el("badge-library").hidden = activeTab === "library" || unread <= 0;
-  if (unread > 0) el("badge-library").textContent = "";
+  const matriline = matrilineVisible(game) && !matrilineCount(game) && matrilineReady(game) ? 1 : 0;
+  setBadge("badge-upgrades", activeTab === "upgrades" ? 0 : upgrades);
+  setBadge("badge-achievements", activeTab === "achievements" ? 0 : achievements);
+  setBadge("badge-prestige", activeTab === "prestige" ? 0 : prestige);
+  setBadge("badge-library", activeTab === "library" ? 0 : unread);
+  setBadge("badge-matriline", activeTab === "matriline" ? 0 : matriline);
 }
 
 const prestigeCards = {};
@@ -1223,7 +1287,7 @@ function renderPrestige() {
     const isOwned = prestigeUpgradeOwned(game, upgrade);
     ui.card.classList.toggle("owned", isOwned);
     ui.card.disabled = isOwned || p.royalJelly < upgrade.cost;
-    ui.cost.textContent = isOwned ? "owned" : upgrade.cost + " Royal Jelly";
+    setText(ui.cost, isOwned ? "owned" : upgrade.cost + " Royal Jelly");
     ui.cost.classList.toggle("affordable", !isOwned && p.royalJelly >= upgrade.cost);
     ui.cost.classList.toggle("owned-tag", isOwned);
   });
@@ -1497,7 +1561,7 @@ function renderChallenges() {
     const rt = { amount: challengeTargetAmount(game, running) };
     const lost = challengeFailed(game);
     const lostRule = challengeFailKind(running);
-    note.textContent = lost
+    setText(note, lost
       ? running.name + " — " + lostRule.lost
       : met
       ? running.name + " is met — " + fmt(challengeCount()) + " of " + fmt(rt.amount) + " " +
@@ -1505,7 +1569,7 @@ function renderChallenges() {
       : running.name + ", attempt " + (challengeLevel(game, running.id) + 1) +
         " — " + challengeRunningText(running, challengeLevel(game, running.id)) + ", " +
         fmt(challengeCount()) + " of " + fmt(rt.amount) + " " + rk.noun + ". " +
-        "Abandoning founds a fresh colony and pays nothing.";
+        "Abandoning founds a fresh colony and pays nothing.");
     note.classList.toggle("met", met && !challengeFailed(game));
     note.classList.toggle("failed", challengeFailed(game));
   }
@@ -1519,36 +1583,36 @@ function renderChallenges() {
     ui.card.classList.toggle("failed", mine && challengeFailed(game));
     const mastered = challengeMastered(game, challenge.id);
     ui.card.classList.toggle("mastered", mastered);
-    ui.level.textContent = !challenge.open ? "not playable yet"
+    setText(ui.level, !challenge.open ? "not playable yet"
       : mastered ? "mastered"
       : level > 0 ? level + " of " + CHALLENGE_MAX_LEVEL + " cleared"
-      : "0 of " + CHALLENGE_MAX_LEVEL + " cleared";
-    ui.rule.textContent = !challenge.open ? challenge.plan
+      : "0 of " + CHALLENGE_MAX_LEVEL + " cleared");
+    setText(ui.rule, !challenge.open ? challenge.plan
       : mastered ? "Every level survived. Nothing here is left to prove."
-      : challengeDebuffText(challenge, level);
+      : challengeDebuffText(challenge, level));
     const tKind = targetKind(challenge);
     const tAmount = challengeTargetAmount(game, challenge);
-    ui.target.textContent = challenge.open && !mastered
+    setText(ui.target, challenge.open && !mastered
       ? "Clear it by " + tKind.gerund + " " + fmt(tAmount) + " " + tKind.noun + "." +
         (mine ? " You have " + fmt(challengeCount()) + "." : "")
-      : "";
-    ui.reward.textContent = challenge.open && !mastered
+      : "");
+    setText(ui.reward, challenge.open && !mastered
       ? challenge.mastery.name + " pays × " + challenge.mastery.step + " " +
         challenge.mastery.type + " and " + masteryLineText(challenge.mastery.type) +
         " — kept for good, by every species the line ever becomes. Each level also " +
         "pays × " + CHALLENGE_REWARD_STEP + " food to the colony holding it, which is " +
         "the half that starts again when the line changes species."
-      : "";
+      : "");
     ui.button.hidden = !challenge.open || mastered;
     ui.button.disabled = !challenge.open || mastered || (!!running && !mine);
     ui.button.classList.toggle("danger", mine && !met);
     const lostRun = mine && challengeFailed(game);
-    ui.button.textContent = mine
+    setText(ui.button, mine
       ? (met ? "Claim the trial"
              : ui.button.dataset.armed === "yes"
                ? (lostRun ? "Really give it up?" : "Really abandon it?")
                : (lostRun ? "Give it up" : "Abandon"))
-      : (ui.button.dataset.armed === "yes" ? "Establish a colony here?" : "Enter");
+      : (ui.button.dataset.armed === "yes" ? "Establish a colony here?" : "Enter"));
   });
 }
 
@@ -1645,7 +1709,9 @@ function render() {
     // terms sub-tab -- a player who left it on What changed never cleared the
     // dot at all, and it read as a badge that never goes away
     markSeen("library", libraryCounts(game).known);
-    if (libraryTab === "terms") renderLibrary(); else renderUpdates();
+    // libraryTab holds a GROUP id now, never "terms" -- checking for the old
+    // value meant renderLibrary() never ran and pressing a category did nothing
+    if (libraryTab === "updates") renderUpdates(); else renderLibrary();
   }
   else if (activeTab === "settings") {
     renderSettings();
@@ -1812,11 +1878,11 @@ function renderMatriline() {
   const button = el("btnMatriline");
   button.hidden = !ready;
   button.disabled = ready && !matPick;
-  button.textContent = !matPick
+  setText(button, !matPick
     ? "Choose a species first"
     : button.dataset.armed === "yes"
     ? "Really begin as " + speciesName(matPick) + "? This clears the lineage."
-    : "Begin a matriline as " + speciesName(matPick);
+    : "Begin a matriline as " + speciesName(matPick));
 
   for (const s of SPECIES) {
     const ui = speciesCards[s.id];
@@ -1824,23 +1890,23 @@ function renderMatriline() {
     const finished = speciesFinished(game, s.id);
     const playing = line === s.id;
     const points = speciesPoints(game, s.id);
-    ui.name.textContent = s.name;
-    ui.state.textContent = playing ? "you are this" : finished ? "finished" : "not yet finished";
+    setText(ui.name, s.name);
+    setText(ui.state, playing ? "you are this" : finished ? "finished" : "not yet finished");
     ui.card.classList.toggle("playing", playing);
     ui.card.classList.toggle("finished", finished);
-    ui.flavour.textContent = s.flavour;
-    ui.active.textContent = (playing ? "Active now — " : "Active only while chosen — ") + s.activeText;
-    ui.passive.textContent = s.passiveName + (finished ? " (paying) — " : " (once finished) — ") +
-      s.passiveText;
-    ui.progress.textContent = finished
+    setText(ui.flavour, s.flavour);
+    setText(ui.active, (playing ? "Active now — " : "Active only while chosen — ") + s.activeText);
+    setText(ui.passive, s.passiveName + (finished ? " (paying) — " : " (once finished) — ") +
+      s.passiveText);
+    setText(ui.progress, finished
       ? "Banked for good, at full strength, whichever species the line becomes next."
       : points + " of " + SPECIES_TARGET + " points — " +
         speciesTrialLevels(game, s.id) + " trial levels, " +
         speciesFlights(game, s.id) + " flights, " +
-        speciesBranchOwned(game, s.id) + " of " + speciesBranch(s.id).length + " adaptations.";
+        speciesBranchOwned(game, s.id) + " of " + speciesBranch(s.id).length + " adaptations.");
     if (ui.pick) {
       ui.pick.classList.toggle("active", matPick === s.id);
-      ui.pick.textContent = s.name + (finished ? " ✓" : "");
+      setText(ui.pick, s.name + (finished ? " ✓" : ""));
     }
   }
 
@@ -1849,10 +1915,10 @@ function renderMatriline() {
     ui.card.hidden = onLine ? !!u.species : u.species !== matSubTab;
     const owned = matrilineUpgradeOwned(game, u.id);
     const afford = haplotype(game) >= u.cost;
-    ui.name.textContent = u.name;
-    ui.level.textContent = u.species ? speciesName(u.species) : u.group;
-    ui.desc.textContent = u.desc;
-    ui.cost.textContent = owned ? "bought" : fmt(u.cost) + " Haplotype";
+    setText(ui.name, u.name);
+    setText(ui.level, u.species ? speciesName(u.species) : u.group);
+    setText(ui.desc, u.desc);
+    setText(ui.cost, owned ? "bought" : fmt(u.cost) + " Haplotype");
     ui.cost.classList.toggle("affordable", !owned && afford);
     ui.cost.classList.toggle("owned-tag", owned);
     ui.card.classList.toggle("owned", owned);
@@ -2212,6 +2278,7 @@ el("broodDirection").onchange = event => {
   updateBroodDialog();
 };
 el("tutorialSkip").onclick = () => { dismissTutorial(); render(); };
+el("tutorialDo").onclick = () => { doAssistantStep(); render(); };
 
 el("broodPromote").onclick = () => {
   const pick = resolvePick();

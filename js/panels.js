@@ -212,6 +212,33 @@ export function currentNote() {
 
 export { paintNote };
 
+// A render that runs every frame must not write a value that has not changed.
+// The Achievements tab set the className of all 317 pips and about forty text
+// nodes on every single frame, whether or not any of them differed -- and in a
+// browser each of those is a style invalidation, which is what made buying an
+// instinct feel like it stuck. Skipping the unchanged ones is free.
+export function setText(node, value) {
+  if (!node) return;
+  const text = String(value);
+  if (node.__text === text) return;
+  node.__text = text;
+  node.textContent = text;
+}
+
+export function setClass(node, value) {
+  if (!node) return;
+  if (node.__cls === value) return;
+  node.__cls = value;
+  node.className = value;
+}
+
+export function setWidth(node, value) {
+  if (!node) return;
+  if (node.__w === value) return;
+  node.__w = value;
+  node.style.width = value;
+}
+
 export function watch(element, entry) {
   element.addEventListener("mouseenter", () => setInspect(entry));
   element.addEventListener("focus", () => setInspect(entry));
@@ -440,6 +467,10 @@ export function buildSettings(handlers) {
   // The panel following the scroll is what makes hover-to-inspect work without
   // moving the mouse, but it also means a panel that never leaves the screen.
   // Asked for as a choice rather than a default either way.
+  el("setAssistant").onchange = event => {
+    setSetting("tutorial", event.target.checked);
+    handlers.refresh();
+  };
   el("setAwayReport").onchange = event => {
     setSetting("awayReport", event.target.checked);
     handlers.refresh();
@@ -525,6 +556,11 @@ export function renderSettings() {
   el("setExile").checked = !!game.settings.exileEnabled;
   el("setTheme").value = game.settings.theme || "dark";
   el("setNotation").value = game.settings.notation || "suffix";
+  const assistant = game.settings.tutorial !== false;
+  el("setAssistant").checked = assistant;
+  el("assistantNote").textContent = assistant
+    ? "She names the next thing worth doing, and offers to do it where it is one safe click. She never exiles, destroys, flies or resets anything."
+    : "Off. Nothing will suggest anything.";
   const report = game.settings.awayReport !== false;
   el("setAwayReport").checked = report;
   el("awayReportNote").textContent = report

@@ -336,6 +336,17 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.4.0", name: "An assistant, and dots that say how many",
+    changes: [
+      "A small ant stands under the header and names the next thing worth doing — through the opening, and then for the rest of the game. Where that thing is one safe click she offers to make it: strip a wing, lay an egg, rally, buy the best adaptation you can afford, dig out when the nest is full.",
+      "She never acts on her own and never offers anything you cannot take back. Exiling, destroying eggs, taking the flight and beginning a matriline all stay yours — and so does shedding her wings, which is the click the game opens on. There is a switch for her in Settings.",
+      "The dots on the tabs say how many. Adaptations you can afford, entries you have not read, instincts you can buy — the number now sits inside the dot rather than being thrown away.",
+      "The Achievements page says how many points you have to spend on instincts, from any of its pages rather than only from the Instincts one.",
+      "The milestone line under the queen goes all the way up now: the Royal Lineage, then the Matriline, then the species you are playing and how far off finishing her, then how many of the six are banked. It used to stop at a thousand ants.",
+      "Pressing a category in the library does something again — it had been showing the same page whichever one you pressed.",
+      "Headings have room above them, everywhere. And the Achievements tab stopped redrawing four hundred things a frame that had not changed, which is what made buying an instinct feel like it stuck."
+    ] },
+
   { version: "0.2.3.0", name: "The first playtest of the Matriline",
     changes: [
       "A matriline reset was quietly taking achievement tiers back \u2014 25 of them on a line with thirty flights and a lot of jelly behind it. It never should have, and it does not now. Nothing you had earned is gone.",

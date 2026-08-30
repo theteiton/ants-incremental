@@ -77,7 +77,7 @@ import {
 } from "./prestige.js";
 import { activeChallenge, challengeDebuff, challengeReward, masteryFood } from "./challenges.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
-import { fmt, fmtFactor, watch } from "./panels.js";
+import { fmt, setText, fmtFactor, watch } from "./panels.js";
 
 const el = id => document.getElementById(id);
 
@@ -691,22 +691,22 @@ export function renderUpgrades() {
     const affordable = canAfford(game, upgrade);
     ui.card.disabled = isOwned || !isOpen || !affordable;
 
-    ui.name.textContent = upgrade.name;
-    ui.level.textContent = "Lv " + held + " / " + max;
-    ui.desc.textContent = isOwned
+    setText(ui.name, upgrade.name);
+    setText(ui.level, "Lv " + held + " / " + max);
+    setText(ui.desc, isOwned
       ? levelName(upgrade, held) + " — " + (levelEffect(upgrade, held).desc || "")
       : levelName(upgrade, nextLevelOf(upgrade)) + " — " +
-        (levelEffect(upgrade, nextLevelOf(upgrade)).desc || "");
+        (levelEffect(upgrade, nextLevelOf(upgrade)).desc || ""));
 
-    ui.cost.textContent = isOwned ? "fully bought" : costText(game, upgrade);
+    setText(ui.cost, isOwned ? "fully bought" : costText(game, upgrade));
     ui.cost.classList.toggle("affordable", !isOwned && isOpen && affordable);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
-    ui.lock.textContent = isOwned
+    setText(ui.lock, isOwned
       ? (upgrade.mastery
           ? "Clear another level of the trial that pays in " + upgrade.mastery + " to raise this cap."
           : "")
-      : upgradeLockText(game, upgrade);
+      : upgradeLockText(game, upgrade));
     // A hidden card is not read, and the preview is the most expensive thing
     // this panel does: each one copies the whole game object twice and recomputes
     // the food rate, the cap, the brood and the fighting strength against it.
@@ -715,10 +715,10 @@ export function renderUpgrades() {
     const shown = !ui.card.hidden;
     const spent = shown && !isOwned && isOpen && levelIsSpent(upgrade);
     ui.card.classList.toggle("spent", spent);
-    ui.effect.textContent = !shown || isOwned || !isOpen ? ""
-      : spent ? spentText(upgrade) : previewUpgrade(upgrade);
-    ui.formula.textContent = !shown || isOwned || !isOpen
-      ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || "");
+    setText(ui.effect, !shown || isOwned || !isOpen ? ""
+      : spent ? spentText(upgrade) : previewUpgrade(upgrade));
+    setText(ui.formula, !shown || isOwned || !isOpen
+      ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || ""));
   });
   // An empty grid with nothing said reads as a broken tab. It is usually
   // "Hide owned" doing exactly what it promises, and at 29 of 29 it hides
@@ -732,16 +732,16 @@ export function renderUpgrades() {
     if (game.settings.hideOwned && owned > 0) reasons.push("Hide maxed");
     if (game.settings.hideLocked && locked > 0) reasons.push("Hide locked");
     if (owned === UPGRADES.length) {
-      note.textContent = "Every adaptation the colony can reach is bought — " +
+      setText(note, "Every adaptation the colony can reach is bought — " +
         levelsHeld + " levels across all " + UPGRADES.length +
         " lines. Clearing more of a trial raises the lines it pays into. " +
-        "Untick Hide maxed to look back over what the colony has.";
+        "Untick Hide maxed to look back over what the colony has.");
     } else if (reasons.length) {
-      note.textContent = "Nothing to show here: " + reasons.join(" and ") +
+      setText(note, "Nothing to show here: " + reasons.join(" and ") +
         (filter === "all" ? "" : " and the " + filter + " filter") +
-        " account for all " + UPGRADES.length + ".";
+        " account for all " + UPGRADES.length + ".");
     } else {
-      note.textContent = "No " + filter + " adaptations to show.";
+      setText(note, "No " + filter + " adaptations to show.");
     }
   }
   el("upgradeTally").textContent = levelsHeld + " levels across " +

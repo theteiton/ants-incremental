@@ -37,8 +37,10 @@
 <p class="away" id="awayNote" hidden></p>
 
 <div class="tutorial" id="tutorialBox" hidden>
+  <span class="tutorial-ant" id="tutorialAnt"></span>
   <span id="tutorialText"></span>
-  <button id="tutorialSkip">Skip the guide</button>
+  <button id="tutorialDo" hidden></button>
+  <button id="tutorialSkip">Dismiss</button>
 </div>
 
 <p class="takeover" id="takeover" hidden>
@@ -307,6 +309,8 @@
       <h2>Colony rules</h2>
       <label class="toggle row-toggle"><input type="checkbox" id="setExile"> Allow exiling ants</label>
       <p class="dim" id="exileStatus"></p>
+      <label class="toggle row-toggle"><input type="checkbox" id="setAssistant"> Let the assistant suggest what to do next</label>
+      <p class="dim" id="assistantNote"></p>
       <label class="toggle row-toggle"><input type="checkbox" id="setAwayReport"> Report what happened while you were away</label>
       <p class="dim" id="awayReportNote"></p>
 

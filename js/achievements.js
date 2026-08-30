@@ -9,7 +9,7 @@ import {
   bestTrialLevel, trialLevelsEver, trialsWithMastery
 } from "./challenges.js";
 import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
-import { fmt, watch } from "./panels.js";
+import { fmt, watch, setText, setClass, setWidth } from "./panels.js";
 
 import { INSTINCTS, instinctOwned, instinctPoints, instinctsSpent } from "./instincts.js";
 
@@ -691,7 +691,7 @@ export function renderInstincts(game) {
   const available = instinctPoints(game);
   const earned = game.achievementPoints || 0;
   const spent = instinctsSpent(game);
-  el("instinctIntro").textContent =
+  setText(el("instinctIntro"),
     "Nothing here unlocks on its own \u2014 you buy each one, by clicking it. Every achievement " +
     "tier the colony has ever earned is one point, and all eight instincts draw on the same " +
     "pool, so buying one leaves fewer for the rest. Spending never lowers your achievement " +
@@ -699,28 +699,31 @@ export function renderInstincts(game) {
     "on besides. Nothing bought here is ever lost \u2014 an instinct is held through a nuptial " +
     "flight, a matriline and a trial alike. " +
     "You have earned " + earned + " points, spent " + spent + ", and have " + available +
-    " left.";
+    " left.");
   for (const instinct of INSTINCTS) {
     const ui = instinctCards[instinct.id];
     if (!ui) continue;
     const owned = instinctOwned(game, instinct.id);
     const afford = available >= instinct.cost;
-    ui.name.textContent = instinct.name;
-    ui.level.textContent = owned ? "held" : "not bought";
-    ui.desc.textContent = instinct.desc;
+    setText(ui.name, instinct.name);
+    setText(ui.level, owned ? "held" : "not bought");
+    setText(ui.desc, instinct.desc);
     // never a bare number: a bare number beside a card reads as the level it
     // unlocks at rather than the price it costs
-    ui.cost.textContent = owned
+    setText(ui.cost, owned
       ? "held for good"
       : afford
       ? "Click to buy \u2014 " + instinct.cost + " points"
-      : instinct.cost + " points, " + (instinct.cost - available) + " more needed";
+      : instinct.cost + " points, " + (instinct.cost - available) + " more needed");
     ui.cost.classList.toggle("affordable", !owned && afford);
     ui.cost.classList.toggle("owned-tag", owned);
     ui.card.classList.toggle("owned", owned);
     ui.card.disabled = owned || !afford;
   }
 }
+
+// concatenated once rather than on every frame
+const ALL_BOXES = BONUS_BOXES.concat(TRIAL_BOXES, UNLOCK_BOXES);
 
 export function renderAchievements(game) {
   ACHIEVEMENT_TRACKS.forEach(track => {
@@ -732,33 +735,38 @@ export function renderAchievements(game) {
     ui.row.classList.toggle("fresh", fresh);
     ui.dot.hidden = !fresh;
     for (let i = 0; i < ui.pips.children.length; i++) {
-      ui.pips.children[i].className = i < tier ? "earned" : "";
+      setClass(ui.pips.children[i], i < tier ? "earned" : "");
     }
     const beyond = tier - definedRungs(track);
-    ui.tier.textContent = "tier " + tier + (beyond > 0 ? " (+" + beyond + " past the ladder)" : "");
-    ui.bar.style.width = (trackProgress(game, track) * 100).toFixed(1) + "%";
-    ui.next.textContent = "Next at " + fmt(next) + " " + track.unit +
-      " (you have " + fmt(track.value(game)) + ")";
+    setText(ui.tier, "tier " + tier + (beyond > 0 ? " (+" + beyond + " past the ladder)" : ""));
+    setWidth(ui.bar, (trackProgress(game, track) * 100).toFixed(1) + "%");
+    setText(ui.next, "Next at " + fmt(next) + " " + track.unit +
+      " (you have " + fmt(track.value(game)) + ")");
   });
 
-  BONUS_BOXES.concat(TRIAL_BOXES, UNLOCK_BOXES).forEach(entry => {
+  ALL_BOXES.forEach(entry => {
     const ui = bonusBoxes[entry.id];
     if (!ui) return;
-    ui.value.textContent = entry.value(game);
-    if (ui.formula) ui.formula.textContent = entry.formula ? entry.formula(game) : "";
+    setText(ui.value, entry.value(game));
+    if (ui.formula) setText(ui.formula, entry.formula ? entry.formula(game) : "");
     if (entry.unlocked) ui.box.classList.toggle("locked", !entry.unlocked(game));
   });
 
   const tiers = totalTiers(game);
   const xp = totalXp(game);
   const level = game.achievementLevel;
-  el("achievementLevel").textContent = "Level " + level;
-  el("achievementPoints").textContent =
-    tiers + " tiers, " + fmt(xp) + " XP — " +
-    fmt(Math.max(0, xpForLevel(level + 1) - xp)) + " to level " + (level + 1) +
-    " (each level costs more than the last)";
+  setText(el("achievementLevel"), "Level " + level);
+  // tiers, what is left of them to spend, and the climb to the next level. The
+  // spendable figure was only on the Instincts page, so a player on any other
+  // sub-tab had no idea what they were holding.
+  const spent = instinctsSpent(game);
+  const spare = Math.max(0, tiers - spent);
+  setText(el("achievementPoints"),
+    tiers + " tiers earned · " + spare + " point" + (spare === 1 ? "" : "s") +
+    " to spend on instincts" + (spent > 0 ? " (" + spent + " spent)" : "") +
+    " · " + fmt(Math.max(0, xpForLevel(level + 1) - xp)) + " XP to level " + (level + 1));
   const floor = xpForLevel(level);
   const span = xpForLevel(level + 1) - floor;
   const progress = Math.max(0, Math.min(1, (xp - floor) / span));
-  el("achievementBar").style.width = (progress * 100).toFixed(1) + "%";
+  setWidth(el("achievementBar"), (progress * 100).toFixed(1) + "%");
 }
