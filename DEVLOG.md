@@ -15,6 +15,43 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.5.1 — 31 August 2026
+
+**Two buttons nobody could read, in any theme.**
+
+The assistant's **Do** button set `color: var(--accent)` on top of the base
+button's `background: var(--accent)`. Accent text on an accent background:
+**1.00:1**, the text exactly its own colour, in dark, light and soil alike.
+Dismiss was 1.02–1.51:1 beside it. The same omission had hit the Matriline
+species picker, where it blanked out the species you had just chosen.
+
+Both wrote the second half of the game's outline-button pattern and not the
+first: `.caste-choice` and `.subtabs button` set `background: transparent`
+before recolouring the text, and these two never did, so they kept the filled
+accent background underneath. Their `border-color` did nothing either, the base
+button being `border: none`.
+
+**A third one, found while checking the first two.** Every outline button in the
+game inherited `button:hover { background: var(--accent-soft) }`, and `--dim` on
+that measures **1.06:1 in dark**, 1.41 in light, 1.29 in soil — so the caste
+picker and every sub-tab bar went unreadable under the pointer, which is the
+moment they are being read. They hover to `--hover` now.
+
+The rule this settles: **a control's legibility must not depend on `--accent`**,
+because the accent is the one palette entry whose character changes between
+themes — deep red in dark, light orange in soil — and no single text colour
+reads on all three. Selection is marked by the border, which needs 3:1 rather
+than 4.5:1 and clears it everywhere.
+
+Measured after, worst of the three themes: the Do button 12.01:1, Dismiss 4.77,
+the chosen species 13.26, any outline button hovered 4.87. A new suite parses the
+palettes straight out of `style.css` and checks twelve control-and-state pairs
+against the WCAG floors, so a palette edit that breaks a control fails instead of
+shipping. Seventeen suites green.
+
+Left alone and recorded: the filled primary button is 3.87:1 in dark. That is
+every button in the game, so it is a palette decision rather than a patch.
+
 ## 0.2.5.0 — 31 August 2026
 
 **Seven findings from reading all of it, worst first.**

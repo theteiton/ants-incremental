@@ -1047,8 +1047,14 @@ ul { list-style: none; margin: 0; padding: 0; }
 .species-flavour { color: var(--dim); font-style: italic; }
 .species-progress { color: var(--dim); }
 #matPickList { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
-.species-pick { font-size: 12px; padding: 5px 10px; }
-.species-pick.active { border-color: var(--accent); color: var(--accent); }
+.species-pick {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.species-pick.active { color: var(--text); border-color: var(--accent); }
 #matUpgradeList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .mat-upgrade.inheritance { border-left: 3px solid var(--good); }
 .mat-upgrade.expression { border-left: 3px solid var(--accent); }
@@ -1097,6 +1103,25 @@ ul { list-style: none; margin: 0; padding: 0; }
 .tutorial-ant { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .tutorial-ant canvas { display: block; image-rendering: pixelated; }
 .tutorial span:not(.tutorial-ant) { flex: 1 1 180px; }
-.tutorial button { font-size: 12px; padding: 4px 10px; flex: 0 0 auto; }
-#tutorialDo { border-color: var(--accent); color: var(--accent); }
+.tutorial button {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  padding: 4px 10px;
+  flex: 0 0 auto;
+}
+#tutorialDo { color: var(--text); border-color: var(--accent); font-weight: 600; }
 #tutorialSkip { margin-left: 0; color: var(--dim); }
+
+/* An outline button must not inherit the filled hover. button:hover paints
+   --accent-soft, and --dim on that measures 1.06:1 in dark, 1.41 in light and
+   1.29 in soil -- so every outline button in the game went unreadable at the
+   moment the pointer was on it, which is the moment it is being read. --hover
+   is one step off the panel in each theme, so the text stays put. */
+.caste-choice:hover:not(:disabled),
+.subtabs button:hover:not(:disabled),
+.species-pick:hover:not(:disabled),
+.tutorial button:hover:not(:disabled) {
+  background: var(--hover);
+}

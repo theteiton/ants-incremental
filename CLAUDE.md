@@ -834,6 +834,42 @@ ever. It is the third click bug in this game and the third different cause: a
 detached node, a sticky header eating the pointer, and now a stale closure. When
 a control does nothing, check all three.
 
+**An outline button is two rules, and writing only the second one paints text
+onto its own colour.** The pattern is `background: transparent; color: --dim;
+border: 1px solid --line` with a modifier that sets `color: --text;
+border-color: --accent`. `.caste-choice` and `.subtabs button` have both halves.
+`.species-pick` and the assistant's buttons had only the modifier, so they kept
+the base button's `background: var(--accent)` and painted **accent text onto an
+accent background — 1.00:1, in all three themes**, on the assistant's only action
+and on the species you had just picked. `border-color` on those rules did nothing
+either, because the base button is `border: none`.
+
+**A control's legibility must never depend on `--accent`.** It is the one palette
+entry whose character changes between themes — a deep red at 0.11 luminance in
+dark against a light orange at 0.31 in soil — so no single text colour reads on
+it everywhere: `--btn-text` measures 3.87 / 5.61 / 6.39 and white measures 4.83 /
+5.93 / **2.92**. Colour marks a selection with the **border**, which needs only
+3:1 as a non-text element and clears it in every theme; the text stays `--text`
+at 12:1 or better.
+
+**Every outline button in the game went unreadable at the moment it was being
+read.** They inherited `button:hover { background: var(--accent-soft) }`, and
+`--dim` on that is **1.06 in dark, 1.41 in light, 1.29 in soil** — so the caste
+picker, every sub-tab bar, the species picker and the assistant all blanked out
+under the pointer. They hover to `--hover` now, which is one step off the panel
+in each theme and holds 4.87:1 at worst.
+
+**Contrast is measured, not eyeballed.** A suite parses the three palettes out of
+`style.css` and checks twelve control-and-state pairs against the WCAG floors —
+4.5:1 for text, 3:1 for borders — so a palette edit that breaks a control fails
+rather than shipping. It also refuses any rule that sets `color` and `background`
+to the same variable, which is the exact fault above. **This is the one kind of
+visual check that does not need a screenshot**, and the rest still does.
+
+**The filled primary button is 3.87:1 in dark** — `--btn-text` on `--accent`,
+below the 4.5 floor for body text. It is every button in the game and the
+established look, so it is recorded here rather than changed.
+
 **A colony is food-bound sixty minutes out of sixty, and twelve species nodes
 were priced as though it were not.** Sampled once a minute across an hour,
 `colonyBottleneck()` never once said anything but *food-bound* — the population
