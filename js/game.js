@@ -126,6 +126,9 @@ export { GENERIC, SPECIES, SPECIES_TARGET, currentSpecies, playingSpecies, speci
   passiveCombat, passiveProtein, passiveHunt, passiveSalvage, passiveFeedFree,
   passiveOfflineHours, dulosis, nomadic } from "./matriline.js";
 export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
+// a real import, not a re-export: speciesRatios is USED below, and a re-export
+// creates no local binding
+import { speciesRatios } from "./species.js";
 export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent, affordableInstincts,
   instinctBaseCap, instinctBrood, instinctCombat, instinctProtein, instinctHatch,
   instinctOfflineHours, instinctKeptFood } from "./instincts.js";
@@ -1038,6 +1041,11 @@ export function doMatrilineReset(speciesId) {
   m.trialLevels = 0;
 
   refoundColony({ challenge: null });
+  // A species whose optimum shares differ from the generic ones says so, and
+  // committing to her is where they are set -- the automation would otherwise
+  // go on laying to a default measured for a different animal.
+  const ratios = speciesRatios(m.species);
+  if (ratios) game.settings.ratios = ratios;
   game.prestige = {
     royalJelly: keep,
     royalJellyTotal: 0,

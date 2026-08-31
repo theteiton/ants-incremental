@@ -160,26 +160,26 @@ export const MATRILINE_UPGRADES = [
 
   { id: "mat_sol_1", name: "Second Queen", cost: 4, group: "species", species: "solenopsis",
     desc: "Another queen joins the nest. The population cap rises further.",
-    effect: { type: "active", key: "capMultAdd", add: 0.5 } },
+    effect: { type: "active", key: "capMultAdd", add: 0.5, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_sol_2", name: "Alkaloid Reserve", cost: 9, group: "species", species: "solenopsis",
     desc: "The venom runs deeper. A lost raid costs the colony far less of itself.",
     effect: { type: "active", key: "lossMultScale", mult: 0.6 } },
   { id: "mat_sol_3", name: "Third Queen", cost: 15, group: "species", species: "solenopsis",
     desc: "A third laying queen joins the nest. The population cap rises again.",
-    effect: { type: "active", key: "capMultAdd", add: 0.5 } },
+    effect: { type: "active", key: "capMultAdd", add: 0.5, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_sol_4", name: "Brood Piles", cost: 22, group: "species", species: "solenopsis",
     desc: "Several queens laying into one chamber. +4 brood slots.",
     effect: { type: "active", key: "broodAddNode", add: 4 } },
 
   { id: "mat_cam_1", name: "Deeper Galleries", cost: 4, group: "species", species: "camponotus",
     desc: "Chambers cut further into the heartwood. Each excavator holds more still.",
-    effect: { type: "active", key: "excavatorCapMultAdd", add: 0.5 } },
+    effect: { type: "active", key: "excavatorCapMultAdd", add: 0.5, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_cam_2", name: "Nitrogen Loop", cost: 9, group: "species", species: "camponotus",
     desc: "The endosymbiont closes the loop. Feeding the brood costs no protein at all.",
     effect: { type: "active", key: "proteinCostMultScale", mult: 0 } },
   { id: "mat_cam_3", name: "Heartwood", cost: 15, group: "species", species: "camponotus",
     desc: "Chambers cut into the dead heart of the trunk. Each excavator holds more again.",
-    effect: { type: "active", key: "excavatorCapMultAdd", add: 0.5 } },
+    effect: { type: "active", key: "excavatorCapMultAdd", add: 0.5, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_cam_4", name: "Sclerotised", cost: 22, group: "species", species: "camponotus",
     desc: "A cuticle that does not give. The founding generation fades three times more slowly still.",
     effect: { type: "active", key: "naniticHalflifeNode", mult: 3 } },
@@ -199,13 +199,13 @@ export const MATRILINE_UPGRADES = [
 
   { id: "mat_myr_1", name: "Fuller Repletes", cost: 4, group: "species", species: "myrmecocystus",
     desc: "Each replete hangs heavier. The colony holds half again as much food per ant.",
-    effect: { type: "active", key: "foodCapMult", mult: 1.5 } },
+    effect: { type: "active", key: "foodCapMult", mult: 1.5, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_myr_2", name: "Deep Cellar", cost: 9, group: "species", species: "myrmecocystus",
     desc: "A chamber given over entirely to the hanging. Triple what the colony can hold.",
-    effect: { type: "active", key: "foodCapMult", mult: 3 } },
+    effect: { type: "active", key: "foodCapMult", mult: 3, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_myr_3", name: "Living Granary", cost: 15, group: "species", species: "myrmecocystus",
     desc: "Every ant in the nest hangs a little heavier. Double again what the colony can hold.",
-    effect: { type: "active", key: "foodCapMult", mult: 2 } },
+    effect: { type: "active", key: "foodCapMult", mult: 2, also: { key: "eggCostMult", mult: 0.8 } } },
   { id: "mat_myr_4", name: "Overflow", cost: 22, group: "species", species: "myrmecocystus",
     desc: "What will not fit is rendered rather than lost. Food gathered above the store becomes protein.",
     effect: { type: "active", key: "overflowProtein", mult: 1 } },
@@ -276,8 +276,10 @@ function branchApplies(game, upgrade) {
 function activeMult(game, key) {
   let total = 1;
   for (const u of MATRILINE_UPGRADES) {
-    if (u.effect.key !== key || !branchApplies(game, u)) continue;
-    if (u.effect.mult !== undefined) total *= u.effect.mult;
+    if (!branchApplies(game, u)) continue;
+    if (u.effect.key === key && u.effect.mult !== undefined) total *= u.effect.mult;
+    const also = u.effect.also;
+    if (also && also.key === key && also.mult !== undefined) total *= also.mult;
   }
   return total;
 }
@@ -412,6 +414,23 @@ export function dulosis(game) {
 export function speciesFoodCapPerAnt(game) {
   const per = activeValue(game, "foodCapPerAnt", 0);
   return per > 0 ? per * activeMult(game, "foodCapMult") : 0;
+}
+
+// What an egg costs the colony, as a multiplier on the caste curve.
+//
+// Measured, a colony is food-bound 60 minutes out of 60: the cap, the brood and
+// the store never bind, so every node that paid in room paid nothing at all.
+// Solenopsis, Camponotus and Myrmecocystus each spent three of their four nodes
+// on room and their whole branch was worth x0.97, x0.96 and x1.04 -- a species
+// tree bought with Haplotype that did not move the colony.
+//
+// The egg price IS the food sink, so a discount on it is the one thing that
+// reaches the binding constraint without being a global food multiplier, which
+// the design has always refused. Each of the three keeps exactly the node it
+// had; the node now also cheapens the brood, and the reason is the same in
+// every case -- more queens laying, galleries already carved, a full granary.
+export function eggCostMultiplier(game) {
+  return activeMult(game, "eggCostMult");
 }
 
 // ------------------------------------------------- finishing a species

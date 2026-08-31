@@ -361,13 +361,26 @@ registerAchievementCap(MAX_ACHIEVEMENT_LEVEL);
 // it, ten extra rungs cost about a million times the activity.
 export const SOFTCAP_STEP = 1.15;
 
-// A track counting whole things -- trials cleared, flights taken -- must not
-// grow fractional rungs past its designed top. Measured, the trials track ran
-// 30, then 43.77, 73.46, 141.77, which reads as broken on a number that can
-// only ever be an integer.
+// A track counting whole things must not grow fractional rungs past its
+// designed top. Measured, the trials track ran 30, then 43.77, 73.46, 141.77,
+// which reads as broken on a number that can only ever be an integer.
+//
+// That was first fixed for levels and flights alone, which left twenty of the
+// twenty-three tracks still doing it -- "next: 27.899 big foragers", "56.869
+// upgrades bought", "679,458.586 eggs". The test is not which track it was
+// noticed on, it is whether the quantity can be a fraction at all, so the four
+// that genuinely can are named and everything else counts whole things.
+//
+// Rounding UP is safe here and only here: it can only remove values lying
+// strictly between the old rung and the next integer, and for a quantity that
+// is always a whole number there are none. Ceiling a continuous track really
+// would take a tier from somebody standing between the two, which is why food,
+// protein, fighting strength and royal jelly are left alone.
+const FRACTIONAL_UNITS = { food: 1, protein: 1, strength: 1, "royal jelly": 1, hours: 1 };
+
 function roundRung(track, value) {
-  return track.unit === "levels" || track.unit === "flights" || track.integer
-    ? Math.ceil(value) : value;
+  if (track.integer === false) return value;
+  return FRACTIONAL_UNITS[track.unit] && !track.integer ? value : Math.ceil(value);
 }
 
 const stepCache = new Map();

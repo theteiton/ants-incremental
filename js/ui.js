@@ -1649,37 +1649,47 @@ function buildSettingsTabs() {
   selectSettingsTab("colony");
 }
 
+// The stats bar is the one thing drawn on every frame whichever tab is open,
+// and it was writing all twelve of its values and eight hidden flags whether or
+// not any of them had changed -- the exact fault fixed everywhere else last
+// release, left in the busiest place in the game.
+function setHidden(node, value) {
+  if (!node || node.__hid === value) return;
+  node.__hid = value;
+  node.hidden = value;
+}
+
 function render() {
   const reserves = el("readoutReserves");
-  reserves.hidden = game.emerged > 0;
-  reserves.querySelector("[data-value]").textContent = fmt(game.reserves);
-  el("valFood").textContent = fmt(game.food);
-  el("valRate").textContent = fmt(foodPerSecond(game)) + "/s";
-  el("valPop").textContent = fmt(population(game)) + " / " + fmt(populationCap(game));
-  el("valEggs").textContent = fmt(game.eggs.length);
+  setHidden(reserves, game.emerged > 0);
+  setText(reserves.querySelector("[data-value]"), fmt(game.reserves));
+  setText(el("valFood"), fmt(game.food));
+  setText(el("valRate"), fmt(foodPerSecond(game)) + "/s");
+  setText(el("valPop"), fmt(population(game)) + " / " + fmt(populationCap(game)));
+  setText(el("valEggs"), fmt(game.eggs.length));
   const proteinRow = el("readoutProtein");
-  proteinRow.hidden = !raidsUnlocked(game) && game.protein <= 0;
-  el("valProtein").textContent = fmt(game.protein);
-  el("readoutProteinRate").hidden = proteinRow.hidden;
-  el("valProteinRate").textContent = fmt(proteinPerSecond(game)) + "/s";
-  
-  const p = game.prestige || {};
-  const jellyRow = el("readoutRoyalJelly");
-  jellyRow.hidden = !prestigeUnlocked(game) && !(p.royalJelly > 0);
-  el("valRoyalJelly").textContent = fmt(p.royalJelly || 0);
+  const noProtein = !raidsUnlocked(game) && game.protein <= 0;
+  setHidden(proteinRow, noProtein);
+  setText(el("valProtein"), fmt(game.protein));
+  setHidden(el("readoutProteinRate"), noProtein);
+  setText(el("valProteinRate"), fmt(proteinPerSecond(game)) + "/s");
 
-  el("valTime").textContent = fmtTime(game.runTime || 0);
+  const p = game.prestige || {};
+  setHidden(el("readoutRoyalJelly"), !prestigeUnlocked(game) && !(p.royalJelly > 0));
+  setText(el("valRoyalJelly"), fmt(p.royalJelly || 0));
+
+  setText(el("valTime"), fmtTime(game.runTime || 0));
   // the line of queens, shown only once there is more than one of them --
   // before the first flight it would just repeat the colony age
   const flown = (game.prestige && game.prestige.flightsTaken || 0) > 0;
-  el("readoutMatriline").hidden = !flown;
-  if (flown) el("valMatriline").textContent = fmtTime(game.stats.playtime);
+  setHidden(el("readoutMatriline"), !flown);
+  if (flown) setText(el("valMatriline"), fmtTime(game.stats.playtime));
 
-  el("tabButton-prestige").hidden = !prestigeUnlocked(game);
-  el("tabButton-matriline").hidden = !matrilineVisible(game);
-  el("tabButton-challenges").hidden = !challengesUnlocked(game);
-  el("tabButton-library").hidden = !libraryUnlocked(game);
-  el("takeover").hidden = holdsSave();
+  setHidden(el("tabButton-prestige"), !prestigeUnlocked(game));
+  setHidden(el("tabButton-matriline"), !matrilineVisible(game));
+  setHidden(el("tabButton-challenges"), !challengesUnlocked(game));
+  setHidden(el("tabButton-library"), !libraryUnlocked(game));
+  setHidden(el("takeover"), holdsSave());
   renderAway();
   renderTutorial();
   renderBadges();

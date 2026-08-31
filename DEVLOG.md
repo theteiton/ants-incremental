@@ -15,6 +15,55 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.5.0 — 31 August 2026
+
+**Seven findings from reading all of it, worst first.**
+
+**A colony is food-bound sixty minutes out of sixty.** Sampled once a minute for
+an hour, `colonyBottleneck()` never said anything else — the cap, the brood and
+the store never bind, because the egg curve outruns the food rate by
+construction. Twelve of the twenty-four species nodes paid in exactly those
+things, so they paid nothing: Fire ant's branch measured ×0.97 of her own food
+rate, Carpenter's ×0.96, Honeypot's ×1.04. Fifty Haplotype for no change the
+colony could feel. Each of those nodes keeps the effect it had and gains a
+second, a fifth off the brood, which is the one lever that reaches the binding
+constraint without being the global food multiplier the design refuses. After:
+×1.37, ×1.37, ×1.84, against Eciton's ×2.47 and Amazon's ×59.9. The same finding
+is waiting on the four Instincts that pay in cap, brood and hatch speed.
+
+**Leafcutter was losing 89% of her output to a default meant for a different
+animal.** The caste shares ship at the generic optimum and the automation lays to
+them whatever the line committed to: 5% nurses reached 1,433 ants in an hour,
+15% reaches 3,551. A species may now state her own, applied when the matriline
+commits. 15% rather than her raw peak of 20%, because at 20% she stops being
+garden-bound and her own branch — which buys garden — falls to ×1.03.
+
+**The founders' chambers were still a trap.** +2 brood slots for 500 food at
+minute 118, worth 0.00 at minute 121. It reads the lifespan rather than the
+clock, so with Long Burning cleared it never warns at all, and otherwise it names
+the deadline and greys inside the last five minutes.
+
+**Twenty of twenty-three achievement tracks grew fractional rungs** — "next:
+27.899 big foragers", "679,458.586 eggs". Fixed for levels and flights two
+releases ago and nowhere else. Swept across 9,623 values: nobody loses a tier.
+
+**The Upgrades tab cost 700µs a frame, and 1,683µs sorted by price** — against
+92µs for the whole of Achievements, which is the tab that had just been made
+fast. Every visible card rebuilt a probe colony and recomputed four aggregates
+against it, three times over, sixty times a second, to draw a line that says
+"Cap 5,000 to 5,800". Now 211µs and 124µs.
+
+**`foodPerProtein()` was read twice per comparison** in the price sort: 613µs a
+frame against 8.5µs with the rate hoisted out of the comparator.
+
+**And the stats bar** was still writing all twelve of its values and eight hidden
+flags every frame, whichever tab was open — the fault fixed everywhere else last
+release, left in the one place that draws on every frame.
+
+Sixteen suites green. The ordinary run is untouched: with no species the egg
+discount is exactly 1, and a generic colony measures 3,369 ants before these
+changes and 3,377 after.
+
 ## 0.2.4.0 — 30 August 2026
 
 **An assistant, dots that say how many, and the library working again.**

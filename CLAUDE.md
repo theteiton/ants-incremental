@@ -834,6 +834,88 @@ ever. It is the third click bug in this game and the third different cause: a
 detached node, a sticky header eating the pointer, and now a stale closure. When
 a control does nothing, check all three.
 
+**A colony is food-bound sixty minutes out of sixty, and twelve species nodes
+were priced as though it were not.** Sampled once a minute across an hour,
+`colonyBottleneck()` never once said anything but *food-bound* — the population
+cap, the brood and the store never bind, because the egg curve outruns the food
+rate by construction. So every node that paid in room paid nothing at all:
+Solenopsis, Camponotus and Myrmecocystus each spent three of their four
+adaptations on cap or storage, and their whole branch measured **×0.97, ×0.96
+and ×1.04** — fifty Haplotype for no change the colony could feel. The three
+that worked (Atta ×19.7, Eciton ×2.6, Polyergus ×59.9) all touch something that
+genuinely binds. **The egg price is the food sink**, so a discount on it is the
+one lever that reaches the binding constraint without being the global food
+multiplier the design has always refused. Each of those nodes keeps the effect
+it had and gains a second one, a fifth off the brood, for the same reason in
+every case — more queens laying, galleries already carved, a full granary.
+Measured after: ×1.37, ×1.37, ×1.84, against Eciton's ×2.47. **This also means
+the four Instincts that pay in cap, brood and hatch speed are worth less than
+they look**, and that is the same finding waiting to be acted on.
+
+**`eggBase()` is the single source for what an egg costs, discount included.**
+`eggBatchCost()` sums the curve in closed form from `curve.base` and would have
+missed the multiplier outright — the single price and the "lay max" preview
+would have disagreed the moment a species cheapened the brood, which is exactly
+how those two drifted apart once before. Verified equal across four castes, four
+stock levels and three batch sizes.
+
+**A species may state its own caste shares, and Atta had to.** The shipped
+defaults are at the *generic* optimum, and the automation goes on laying to them
+whatever the line has committed to: measured, Leafcutter at the default 5%
+nurses reached 1,433 ants and 1.5e5 food/s in an hour, and 3,647 and 1.4e6 at
+20%. The default was costing her **89% of her output**, and the bottleneck line
+said *garden-bound, nurses widen the garden* the entire time — it simply could
+not reach the setting that was fighting it. `speciesRatios()` is applied when the
+matriline commits, which is where the colony is refounded and everything else
+about it is set. She is set to **15%, not her raw peak of 20%**: at 20% she stops
+being garden-bound and her own branch, which buys garden, falls to ×1.03. At 15%
+it is worth ×1.66 and she still starts competitive. **A default that makes a
+species tree pointless is no better than one that makes the species pointless.**
+
+**The founders' chambers were still a trap, in the last five minutes.** Measured,
+the card offered +2 brood slots for 500 food at minute 118 and was worth 0.00 at
+minute 121. `levelIsSpent()` only covered the caste-scoped food lines, so nothing
+greyed it, and `previewUpgrade()` handled the founders being *already* gone but
+not about to be. It reads the **lifespan, not the clock**, because with Long
+Burning cleared they never die and the purchase is good for ever. The preview
+names the deadline while it still matters and the card greys inside the last five
+minutes.
+
+**Rounding a softcap rung up is safe for a whole-thing track and only for one.**
+The fractional-rung fix was scoped to levels and flights, which left twenty of
+twenty-three tracks still doing it — *"next: 27.899 big foragers"*, *"56.869
+upgrades bought"*, *"679,458.586 eggs"*. The test is not which track it was
+noticed on but whether the quantity can be a fraction at all, so the four that
+genuinely can are named and everything else counts whole things. Ceiling can only
+remove values lying strictly between the old rung and the next integer, and for a
+quantity that is always whole there are none — which is why food, protein,
+fighting strength and royal jelly are left alone, where it really would take a
+tier from somebody standing between the two. Swept across 9,623 values: no value
+scores fewer tiers than before, every ladder still strictly increasing.
+
+**The Upgrades tab was the most expensive thing in the game and had never been
+measured.** For every visible card, every frame, it built a probe colony and
+recomputed the food rate, the cap, the brood and the fighting strength against it
+— three times over, because `levelIsSpent`, `previewUpgrade` and `formulaLines`
+each built their own. **700µs a frame on the default sort and 1,683µs on the
+price sort**, against 92µs for the whole Achievements tab, which is the one that
+had just been optimised. A preview that reads *"Cap 5,000 to 5,800"* does not
+need recomputing sixty times a second: it is on a 250ms clock, and recomputed at
+once whenever a purchase or a filter changes what it would say. **211µs and
+124µs** after.
+
+**`foodPerProtein()` is the single most expensive call in the game** at ~15µs,
+and `comparableCost()` reached it twice per comparison — so sorting twelve lines
+by price cost **613µs a frame against 8.5µs** with the rate read once. It reads
+the colony, not the upgrade, so it is the same number for every line in one pass.
+It is now read once per render and handed down; the exported functions keep their
+standalone fallback.
+
+**The stats bar was the last thing writing unconditionally.** Twelve values and
+eight hidden flags on every frame whichever tab was open — the exact fault fixed
+everywhere else, left in the busiest place in the game, because the sweep went
+tab by tab and the header belongs to none of them.
+
 **Feedback answered on 30 August 2026.** Gyroth, Feliza and Human of Humanity
 played 0.2.2.0. What their reports turned into:
 

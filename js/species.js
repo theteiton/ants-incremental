@@ -46,6 +46,15 @@ export const PASSIVE_KINDS = {
   salvage: { mult: true, label: "salvage from a lost raid" }
 };
 
+// What the caste shares should be for a species whose optimum is not the
+// generic one. Applied when the matriline commits, because that is where the
+// colony is refounded and everything else about it is set. A species with no
+// entry keeps the generic defaults, which are already at ITS measured optimum.
+export function speciesRatios(speciesId) {
+  const species = SPECIES.find(s => s.id === speciesId);
+  return species && species.ratios ? Object.assign({}, species.ratios) : null;
+}
+
 export const SPECIES = [
   {
     id: "atta",
@@ -56,7 +65,14 @@ export const SPECIES = [
     passiveName: "Gongylidia",
     passiveText: "The colony knows how to grow a nutrient-rich hyphal tip. A share of eggs are fed without spending protein.",
     passive: { kind: "feedFree", add: 0.25 },
-    active: { garden: true }
+    active: { garden: true },
+    // Measured across an hour: 5% nurses reaches 1,433 ants, 15% reaches 3,551
+    // and 20% reaches 3,647. 15% rather than her raw peak, because at 20% she
+    // stops being garden-bound and her own branch -- which buys garden -- falls
+    // to being worth x1.03. At 15% it is worth x1.66 and she still starts
+    // competitive. A default that makes a species tree pointless is no better
+    // than one that makes the species pointless.
+    ratios: { forager: 0, excavator: 0, nurse: 15, soldier: 8 }
   },
   {
     id: "solenopsis",

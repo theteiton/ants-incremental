@@ -8,6 +8,7 @@ import {
   NANITIC_BROOD_SLOTS,
   NANITIC_HALFLIFE,
   broodCapacity,
+  naniticLifespan,
   CAP_PER_EXCAVATOR,
   CASTES,
   casteFlatBonus,
@@ -113,6 +114,29 @@ const f = fmtFactor;
 // frame against 0.70ms with no cache at all. Stable, it is 0.24ms.
 const probeLevels = { key: null, byLine: {} };
 
+// how often the before-and-after figures are recomputed, in milliseconds
+const PREVIEW_INTERVAL = 250;
+const previewCache = { at: 0, key: null, text: {}, formula: {}, spent: {} };
+
+// Anything that changes what a preview would say, cheaply: which levels are
+// held (a purchase), and which cards are on screen.
+function previewKey() {
+  const s = game.settings;
+  return levelsOwned(game, null) + "|" + (s.upgradeFilter || "all") +
+    "|" + (s.hideLocked ? 1 : 0) + (s.hideOwned ? 1 : 0);
+}
+
+function previewDue() {
+  const now = Date.now();
+  const key = previewKey();
+  if (key !== previewCache.key || now - previewCache.at >= PREVIEW_INTERVAL) {
+    previewCache.at = now;
+    previewCache.key = key;
+    return true;
+  }
+  return false;
+}
+
 function probeLevelsFor(line) {
   if (probeLevels.key !== game.upgrades) {
     probeLevels.key = game.upgrades;
@@ -144,13 +168,13 @@ function nextEffect(line) {
 
 // A level can cost food and protein at once past the defined rungs, so cost is
 // a pair and every place that shows or compares one has to say both.
-export function costText(game, line) {
+export function costText(game, line, rate) {
   const cost = nextLevelCost(game, line);
   if (!cost) return "";
   const bits = [];
   if (cost.food > 0) bits.push(fmt(cost.food) + " food");
   if (cost.protein > 0) {
-    const worth = foodPerProtein(game);
+    const worth = rate === undefined ? foodPerProtein(game) : rate;
     bits.push(fmt(cost.protein) + " protein" +
       (worth > 0 && cost.food <= 0 ? " (≈ " + fmt(cost.protein * worth) + " food)" : ""));
   }
@@ -489,8 +513,27 @@ const SPENT_GAIN = 1.001;
 // multiplies all of the work, so its bound is infinite and it never runs out.
 const SPENT_TYPES = { casteFlat: 1, casteFood: 1, casteMult: 1 };
 
+// A founders' chamber has to be worth the walk to it. Below this many seconds
+// of founder life left, it is not: nothing the extra slots hatch pays back
+// before the founders who dug them are gone.
+export const NANITIC_SPENT_WINDOW = 300;
+
+// how long the founders have, or Infinity once Long Burning has been cleared
+function naniticTimeLeft(game) {
+  if (game.ants.nanitic <= 0) return 0;
+  const life = naniticLifespan(game);
+  if (!isFinite(life)) return Infinity;
+  return Math.max(0, life - (game.runTime || 0));
+}
+
 function levelIsSpent(line) {
-  if (!SPENT_TYPES[line.effect && line.effect.type]) return false;
+  const type = line.effect && line.effect.type;
+  // the founders' own line is spent when the founders are almost gone, whatever
+  // the slots would be worth to a colony that still had them
+  if (type === "naniticSlots") {
+    return naniticTimeLeft(game) < NANITIC_SPENT_WINDOW;
+  }
+  if (!SPENT_TYPES[type]) return false;
   if (upgradeLevel(game, line) < line.levels.length) return false;
   const before = foodPerSecond(game);
   if (before <= 0) return false;
@@ -498,6 +541,13 @@ function levelIsSpent(line) {
 }
 
 function spentText(line) {
+  if (line.effect && line.effect.type === "naniticSlots") {
+    const left = naniticTimeLeft(game);
+    return left <= 0
+      ? "The founders are already gone — these chambers have nobody to dig them."
+      : "The founders have about " + Math.round(left) + "s left. Chambers bought now " +
+        "go with them.";
+  }
   const caste = line.effect && line.effect.caste;
   return caste
     ? "Nothing left to gain — " + (CASTES[caste] ? CASTES[caste].name.toLowerCase() : caste) +
@@ -522,7 +572,9 @@ function previewUpgrade(upgrade) {
   }
   if (type === "naniticSlots") {
     if (game.ants.nanitic === 0) return "The founders are already gone.";
-    return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once";
+    const left = naniticTimeLeft(game);
+    return "Brood " + broodCapacity(game) + " to " + broodCapacity(probe) + " eggs at once" +
+      (isFinite(left) ? " — for the " + fmtTimeShort(left) + " the founders have left" : "");
   }
   if (type === "broodSlots" || type === "nurseSlots") {
     if (type === "nurseSlots" && game.ants.nurse === 0) return "Needs nurses to matter";
@@ -545,17 +597,22 @@ function previewUpgrade(upgrade) {
 // so sorting by price converts protein into its food equivalent first
 // A level can cost both currencies now, so the comparable price is the food
 // plus the protein converted at what the colony currently earns.
-export function comparableCost(game, upgrade) {
+// `rate` is optional and is what makes this cheap in a loop: foodPerProtein()
+// reads the colony, not the upgrade, so it is the same number for all twelve
+// lines in one pass -- and it is the single most expensive call in the game at
+// ~10us. Sorting by price reached it twice per comparison, which cost 613us a
+// frame against 8.5us with the rate read once.
+export function comparableCost(game, upgrade, rate) {
   const cost = nextLevelCost(game, upgrade);
   if (!cost) return Infinity;
-  const rate = foodPerProtein(game);
+  if (rate === undefined) rate = foodPerProtein(game);
   return cost.food + cost.protein * (rate > 0 ? rate : 10000);
 }
 
-export function proteinInFood(game, upgrade) {
+export function proteinInFood(game, upgrade, rate) {
   const cost = nextLevelCost(game, upgrade);
   if (!cost || cost.protein <= 0) return 0;
-  const rate = foodPerProtein(game);
+  if (rate === undefined) rate = foodPerProtein(game);
   return rate > 0 ? cost.protein * rate : 0;
 }
 
@@ -567,11 +624,16 @@ const SORTS = {
   "default": null,
   "name": (a, b) => a.name.localeCompare(b.name),
   "name-desc": (a, b) => b.name.localeCompare(a.name),
-  "cost": (a, b) => comparableCost(game, a) - comparableCost(game, b),
-  "cost-desc": (a, b) => comparableCost(game, b) - comparableCost(game, a),
+  "cost": (a, b) => comparableCost(game, a, sortRate) - comparableCost(game, b, sortRate),
+  "cost-desc": (a, b) => comparableCost(game, b, sortRate) - comparableCost(game, a, sortRate),
   "req": (a, b) => reqCount(a) - reqCount(b) || a.name.localeCompare(b.name),
   "req-desc": (a, b) => reqCount(b) - reqCount(a) || a.name.localeCompare(b.name)
 };
+
+// The price sort converts protein into food, and that rate is a property of the
+// colony rather than of any one line -- so it is read once per sort and handed
+// to every comparison, rather than being recomputed inside the comparator.
+let sortRate = 0;
 
 function sortedUpgrades() {
   const compare = SORTS[game.settings.upgradeSort || "default"];
@@ -662,6 +724,10 @@ export function buildUpgrades(onChange) {
 export function renderUpgrades() {
   let owned = 0;
   let locked = 0;
+  sortRate = foodPerProtein(game);
+  // the before-and-after figures are recomputed on a slow clock, and at once
+  // whenever a purchase or a filter changes what they would say
+  const fresh = previewDue();
   const levelsHeld = levelsOwned(game, null);
   // Ordered by CSS, not by moving the nodes. appendChild on a card already in
   // the list detaches it first, and a button detached between mousedown and
@@ -698,7 +764,7 @@ export function renderUpgrades() {
       : levelName(upgrade, nextLevelOf(upgrade)) + " — " +
         (levelEffect(upgrade, nextLevelOf(upgrade)).desc || ""));
 
-    setText(ui.cost, isOwned ? "fully bought" : costText(game, upgrade));
+    setText(ui.cost, isOwned ? "fully bought" : costText(game, upgrade, sortRate));
     ui.cost.classList.toggle("affordable", !isOwned && isOpen && affordable);
     ui.cost.classList.toggle("owned-tag", isOwned);
 
@@ -713,12 +779,19 @@ export function renderUpgrades() {
     // Measured at 0.70ms a frame for twelve lines, which is most of the panel's
     // cost -- and with a branch filter or Hide owned on, most of them are hidden.
     const shown = !ui.card.hidden;
-    const spent = shown && !isOwned && isOpen && levelIsSpent(upgrade);
-    ui.card.classList.toggle("spent", spent);
-    setText(ui.effect, !shown || isOwned || !isOpen ? ""
-      : spent ? spentText(upgrade) : previewUpgrade(upgrade));
-    setText(ui.formula, !shown || isOwned || !isOpen
-      ? "" : (formulaLines(upgrade, probeWith(upgrade))[1] || ""));
+    if (!shown || isOwned || !isOpen) {
+      previewCache.text[upgrade.id] = "";
+      previewCache.formula[upgrade.id] = "";
+      previewCache.spent[upgrade.id] = false;
+    } else if (fresh) {
+      const spent = levelIsSpent(upgrade);
+      previewCache.spent[upgrade.id] = spent;
+      previewCache.text[upgrade.id] = spent ? spentText(upgrade) : previewUpgrade(upgrade);
+      previewCache.formula[upgrade.id] = formulaLines(upgrade, probeWith(upgrade))[1] || "";
+    }
+    ui.card.classList.toggle("spent", !!previewCache.spent[upgrade.id]);
+    setText(ui.effect, previewCache.text[upgrade.id] || "");
+    setText(ui.formula, previewCache.formula[upgrade.id] || "");
   });
   // An empty grid with nothing said reads as a broken tab. It is usually
   // "Hide owned" doing exactly what it promises, and at 29 of 29 it hides

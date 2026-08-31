@@ -336,6 +336,16 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.5.0", name: "Three species that were doing nothing",
+    changes: [
+      "Fire ant, Carpenter ant and Honeypot ant each spent three of their four adaptations on room \u2014 a bigger nest, deeper galleries, a fuller store \u2014 and a colony is almost never short of room. Their whole branch was worth nothing at all. Each of those adaptations still does what it did, and now also makes eggs cheaper, which is the thing a colony really is short of.",
+      "Leafcutter was being played wrong by her own automation. The caste shares start where they suit an ordinary colony, and she wants far more nurses than that \u2014 the garden is what feeds her and nurses are what widen it. Committing to her now sets them for her. She reaches about two and a half times as far in an hour.",
+      "The founders\u0027 chambers no longer let you buy slots for founders who are about to die. The card says how long they have left, and stops offering once there is no time to use them. If you have cleared the Nanitic Line they never die, and it never warns.",
+      "Achievement tracks asked for whole numbers of whole things again \u2014 28 big foragers rather than 27.899, 57 upgrades rather than 56.869. Nobody loses a tier they had.",
+      "The Upgrades tab was doing about eight times the work of any other tab, every frame, to redraw numbers that had not changed \u2014 and about thirteen times that again if you had it sorted by price. Sorting by price should feel like a different tab now.",
+      "The readouts along the top stopped being rewritten sixty times a second whether or not anything moved."
+    ] },
+
   { version: "0.2.4.0", name: "An assistant, and dots that say how many",
     changes: [
       "A small ant stands in the queen's panel and names the next thing worth doing — through the opening, and then for the rest of the game. Where that thing is one safe click she offers to make it: strip a wing, lay an egg, rally, buy the best adaptation you can afford, dig out when the nest is full.",

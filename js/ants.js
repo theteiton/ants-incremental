@@ -4,7 +4,7 @@ import {
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
-  speciesFoodCapPerAnt, dulosis, passiveOfflineHours
+  speciesFoodCapPerAnt, dulosis, passiveOfflineHours, eggCostMultiplier
 } from "./matriline.js";
 import { CHALLENGES, bestTrialLevel, challengeDebuff, challengeReward, masteryFood,
   siegeActive, SIEGE_UNLOCK, barrenActive, sealedActive, sterileActive,
@@ -948,10 +948,18 @@ export function eggCurve(game, casteId) {
   return CASTE_COSTS[casteId] || CASTE_COSTS.forager;
 }
 
+// The single source for what an egg costs, discount included. eggBatchCost sums
+// the same curve in closed form, so both read this rather than curve.base --
+// they would otherwise disagree the moment a species cheapened the brood, which
+// is exactly how the cost and the "lay max" preview drifted apart before.
+function eggBase(game, curve) {
+  return curve.base * (game ? eggCostMultiplier(game) : 1);
+}
+
 export function eggPrice(casteId, n, game) {
   const curve = eggCurve(game, casteId);
   const exponent = curve.breakAt && n > curve.breakAt ? curve.exponent2 : curve.exponent;
-  return curve.base * Math.pow(n, exponent);
+  return eggBase(game, curve) * Math.pow(n, exponent);
 }
 
 // What a run of eggs costs, without adding them up one at a time. Egg n costs
@@ -981,17 +989,18 @@ export function eggBatchCost(casteId, stock, count, game) {
     return total;
   }
   const curve = eggCurve(game, casteId);
+  const base = eggBase(game, curve);
   const from = stock;
   const to = stock + count;
   if (!curve.breakAt || to <= curve.breakAt) {
-    return powerSum(curve.base, curve.exponent, from, to);
+    return powerSum(base, curve.exponent, from, to);
   }
   if (from >= curve.breakAt) {
-    return powerSum(curve.base, curve.exponent2, from, to);
+    return powerSum(base, curve.exponent2, from, to);
   }
   // the curve steepens partway through this batch, so it is two sums
-  return powerSum(curve.base, curve.exponent, from, curve.breakAt) +
-    powerSum(curve.base, curve.exponent2, curve.breakAt, to);
+  return powerSum(base, curve.exponent, from, curve.breakAt) +
+    powerSum(base, curve.exponent2, curve.breakAt, to);
 }
 
 // the largest batch affordable on `budget`, found by bisection rather than by
