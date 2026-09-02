@@ -5,7 +5,7 @@
 undecided, and every line of it is arguable until it lands. When something here
 ships, it moves into the canon files and comes out of this one.
 
-Last updated 31 August 2026, against 0.3.0.0.
+Last updated 2 September 2026, against 0.3.1.1.
 
 ---
 
@@ -177,7 +177,7 @@ was meant as one.
 **Built and measured in 0.3.0.0.** Kept here because the reasoning is worth
 reading; the measured figures live in the canon. What follows was the plan.
 
-Chosen 31 August 2026. Five things were on the table and the map subsumes one of
+Chosen 2 September 2026. Five things were on the table and the map subsumes one of
 them, so it is four.
 
 ### The number the whole release answers
@@ -225,7 +225,7 @@ Combat.
 
 ### The board telescopes, so the map has no edge
 
-Decided 31 August 2026, replacing the three bounded options that were offered.
+Decided 2 September 2026, replacing the three bounded options that were offered.
 
 **Thirty cells are visible at any time.** Clear all of them and the whole ring
 collapses inward — it **merges into the nest**, becomes permanently held, and a
@@ -370,7 +370,7 @@ on top compounds that instead of fixing it.
 
 ### Trophies
 
-Decided 31 August 2026. The Hunt alone is one system, which is thin for a
+Decided 2 September 2026. The Hunt alone is one system, which is thin for a
 release; trophies are what make the fifty creatures matter. Without something
 that records them, all 250 encounters are names that scroll past, and the
 optimal play is to clear the nearest cheap cell for ever.

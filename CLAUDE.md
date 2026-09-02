@@ -147,7 +147,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 25 August 2026. Published and playable at the Pages URL below.
+Last updated 2 September 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first four workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 16 / 64 / 256 are in.
 
@@ -1178,7 +1178,7 @@ explained and written into the table rather than discovered by a player.
 **The rallying row now has all seven figures.** Only the 1,000-ant one was ever
 recorded — 47.7m, which the harness reproduces exactly — because the older full
 row in the pacing table predates the achievement rework and was superseded
-without being re-taken. Measured 31 August 2026: **1.2 / 2.7 / 6.0 / 16.6 / 29.3
+without being re-taken. Measured 2 September 2026: **1.2 / 2.7 / 6.0 / 16.6 / 29.3
 / 47.7 / 66.2**.
 
 **The shim cannot see appearance, and that has not changed.** It is built from

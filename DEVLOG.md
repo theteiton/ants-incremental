@@ -15,7 +15,7 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
-## 0.3.1.1 — 31 August 2026
+## 0.3.1.1 — 2 September 2026
 
 **Forty-nine trophies that each do something, and combat that survives a flight.**
 
@@ -51,7 +51,7 @@ all disappeared until the new colony clawed back — hiding a board being worked
 and a collection being filled. A line that has flown does not forget there is
 ground out there.
 
-## 0.3.1.0 — 31 August 2026
+## 0.3.1.0 — 2 September 2026
 
 **The ground is made of somewhere now, and the pacing test was lying.**
 
@@ -81,7 +81,7 @@ because `watch()` takes plain values for title and body and only `note` may be a
 function. And a long cost line crushed the upgrade name to one word per line and
 overlapped it, because the card head was a flex that could not wrap.
 
-## 0.3.0.2 — 31 August 2026
+## 0.3.0.2 — 2 September 2026
 
 **A trial was starting with a quarter of your food bank.**
 
@@ -110,7 +110,7 @@ trial and a matriline both begin with nothing.
 food), what may stay (food, on a flight, through Living Memory) and what is
 banked against the line and can never be taken (merged circles, trophies).
 
-## 0.3.0.1 — 31 August 2026
+## 0.3.0.1 — 2 September 2026
 
 **The Hunt and the Trophies pages were blank, and the tests were green.**
 
@@ -137,7 +137,7 @@ taken, trophies picked up — and it names it plainly when the frontier has been
 pushed back. An absence is exactly when territory is most likely to be lost, and
 the report was silent about it.
 
-## 0.3.0.0 — 31 August 2026
+## 0.3.0.0 — 2 September 2026
 
 **The Hunt: the ground around the nest, and what you keep from it.**
 
@@ -190,7 +190,7 @@ because that colony runs closer to the edge. Deliberate, and recorded.
 Save v9, migrating an existing colony to an empty board at tier zero with no
 trophies: nothing granted, nothing lost.
 
-## 0.2.6.0 — 31 August 2026
+## 0.2.6.0 — 2 September 2026
 
 **The harness moves into the repo, and five rewards that paid nothing start
 paying.**
