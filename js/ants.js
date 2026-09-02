@@ -1,6 +1,8 @@
 import {
   instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours, instinctEggCost
 } from "./instincts.js";
+import { territoryYield } from "./hunt.js";
+import { trophyTerritory, trophyMyth } from "./trophies.js";
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
@@ -750,7 +752,15 @@ export function hidingPenalty(game) {
 // something hidden inside a factor called "colony".
 export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game) *
-    prestigeFoodMultiplier(game) * challengeReward(game) * masteryFood(game);
+    prestigeFoodMultiplier(game) * challengeReward(game) * masteryFood(game) *
+    huntTerritory(game);
+}
+
+// Held ground, and the trophies that make holding it pay more. Bounded on
+// purpose: a full board is x1.72 and merged tiers go as the square root of the
+// count, so the map can never become the whole game however long it is played.
+export function huntTerritory(game) {
+  return territoryYield(game) * trophyTerritory(game) * trophyMyth(game);
 }
 
 // Everything that takes food away, multiplied together. Trials plug in here,

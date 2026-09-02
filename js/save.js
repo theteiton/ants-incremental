@@ -1,7 +1,7 @@
 import { RAID_INTERVAL } from "./raids.js";
 
-export const SAVE_KEY = "ants_save_v8";
-export const LEGACY_SAVE_KEYS = ["ants_save_v7", "ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
+export const SAVE_KEY = "ants_save_v9";
+export const LEGACY_SAVE_KEYS = ["ants_save_v8", "ants_save_v7", "ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
 export const SAVE_VERSION = 8;
 export const LOCK_KEY = "ants_lock";
 
@@ -137,6 +137,16 @@ export function migrate(data) {
       data.stats.jellyEver = Math.max(data.stats.jellyEver || 0, p.royalJellyTotal || 0);
     }
     data.version = 8;
+  }
+  if (data.version === 8) {
+    // The Hunt. An existing colony gets an empty board at tier zero and no
+    // trophies -- nothing is granted and nothing is lost. The board opens
+    // itself when raids are unlocked, the same gate raids have always used.
+    data.hunt = { cells: null, tier: 0, open: false, march: null,
+      spawnTimer: 0, advanceTimer: 0 };
+    data.trophies = {};
+    data.trophyKills = {};
+    data.version = 9;
   }
   return data;
 }

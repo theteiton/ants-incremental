@@ -15,6 +15,59 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.3.0.0 — 31 August 2026
+
+**The Hunt: the ground around the nest, and what you keep from it.**
+
+Combat was a side system and the arithmetic said why. The colony spends 79.4% of
+its food on foragers and 15.8% on soldiers, and the soldiers bought nothing it
+grows on. **Held ground multiplies foraging**, so the army is leverage on the
+79.4% rather than a tax on it.
+
+**A board of thirty cells with no edge.** Six sectors, five rings, drawn on a
+canvas under Combat. Clear all thirty and the circle merges into the nest for
+good, a fresh thirty open outside it, and everything in them is harder. It is
+the shape the achievement ladders already have: an endless climb with a
+fixed-size readout.
+
+Held ground **is** the nest, so anything walking into it is a defence battle
+where it stands. That makes expansion self-balancing: a longer frontier is more
+perimeter to defend. And one march at a time, with the soldiers sent unable to
+defend the nest — push out to grow, or hold back to survive.
+
+The payoff is bounded and the bound is measured: a full board is ×1.720 and
+twenty-five merged circles ×3.72, both inside the ×4.85 ceiling that Amdahl puts
+on the forager share. Merged tiers pay as the square root of the count, because
+tiers do not stop.
+
+**Forty-nine creatures in five bands, times five modifier words: 245
+encounters**, against twenty-one bare names. And **fifty trophies, five grades
+tall**. The first kill always gives one, every kill after rolls for the grade the
+creature actually wore, and a kill count raises it anyway — luck can slow a
+trophy but never block one. A band caps what it can drop, so the grades are
+climbed by hunting further out rather than farming what is nearest.
+
+Trophies pay into fighting strength, protein, hunting speed and territory, which
+is only safe because of the Hunt: a combat reward was inert while combat bought
+nothing the colony grew on.
+
+**Two things measurement caught.** The modifier weights added a hidden 22% to
+every attacker in the game, and unevenly — the early bands got easier and the
+late ones harder, because a band caps which modifiers it can carry. Each band is
+normalised to a mean of exactly 1.0000 now. And a colony that never marched
+filled 27 of 30 cells in an hour, which is the wall of red the design refused;
+spawning stops at ten.
+
+**Pacing.** The idle row is untouched at +0.2% and +0.6%. The rallying row moved
+— 47.7 → 50.0m and 66.2 → 73.0m at 1,000 and 2,000 ants — and it moved even
+though the expected attacker is exactly what it was. The loss function is convex:
+winning by a wider margin gains nothing, losing costs up to a fifth of the
+colony, so mean-neutral variance still costs time. It shows on the rallying row
+because that colony runs closer to the edge. Deliberate, and recorded.
+
+Save v9, migrating an existing colony to an empty board at tier zero with no
+trophies: nothing granted, nothing lost.
+
 ## 0.2.6.0 — 31 August 2026
 
 **The harness moves into the repo, and five rewards that paid nothing start

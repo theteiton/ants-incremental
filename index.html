@@ -172,6 +172,34 @@
       <p class="dim" id="combatNone" hidden></p>
     </div>
 
+    <div id="combatPanel-hunt" hidden>
+      <p class="dim" id="huntLocked" hidden></p>
+      <div id="huntBoard" hidden>
+        <p id="huntSummary"></p>
+        <canvas id="huntMap" class="hunt-map"></canvas>
+        <p class="dim" id="huntHint"></p>
+        <div class="hunt-controls" id="huntControls" hidden>
+          <span id="huntTarget"></span>
+          <label class="field inline">send
+            <select id="huntShare">
+              <option value="0.25">a quarter of the army</option>
+              <option value="0.5" selected>half the army</option>
+              <option value="0.75">three quarters</option>
+              <option value="1">everything</option>
+            </select>
+          </label>
+          <button id="huntSend">Send them</button>
+        </div>
+        <p class="hunt-march" id="huntMarch" hidden></p>
+        <button id="huntRecall" hidden>Call them home</button>
+      </div>
+    </div>
+
+    <div id="combatPanel-trophies" hidden>
+      <p class="dim" id="trophyIntro"></p>
+      <div id="trophyBands"></div>
+    </div>
+
     <div id="combatPanel-units" hidden>
       <p class="dim" id="unitsLocked" hidden></p>
       <div id="unitsBody" hidden>

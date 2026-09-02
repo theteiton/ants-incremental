@@ -5,7 +5,7 @@
 undecided, and every line of it is arguable until it lands. When something here
 ships, it moves into the canon files and comes out of this one.
 
-Last updated 31 August 2026, against 0.2.6.0.
+Last updated 31 August 2026, against 0.3.0.0.
 
 ---
 
@@ -172,7 +172,10 @@ was meant as one.
 
 ---
 
-## 0.3.0.0 — The Hunt
+## 0.3.0.0 — The Hunt (SHIPPED)
+
+**Built and measured in 0.3.0.0.** Kept here because the reasoning is worth
+reading; the measured figures live in the canon. What follows was the plan.
 
 Chosen 31 August 2026. Five things were on the table and the map subsumes one of
 them, so it is four.
@@ -364,6 +367,67 @@ It is the whole release now.
 
 **Not in: layer 3.** Layer 2 is 0.9 hours of a 40-hour intent, and a third layer
 on top compounds that instead of fixing it.
+
+### Trophies
+
+Decided 31 August 2026. The Hunt alone is one system, which is thin for a
+release; trophies are what make the fifty creatures matter. Without something
+that records them, all 250 encounters are names that scroll past, and the
+optimal play is to clear the nearest cheap cell for ever.
+
+**Fifty trophies, five grades tall.** One per base creature -- not 250, because
+the five modifier words are *grades* of the same trophy rather than separate
+entries. So the wall is fifty slots deep and five grades tall, and a creature
+already caught stays worth meeting in a bigger form.
+
+**Three ways to earn one, mixed, because each alone has a flaw.**
+
+1. **The first kill always gives the trophy**, at the lowest grade that creature
+   can give. A fight is never wasted and nothing is gated behind luck.
+2. **Every kill after that rolls for a higher grade**, capped by what that
+   creature is capable of dropping. This is the upside, and it is the reason to
+   go deep.
+3. **Kill count raises it anyway**, as a floor. Bad luck slows a trophy down; it
+   can never block one.
+
+**A creature's band decides which grades it can drop.** The weakest drop only
+the lowest grade. The deepest can drop the highest, at low chance. So the grade
+ladder is climbed by hunting *further out*, not by farming the nearest cell --
+which is exactly the behaviour the map needs to encourage.
+
+**Grades are cumulative.** Holding grade 4 pays grades 1 through 4, so a trophy
+never stops being worth what it already was.
+
+**What they pay, and why combat is safe here.** A reward that does not touch what
+binds is decoration -- the lesson from twelve species nodes and five instincts.
+Trophies pay into **fighting strength and territory yield**, and that is safe
+*only because of the Hunt*: territory multiplies foraging, so combat stops being
+a side system and a combat reward is no longer inert. It is still not a global
+food multiplier, so the hardest rule in the canon holds.
+
+**Each band pays a different kind of bonus**, which is where the uniqueness lives:
+the real animals and the mythical ones do not give the same sort of thing.
+Completing a whole band pays a large bonus on top. Five bands, so five real
+collection goals rather than one slowly rising number.
+
+**A Trophies sub-tab under Combat**, making it Overview, Units, Hunt, Trophies,
+Trade -- each about a screen, the way the Settings split went.
+
+**All fifty authored in the first build.** A wall with visible gaps for content
+that does not exist yet reads as unfinished rather than as something to
+complete.
+
+#### Open
+
+- **Do the fifty unique bonuses risk being fifty inert rewards?** That is the
+  exact mistake 0.2.6.0 fixed. The safeguard is that a band gives a *kind* and a
+  trophy gives a value within it, so there are five effects to measure rather
+  than fifty -- and every one of them has to be measured against a colony that
+  is food-bound sixty minutes out of sixty.
+- **Band completion and territory yield both multiply held ground.** They will
+  compound; the pair needs measuring together, not separately.
+
+---
 
 ### Open, for the map
 

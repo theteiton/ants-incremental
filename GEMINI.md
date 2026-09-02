@@ -92,6 +92,9 @@ js/upgrades.js      upgrade panel, effect previews, lock text
 js/achievements.js  achievement tracks, tiers, levels, achievement panel
 js/challenges.js    the trials: debuff and reward curves, what each one does
 js/library.js       the lexicon and the player-facing changelog
+js/bestiary.js      the forty-nine creatures, their bands and the modifier words
+js/hunt.js          the board, the march, held ground and the merged tiers
+js/trophies.js      what is kept from what the colony beats
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
 test/               the regression harness -- plain node, no deps, never shipped
@@ -409,6 +412,93 @@ to check whenever one is added.
 **A ladder's top must never move.** `ladder()` interpolates between its start and its top, so raising the top shifts every rung underneath it — and opening three more trials took the trials ladder from "five levels per playable trial" to 25, moving its fifth rung from 5 to 6 and taking a tier from anyone standing on it. The top counts all six trials now, built or not, so it cannot move again. Stepping from the start instead was tried and broke sixteen other values; the narrower fix was correct.
 
 **When layer 2 lands, the lifetime clock is the Matriline.** Not the bloodline: ants have hemolymph rather than blood, in an open system with no hemoglobin, so nothing about them is red or vessel-borne. Colonies genuinely are matrilineal — every worker descends from the queen, and each new nest is founded by her daughter — so the Matriline is the accurate word for the line of queens, and the right home for the total-time figure the header stopped showing when colony age began resetting. Layer 1 keeps *Lineage*; the two read as related without colliding.
+
+---
+
+## The Hunt — prestige-independent, and the second constraint
+
+**Held ground multiplies foraging, which is what makes combat part of the game
+rather than beside it.** The colony spends 79.4% of its food on foragers and
+15.8% on soldiers, and until now the soldiers bought nothing the colony grows
+on. Territory is the bridge: the army takes ground, the ground feeds the nest.
+
+**The board is thirty cells and has no edge.** Six sectors by five rings, drawn
+on a canvas. Clear all thirty and the circle **merges into the nest**
+permanently, a fresh thirty appear outside it, and everything in them is
+`TIER_SCALE` harder. Combat gets the shape the achievement ladders already have:
+an endless climb with a fixed-size readout.
+
+**Territory is bounded on purpose, and the bound is measured.** A full board is
+**×1.720** — `CELL_YIELD` 0.008 per ring, so the far cells are worth more — and
+merged tiers pay `TIER_YIELD × sqrt(tier)`, which is ×3.72 at twenty-five
+circles. Both together stay inside the **×4.85 Amdahl ceiling** for the forager
+share, so the map can never become the whole game however long it is played.
+Square root rather than linear is the whole reason: tiers do not stop.
+
+**Held ground IS the nest, so a monster walking into it starts a defence battle
+where it stands.** There is no separate "it reached the centre". That is what
+makes expansion self-balancing without a hand-tuned penalty: a longer frontier
+is more perimeter to be attacked along.
+
+**One march at a time, and the soldiers sent cannot defend.** `resolveRaid`
+multiplies the home defence by `1 - marchShare(game)`, so committing three
+quarters of the army to a deep cell leaves a quarter at home. That is the
+decision the game was short of.
+
+**Spawning stops at `MAX_ON_BOARD`.** Measured, a colony that simply never
+marched filled 27 of 30 cells in an hour, which is exactly the wall of red the
+design refused — a full board reads as "you have already lost" rather than as
+somewhere to go. Capped at ten, the pressure is real and the board stays legible.
+
+---
+
+## The bestiary and the trophies
+
+**Forty-nine creatures in five bands, times five modifier words — 245
+encounters** against the twenty-one bare names before. `bestiary.js` imports
+nothing, for the same reason `species.js` and `instincts.js` do not: `raids.js`
+and `hunt.js` both need it.
+
+**`monsterChoices` sorts by power rather than trusting array order.** The list is
+grouped by band so it reads well, which means it is NOT in power order, and
+slicing it raw offered a colony of 200 power a Land Kraken.
+
+**A modifier must add variety, not difficulty, and the raw weights added 22%.**
+The weighted mean of the power multipliers is 1.219 — so every attacker in the
+game was quietly harder, and measured it pushed 2,000 ants from 66.2m to 74.3m.
+Worse, the mean differs per band because a band caps which modifiers it can
+carry: Small Things averaged 0.84 and myth 1.219, so the same change made the
+early game easier and the late game harder at once. **Each band is normalised to
+a mean of exactly 1.0000**, spread untouched.
+
+**Variance still costs time, and that is a real finding.** Even mean-neutral, the
+rallying row moved 47.7 → 50.0m and 66.2 → 73.0m, because the loss function is
+convex: winning by a wider margin gains nothing while losing costs up to a fifth
+of the colony. It shows on the rallying row and not the idle one because a
+rallying colony runs closer to the edge. **The idle row is untouched at +0.2%
+and +0.6%**, and the rallying figures are recorded as the new baseline.
+
+**Fifty trophies, five grades tall, three ways to earn one.** The modifier words
+are grades of one trophy rather than 250 entries. The first kill always gives it,
+so a fight is never wasted; every kill after rolls for the grade the creature
+actually wore; and a kill count raises it anyway as a floor — measured, 600
+unlucky kills still reach grade 4. **A band caps the grade it can drop**, so a
+Phorid Fly is grade 2 for ever however lucky or persistent you are, and the
+ladder is climbed by hunting further out rather than farming what is nearest.
+
+**Trophies pay into strength, protein, hunting speed and territory — and that is
+safe only because of the Hunt.** A combat reward was inert while combat bought
+nothing the colony grows on; territory changes that. It is still not a global
+food multiplier. **A band gives a KIND and a trophy gives a value within it**, so
+there are five effects to measure rather than fifty, which is the safeguard
+against fifty inert rewards. At every trophy and every top grade: strength
+×5.44, protein ×2.58, territory ×2.07, myth ×3.07. The myth band was ×7.60 at
+first and had to come down, because it multiplies four things at once.
+
+**Trophies and merged tiers survive every reset**, the standing board does not.
+A trophy is what the line has ever beaten, like an achievement; a merged circle
+was taken permanently; the ground under a colony that has flown away is not its
+ground any more.
 
 ---
 

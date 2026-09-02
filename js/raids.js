@@ -104,7 +104,8 @@ export function combatPerCaste(game, caste) {
 export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
-  return power * passiveCombat(game) * instinctCombat(game);
+  return power * passiveCombat(game) * instinctCombat(game) *
+    trophyStrength(game) * trophyMyth(game);
 }
 
 export function raidsSeen(game) {
@@ -146,7 +147,8 @@ export function huntRate(game) {
   if (!hunting(game)) return 0;
   return huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
     (1 + effectTotal(game, "proteinYield")) *
-    passiveHunt(game) * speciesHuntMult(game) * instinctProtein(game);
+    passiveHunt(game) * speciesHuntMult(game) * instinctProtein(game) *
+    trophySpeed(game) * trophyMyth(game);
 }
 
 
@@ -251,69 +253,63 @@ export function monsterPower(game) {
 //
 // `from` is the attacker power at which one starts appearing. The band stays
 // open afterwards, so a strong colony still meets the occasional woodpecker.
-export const MONSTERS = [
-  { id: "phorid", name: "Phorid Fly", from: 0,
-    note: "A fly the size of a pinhead that lays a single egg in a worker's head. Barely an attack at all, and every colony's first." },
-  { id: "antlion", name: "Antlion", from: 200,
-    note: "It does not hunt. It digs a pit in loose sand and waits at the bottom for the trail to cross it." },
-  { id: "spider", name: "Wolf Spider", from: 600,
-    note: "No web. It runs the foraging trails down one ant at a time and carries them off." },
-  { id: "assassin", name: "Assassin Bug", from: 1500,
-    note: "It drains a worker and wears the empty shell on its back, stacked with the others, and walks into the nest wearing them." },
-  { id: "mantis", name: "Praying Mantis", from: 4000,
-    note: "Still for hours at the mouth of the tunnel, then not still." },
-  { id: "raiders", name: "Army Ant Raiders", from: 10000,
-    note: "Another colony, and a bigger one. They take the brood rather than the workers, which is worse." },
-  { id: "toad", name: "Cane Toad", from: 25000,
-    note: "Sits on the entrance and swallows whatever comes out of it, for as long as anything does." },
-  { id: "woodpecker", name: "Green Woodpecker", from: 60000,
-    note: "It is not after the wood. Its tongue is longer than its head and sticky along its whole length." },
-  { id: "pangolin", name: "Pangolin", from: 150000,
-    note: "Armoured, clawed, and entirely uninterested in being bitten. It opens the nest like a tin." },
-  { id: "aardvark", name: "Aardvark", from: 400000,
-    note: "A metre of digging muscle that eats fifty thousand insects a night and sleeps somewhere else." },
-  { id: "anteater", name: "Giant Anteater", from: 1e6,
-    note: "Two metres, no teeth, and a tongue that goes in and out a hundred and fifty times a minute." },
-  { id: "echidna", name: "Echidna", from: 2.5e6,
-    note: "Spined, egg-laying, and older than almost everything. It has been eating ants since before there were anteaters to compete with." },
-  { id: "bear", name: "Sloth Bear", from: 6e6,
-    note: "It closes its nostrils, puts its face into the nest and inhales. The noise carries for half a mile." },
-  { id: "badger", name: "Honey Badger", from: 1.5e7,
-    note: "It is not especially large. It is simply unwilling to stop, and nothing it meets has yet convinced it otherwise." },
-  { id: "monitor", name: "Monitor Lizard", from: 4e7,
-    note: "It excavates rather than raids, and it returns to the same nest until there is nothing left worth returning for." },
-  { id: "boar", name: "Wild Boar", from: 1e8,
-    note: "Not a specialist. It simply ploughs the ground where the colony happens to be and eats what surfaces." },
-  { id: "basilisk", name: "Basilisk", from: 2.5e8,
-    note: "The trails nearest the entrance are found stopped mid-step, every ant still facing the way it came." },
-  { id: "wyvern", name: "Wyvern", from: 7e8,
-    note: "Two legs, two wings, and a descent steep enough that the first warning is the shadow crossing the trail." },
-  { id: "chimera", name: "Chimera", from: 2e9,
-    note: "Three heads that do not agree on which chamber to open first, which is the only reason anything survives it." },
-  { id: "dragon", name: "Dragon", from: 5e9,
-    note: "It does not dig. It waits above the nest for the alates to rise, and takes the whole flight in one pass." },
-  { id: "wyrm", name: "Elder Wyrm", from: 2e10,
-    note: "It was underground before the colony was, and it has been moving towards the warmth for a very long time." }
-];
+// The bestiary lives in bestiary.js now: fifty creatures across five bands,
+// each band a collection goal and a bonus kind at once. Re-exported from here
+// so nothing that already imported them from raids.js has to change.
+export { MONSTERS, BANDS, BAND_TOP_GRADE, bandById } from "./bestiary.js";
+// A real import as well as the re-export: everything below is USED here, and a
+// re-export creates no local binding. That trap has now cost this codebase five
+// separate crashes, each of which only fired on one code path.
+import { MODIFIERS, MODIFIER_WEIGHTS, modifierById, topGradeFor, monsterById,
+  monsterChoices, monsterFullName, modifierPower } from "./bestiary.js";
+import { cellPower, marchShare } from "./hunt.js";
+import { awardTrophy, trophyStrength, trophyProtein, trophySpeed,
+  trophyMyth } from "./trophies.js";
+export { modifierById, topGradeFor, monsterById, monsterChoices, monsterFullName };
 
-// Which attackers a threat of this size could be. The last few bands stay open
-// so a colony meets some variety rather than the same creature for ever.
-export function monsterChoices(power) {
-  const open = MONSTERS.filter(m => power >= m.from);
-  if (!open.length) return [MONSTERS[0]];
-  return open.slice(Math.max(0, open.length - 3));
+// What arrives is a creature AND a modifier, so fifty bases read as hundreds of
+// encounters and one creature stays worth meeting across many tiers -- the same
+// aardvark is an early nuisance as a Starveling and a wall as an Ancient.
+//
+// The modifier is weighted: the ordinary form is much the commonest, and the
+// deep ones are rare enough to be worth remembering. It is also capped by what
+// the creature's band can carry, so nothing in the Small Things band ever
+// arrives Ancient -- which is what makes hunting further out the way to climb
+// the trophy grades rather than farming whatever is nearest.
+// the weights live in bestiary.js beside the normalisation that uses them
+
+export function rollModifier(monster) {
+  const top = topGradeFor(monster);
+  const open = MODIFIERS.filter(m => m.grade <= top);
+  let total = 0;
+  for (const m of open) total += MODIFIER_WEIGHTS[m.id] || 1;
+  let roll = Math.random() * total;
+  for (const m of open) {
+    roll -= MODIFIER_WEIGHTS[m.id] || 1;
+    if (roll <= 0) return m.id;
+  }
+  return open[open.length - 1].id;
 }
 
-export function monsterById(id) {
-  return MONSTERS.find(m => m.id === id) || MONSTERS[0];
-}
-
-// Rolled once and remembered, so the attacker does not change identity between
-// frames while the colony is looking at it.
 export function rollMonster(game) {
   const choices = monsterChoices(monsterPower(game));
-  game.monster = choices[Math.floor(Math.random() * choices.length)].id;
+  const picked = choices[Math.floor(Math.random() * choices.length)];
+  game.monster = picked.id;
+  game.monsterMod = rollModifier(picked);
   return game.monster;
+}
+
+export function currentModifier(game) {
+  return modifierById(game.monsterMod || "plain");
+}
+
+// the attacker's actual strength, the modifier included
+export function attackerPower(game) {
+  return monsterPower(game) * modifierPower(currentMonster(game), game.monsterMod);
+}
+
+export function attackerName(game) {
+  return monsterFullName(currentMonster(game), game.monsterMod || "plain");
 }
 
 export function currentMonster(game) {
@@ -371,7 +367,7 @@ export function raidRewards(game, power) {
   return {
     protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
       (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) *
-      instinctProtein(game) * spoils)),
+      instinctProtein(game) * trophyProtein(game) * trophyMyth(game) * spoils)),
     food: power * FOOD_PER_POWER * globalFoodMultiplier(game) * spoils
   };
 }
@@ -521,13 +517,32 @@ function captureBrood(game) {
   return diggers + rest;
 }
 
-export function resolveRaid(game) {
-  const power = monsterPower(game);
-  const defence = combatPower(game);
+export function resolveRaid(game, cell) {
+  // A cell fights with its own creature and its own strength; the timer's raid
+  // uses whatever is currently rolled. Either way the modifier is what decides
+  // the trophy grade.
+  const mod = cell ? modifierById(cell.mod) : currentModifier(game);
+  const which = cell ? cell.monster : game.monster;
+  const power = cell
+    ? cellPower(game, cell, monsterPower(game))
+    : monsterPower(game) * modifierPower(monsterById(which), game.monsterMod);
+  // Soldiers away with the march cannot defend the nest. That is the decision
+  // the Hunt exists to create: push out to grow, or hold back to survive.
+  const defence = combatPower(game) * (1 - marchShare(game));
   const won = defence >= power;
   const reward = raidRewards(game, power);
+  reward.protein = Math.round(reward.protein * mod.reward);
+  reward.food = Math.round(reward.food * mod.reward);
 
   if (won) {
+    // what you keep from it
+    const taken = which ? awardTrophy(game, which, mod.grade) : null;
+    if (cell) {
+      // the ground is the colony's again
+      cell.monster = null;
+      cell.mod = null;
+      cell.held = true;
+    }
     game.protein += reward.protein;
     game.stats.proteinEarned = (game.stats.proteinEarned || 0) + reward.protein;
     game.food += reward.food;
@@ -539,8 +554,8 @@ export function resolveRaid(game) {
     const promoted = promoteVeterans(game);
     const captured = captureBrood(game);
     game.lastRaid = { won: true, power, protein: reward.protein, food: reward.food,
-      dead: fallen, promoted, captured, monster: game.monster };
-    rollMonster(game);
+      dead: fallen, promoted, captured, monster: which, mod: mod.id, trophy: taken };
+    if (!cell) rollMonster(game);
     return game.lastRaid;
   }
 
@@ -554,8 +569,9 @@ export function resolveRaid(game) {
   game.stats.proteinEarned = (game.stats.proteinEarned || 0) + salvage;
   game.raidsLost++;
   game.lossStreak = (game.lossStreak || 0) + 1;
+  // a lost breach leaves the ground to whatever took it
   game.lastRaid = { won: false, power, protein: salvage, food: 0, dead, promoted: {},
-    monster: game.monster };
-  rollMonster(game);
+    monster: which, mod: mod.id, trophy: null };
+  if (!cell) rollMonster(game);
   return game.lastRaid;
 }

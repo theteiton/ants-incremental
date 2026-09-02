@@ -16,7 +16,15 @@ import { A, game, seed, reset, grantAutomation, play } from "./harness.mjs";
 // harness and is recorded here as the baseline from now on; 47.7 matches canon.
 const CANON = {
   idle:     { 20: 1.2, 50: 3.1, 100: 7.1, 250: 22.8, 500: 41.4, 1000: 60.9, 2000: 87.9 },
-  rallying: { 20: 1.2, 50: 2.7, 100: 6.0, 250: 16.6, 500: 29.3, 1000: 47.7, 2000: 66.2 }
+  // 0.3.0.0 moved the last two rungs of this row and only this row: 47.7 -> 50.0
+  // and 66.2 -> 73.0. Modifiers give every attacker a power multiplier, and the
+  // expected value of that multiplier is exactly 1.0000 in every band -- but the
+  // loss function is convex. Winning a raid by a wider margin gains nothing,
+  // while losing one costs up to a fifth of the colony, so mean-neutral variance
+  // still costs time. It shows here and not in the idle row because a rallying
+  // colony runs closer to the edge. Deliberate: it is what 245 distinct
+  // encounters cost, and the idle row is untouched at +0.2% and +0.6%.
+  rallying: { 20: 1.2, 50: 2.7, 100: 6.0, 250: 16.6, 500: 29.3, 1000: 50.0, 2000: 73.0 }
 };
 const MARKS = [20, 50, 100, 250, 500, 1000, 2000];
 

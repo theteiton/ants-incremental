@@ -133,6 +133,11 @@ export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
 // a real import, not a re-export: speciesRatios is USED below, and a re-export
 // creates no local binding
 import { speciesRatios } from "./species.js";
+import { initHunt, huntTick, huntUnlocked, marchTick, mergeTier,
+  SPAWN_SECONDS, ADVANCE_SECONDS } from "./hunt.js";
+// real imports, not re-exports: these are USED in tick() below
+import { monsterPower, raidsUnlocked as raidsOpen } from "./raids.js";
+import { awardTrophy } from "./trophies.js";
 export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent, affordableInstincts,
   instinctBaseCap, instinctBrood, instinctCombat, instinctProtein, instinctHatch,
   instinctOfflineHours, instinctKeptFood } from "./instincts.js";
@@ -177,6 +182,10 @@ function blankGame() {
     reserves: 0,
     food: 0,
     eggs: [],
+    // the ground around the nest, and what has been kept from it
+    hunt: { cells: null, tier: 0, open: false, march: null, spawnTimer: 0, advanceTimer: 0 },
+    trophies: {},
+    trophyKills: {},
     ants: { nanitic: 0, forager: 0, bigforager: 0, excavator: 0, nurse: 0, soldier: 0,
       major: 0, supermajor: 0, guard: 0 },
     bigForagers: [],
@@ -903,6 +912,18 @@ export function flightGate(game) {
   return speciesFlightGate(game, PRESTIGE_UNLOCK);
 }
 
+// The map opens when raids do, and it opens MOSTLY EMPTY -- a full circle of
+// red on the first frame reads as a defeat screen rather than as somewhere to
+// go. It fills as the colony watches.
+export function openHunt() {
+  const h = initHunt(game);
+  if (h.open) return false;
+  h.open = true;
+  h.spawnTimer = SPAWN_SECONDS;
+  h.advanceTimer = ADVANCE_SECONDS;
+  return true;
+}
+
 export function flightReady() {
   return !challengeActive(game) && population(game) >= flightGate(game);
 }
@@ -943,7 +964,13 @@ export function doFlight() {
 
 // Everything that outlives a colony. A nuptial flight, entering a trial and
 // leaving one all found a new colony and keep exactly this much.
+// A new colony is founded somewhere new, so the ground it held is not its
+// ground any more -- but a MERGED tier was taken permanently and is banked
+// against the line rather than the nest. So the board resets and the tier
+// count does not, which is what makes pushing a circle to completion worth
+// doing before flying.
 function refoundColony(extra) {
+  const bankedTier = (game.hunt && game.hunt.tier) || 0;
   const surviving = {
     prestige: game.prestige,
     achievements: game.achievements,
@@ -966,7 +993,11 @@ function refoundColony(extra) {
     // The matriline outlives every colony AND every flight -- it is the layer
     // above them. Without this the reset wiped the species it had just
     // committed to, along with the whole tree that paid for the inheritance.
-    matriline: game.matriline
+    matriline: game.matriline,
+    // Trophies are a lifetime collection, like achievements: what the line has
+    // ever beaten, it has beaten. Nothing a reset does can take one back.
+    trophies: game.trophies,
+    trophyKills: game.trophyKills
   };
   const keptFood = (game.food || 0) * instinctKeptFood(game);
   Object.assign(game, blankGame());
@@ -976,6 +1007,9 @@ function refoundColony(extra) {
   // rather than carried in `surviving`, because it is a share of what was
   // standing and not a field that persists.
   game.food = keptFood;
+  // A fresh board on fresh ground, and the tiers already taken carried across.
+  game.hunt = { cells: null, tier: bankedTier, open: false, march: null,
+    spawnTimer: 0, advanceTimer: 0 };
 }
 
 export function enterChallenge(id) {
@@ -1249,6 +1283,23 @@ export function tick(dt) {
       game.eggs.splice(i, 1);
       touchBrood();
     }
+  }
+
+  // The ground around the nest. Monsters appear on the rim and walk inward,
+  // and anything that walks into ground the colony holds has started a defence
+  // battle where it stands -- there is no separate "it reached the centre".
+  // opens with the soldiers, the same gate raids have always used
+  if (raidsUnlocked(game) && !huntUnlocked(game)) openHunt();
+  if (huntUnlocked(game)) {
+    const breach = huntTick(game, dt, monsterPower(game));
+    for (const cell of breach.breached) {
+      // a breach is a raid, resolved by whatever is not away with the march
+      resolveRaidFor(game, cell);
+    }
+    // and the army in the field, which fights with only what was sent
+    marchTick(game, dt, cell => resolveRaidFor(game, cell));
+    // a circle taken whole becomes the nest, and a new one opens outside it
+    mergeTier(game);
   }
 
   // The Blight. Infection grows on the infected and on the share it already

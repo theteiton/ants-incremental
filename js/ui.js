@@ -198,6 +198,11 @@ import {
 import { drawSprite, spriteFor } from "./sprites.js";
 import { LIBRARY, LIBRARY_GROUPS, entryState, libraryCounts, libraryUnlocked,
   libraryUnread, UPDATES, latestVersion, updatesUnread } from "./library.js";
+import { huntUnlocked, heldCells, occupied, cellAt, cellName, cellPower,
+  marchReady, sendMarch, recallMarch, CELLS, SECTORS, RINGS } from "./hunt.js";
+import { BANDS, MONSTERS, topGradeFor } from "./bestiary.js";
+import { bandMonsters, bandHeld, bandComplete, bandBonus, trophyGrade,
+  trophyKills, trophyCount } from "./trophies.js";
 
 const el = id => document.getElementById(id);
 const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "matriline", "challenges", "library", "settings"];
@@ -562,6 +567,215 @@ function renderCombatBar() {
 
 // Nothing in the game said which castes were fighting or for how much. The
 // rows are pooled and updated in place, never rebuilt.
+
+// ------------------------------------------------------------------- the Hunt
+//
+// The board is drawn rather than laid out, because thirty cells in five rings
+// is a picture and not a list. Everything else about the panel is ordinary DOM,
+// and every write goes through setText so a render that changes nothing writes
+// nothing.
+let huntPick = -1;
+
+function huntCellAt(x, y, size) {
+  // which cell a click landed in, in the same polar frame the drawing uses
+  const cx = size / 2;
+  const cy = size / 2;
+  const dx = x - cx;
+  const dy = y - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const inner = size * 0.11;
+  const band = (size / 2 - inner) / RINGS;
+  const ring = Math.ceil((dist - inner) / band);
+  if (ring < 1 || ring > RINGS) return -1;
+  let angle = Math.atan2(dy, dx) + Math.PI / 2;
+  while (angle < 0) angle += Math.PI * 2;
+  const sector = Math.floor((angle / (Math.PI * 2)) * SECTORS) % SECTORS;
+  return (ring - 1) * SECTORS + sector;
+}
+
+function drawHuntMap() {
+  const canvas = el("huntMap");
+  if (!canvas || !canvas.getContext) return;
+  const size = 320;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const css = getComputedStyle(document.documentElement);
+  const line = css.getPropertyValue("--line").trim() || "#3a2320";
+  const good = css.getPropertyValue("--good").trim() || "#7fa653";
+  const accent = css.getPropertyValue("--accent").trim() || "#c8443a";
+  const dim = css.getPropertyValue("--dim").trim() || "#ab8880";
+  const text = css.getPropertyValue("--text").trim() || "#f2e6e2";
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const inner = size * 0.11;
+  const band = (size / 2 - inner) / RINGS;
+  const cells = (game.hunt && game.hunt.cells) || [];
+
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const r0 = inner + (cell.ring - 1) * band;
+    const r1 = inner + cell.ring * band;
+    const a0 = (cell.sector / SECTORS) * Math.PI * 2 - Math.PI / 2;
+    const a1 = ((cell.sector + 1) / SECTORS) * Math.PI * 2 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r1, a0, a1);
+    ctx.arc(cx, cy, r0, a1, a0, true);
+    ctx.closePath();
+    ctx.fillStyle = cell.monster ? accent : cell.held ? good : "transparent";
+    if (cell.monster || cell.held) {
+      ctx.globalAlpha = cell.monster ? 0.65 : 0.35;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = i === huntPick ? text : line;
+    ctx.lineWidth = i === huntPick ? 2 : 1;
+    ctx.stroke();
+    if (cell.guard > 0) {
+      const mid = (a0 + a1) / 2;
+      const mr = (r0 + r1) / 2;
+      ctx.fillStyle = text;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(mid) * mr, cy + Math.sin(mid) * mr, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // the nest
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+  ctx.fillStyle = good;
+  ctx.globalAlpha = 0.5;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = dim;
+  ctx.font = "10px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("nest", cx, cy + 3);
+}
+
+function renderHunt() {
+  const open = huntUnlocked(game);
+  setHidden(el("huntLocked"), open);
+  setHidden(el("huntBoard"), !open);
+  if (!open) {
+    setText(el("huntLocked"), "The ground beyond the nest is not yet the colony's concern. " +
+      "It opens with the soldiers, at " + fmt(RAID_UNLOCK) + " ants.");
+    return;
+  }
+  const h = game.hunt;
+  const held = heldCells(game).length;
+  const there = occupied(game).length;
+  setText(el("huntSummary"),
+    held + " of " + CELLS + " held" +
+    (h.tier > 0 ? ", " + h.tier + (h.tier === 1 ? " circle" : " circles") + " taken for good" : "") +
+    " — ground is worth x" + fmtFactor(huntTerritory(game)) + " food. " +
+    there + (there === 1 ? " thing is" : " things are") + " out there.");
+
+  drawHuntMap();
+
+  const cell = huntPick >= 0 ? cellAt(game, huntPick) : null;
+  const canSend = marchReady(game) && cell && cell.monster;
+  setHidden(el("huntControls"), !canSend);
+  if (canSend) {
+    setText(el("huntTarget"), cellName(cell) + " at ring " + cell.ring +
+      ", strength " + fmt(cellPower(game, cell, monsterPower(game))) +
+      " against your " + fmt(combatPower(game)) + ".");
+  }
+  setText(el("huntHint"), cell
+    ? (cell.monster ? "" : cell.held ? "Held. Nothing to fight here." : "Empty ground — nothing holds it.")
+    : "Point at a cell to choose where to send the army.");
+
+  const march = h.march;
+  setHidden(el("huntMarch"), !march);
+  setHidden(el("huntRecall"), !march || march.home > 0);
+  if (march) {
+    const target = cellAt(game, march.cell);
+    setText(el("huntMarch"), march.home > 0
+      ? "Marching home, " + Math.ceil(march.home) + "s. " +
+        Math.round(march.share * 100) + "% of the army is still out of position."
+      : march.out > 0
+        ? "On the march to " + (target ? cellName(target) || "empty ground" : "the field") +
+          ", " + Math.ceil(march.out) + "s out. " +
+          Math.round(march.share * 100) + "% of your strength cannot defend the nest."
+        : "Fighting.");
+  }
+}
+
+// --------------------------------------------------------------- the trophies
+let trophyRows = null;
+
+function buildTrophies() {
+  const host = el("trophyBands");
+  if (!host || trophyRows) return;
+  trophyRows = {};
+  for (const band of BANDS) {
+    const box = document.createElement("div");
+    box.className = "trophy-band";
+    const head = document.createElement("h2");
+    head.textContent = band.name;
+    const note = document.createElement("p");
+    note.className = "dim";
+    note.textContent = band.note;
+    const state = document.createElement("p");
+    state.className = "trophy-state";
+    const grid = document.createElement("div");
+    grid.className = "trophy-grid";
+    box.appendChild(head);
+    box.appendChild(note);
+    box.appendChild(state);
+    box.appendChild(grid);
+    host.appendChild(box);
+    const cards = {};
+    for (const m of bandMonsters(band.id)) {
+      const card = document.createElement("div");
+      card.className = "trophy";
+      const name = document.createElement("b");
+      const pips = document.createElement("span");
+      pips.className = "trophy-pips";
+      card.appendChild(name);
+      card.appendChild(pips);
+      watch(card, { title: () => m.name, body: () => m.note });
+      grid.appendChild(card);
+      cards[m.id] = { card, name, pips };
+    }
+    trophyRows[band.id] = { state, cards };
+  }
+}
+
+function renderTrophies() {
+  buildTrophies();
+  if (!trophyRows) return;
+  setText(el("trophyIntro"),
+    trophyCount(game) + " of " + MONSTERS.length + " taken. What a colony beats, it keeps — " +
+    "and what it wore when you beat it decides how good the trophy is, so the deep " +
+    "ground is where the best of them are.");
+  for (const band of BANDS) {
+    const row = trophyRows[band.id];
+    const all = bandMonsters(band.id);
+    const have = bandHeld(game, band.id);
+    const done = bandComplete(game, band.id);
+    setText(row.state, have + " of " + all.length +
+      (done ? " — complete, x" + fmtFactor(band.complete) + " on top" : "") +
+      "   ·   this band is worth x" + fmtFactor(bandBonus(game, band.id)));
+    for (const m of all) {
+      const ui = row.cards[m.id];
+      const grade = trophyGrade(game, m.id);
+      const kills = trophyKills(game, m.id);
+      setClass(ui.card, "trophy" + (grade > 0 ? " held" : ""));
+      setText(ui.name, grade > 0 ? m.name : "— — —");
+      const top = topGradeFor(m);
+      let pips = "";
+      for (let i = 1; i <= top; i++) pips += i <= grade ? "\u25c6" : "\u25c7";
+      setText(ui.pips, grade > 0 ? pips + "  " + kills + (kills === 1 ? " kill" : " kills") : "");
+    }
+  }
+}
+
 function renderFighters() {
   const list = el("combatList");
   const rows = [];
@@ -627,6 +841,8 @@ function renderExchange() {
 const COMBAT_TABS = [
   { id: "overview", name: "Overview" },
   { id: "units", name: "Units" },
+  { id: "hunt", name: "Hunt" },
+  { id: "trophies", name: "Trophies" },
   { id: "trade", name: "Trade" }
 ];
 let combatTab = "overview";
@@ -1718,7 +1934,11 @@ function render() {
     markSubTab("achievementTabs", "tracks", newTrackCount(game));
     markSubTab("achievementTabs", "instincts", affordableInstincts(game));
   }
-  else if (activeTab === "combat") renderFighters();
+  else if (activeTab === "combat") {
+    renderFighters();
+    if (combatTab === "hunt") renderHunt();
+    else if (combatTab === "trophies") renderTrophies();
+  }
   else if (activeTab === "prestige") renderPrestige();
   else if (activeTab === "matriline") renderMatriline();
   else if (activeTab === "challenges") renderChallenges();
@@ -2322,6 +2542,20 @@ el("broodDirection").onchange = event => {
   setSetting("broodDirection", event.target.value);
   updateBroodDialog();
 };
+el("huntMap").onclick = event => {
+  const canvas = el("huntMap");
+  const box = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 320, height: 320 };
+  const scale = box.width ? 320 / box.width : 1;
+  huntPick = huntCellAt((event.clientX - box.left) * scale, (event.clientY - box.top) * scale, 320);
+  render();
+};
+el("huntSend").onclick = () => {
+  const share = Number(el("huntShare").value) || 0.5;
+  sendMarch(game, huntPick, share);
+  render();
+};
+el("huntRecall").onclick = () => { recallMarch(game); render(); };
+
 el("broodLimit").oninput = event => {
   setSetting("broodLimit", event.target.value.trim());
   updateBroodDialog();

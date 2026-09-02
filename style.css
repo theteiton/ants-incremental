@@ -1125,3 +1125,40 @@ ul { list-style: none; margin: 0; padding: 0; }
 .tutorial button:hover:not(:disabled) {
   background: var(--hover);
 }
+
+/* ---------------------------------------------------------------- the Hunt */
+.hunt-map {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 10px auto;
+  cursor: pointer;
+  image-rendering: auto;
+}
+.hunt-controls {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 10px 0 0; font-size: 13px;
+}
+.hunt-march {
+  margin: 10px 0 0; padding: 6px 10px; font-size: 13px;
+  background: var(--panel2); border-left: 3px solid var(--accent); border-radius: 6px;
+}
+
+/* ------------------------------------------------------------ the trophies */
+.trophy-band { margin-bottom: 18px; }
+.trophy-state { font-size: 12px; color: var(--good); margin: 0 0 8px; }
+.trophy-grid {
+  display: grid; gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.trophy {
+  padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; font-size: 12px; opacity: 0.45;
+}
+.trophy.held { opacity: 1; border-color: var(--good); background: var(--panel2); }
+.trophy b { display: block; }
+.trophy-pips {
+  display: block; margin-top: 3px; font-size: 11px; color: var(--dim);
+  letter-spacing: 0.08em;
+}

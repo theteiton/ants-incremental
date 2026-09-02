@@ -336,6 +336,17 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.3.0.0", name: "The Hunt",
+    changes: [
+      "There is ground around the nest now, and a map of it under Combat. Thirty cells in five rings, with things walking inward across them. Ground you hold makes your foragers bring back more \u2014 which is the first time an army has ever paid for itself.",
+      "Held ground counts as the nest, so anything that walks into it is a fight where it stands. The further out your frontier, the more of it there is to defend.",
+      "You send the army out yourself, one expedition at a time \u2014 and whoever you send cannot defend the nest while they are gone. Push out to grow, or hold back to survive.",
+      "Clear all thirty cells and the whole circle becomes part of your nest for ever. A new thirty opens outside it, harder. There is no last ring.",
+      "Forty-nine creatures instead of twenty-one, and each can turn up Starveling, Great, Gravid or Ancient \u2014 245 things that can come through the door. An Ancient hits three and a half times as hard as a Starveling and is worth remembering.",
+      "Fifty trophies to take, five grades deep, on their own page. Beating something always gives you its trophy; beating a bigger one upgrades it; and killing enough of anything upgrades it eventually, so bad luck can slow you down but never stop you. The weakest creatures only ever give the lowest trophy, so the good ones are out in the deep ground.",
+      "Trophies make you fight harder, hunt better, and hold ground for more. Finishing a whole band pays on top of that."
+    ] },
+
   { version: "0.2.6.0", name: "Three new trials, and rewards that finally pay",
     changes: [
       "Three new trials, and these ones are asked of every matriline. The Blight: a fungus spreads through the colony, an infected ant gathers nothing, and carrying her out is the only cure \u2014 so exiling, which you have probably never once used, becomes the whole loop. Clearing it means every ant you lose anywhere, to anything, you lose fewer of.",
