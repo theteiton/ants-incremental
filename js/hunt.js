@@ -50,16 +50,64 @@ export const TIER_YIELD = 0.4;
 // travel is per ring, each way
 export const TRAVEL_SECONDS = 12;
 
+// ---------------------------------------------------------------- the ground
+//
+// Every cell used to be identical, so the only decision the board offered was
+// how far out to push. An area has a KIND now, rolled when the circle is built,
+// and holding it pays what that ground is actually good for -- so which cell to
+// take is a decision as well as how far.
+//
+// The weights lean hard towards the food kinds on purpose. Measured, a colony
+// is food-bound sixty minutes out of sixty and the cap and the brood are worth
+// x1.02 by Amdahl however generous they are, so a board full of loam and seeps
+// would be a board full of nothing. The rarer kinds are spice, not staples.
+export const AREAS = [
+  { id: "forage", name: "Foraging ground", kind: "food", yield: 0.010, weight: 30,
+    note: "Open ground with trails already worn into it. The plainest thing the map offers and the most useful." },
+  { id: "aphid", name: "Aphid pasture", kind: "food", yield: 0.018, weight: 12,
+    note: "A stand of plants under a herd the colony milks for honeydew. Real ants keep these, defend them, and move them." },
+  { id: "seedbed", name: "Seed bed", kind: "food", yield: 0.014, weight: 14,
+    note: "Grass gone to seed, and enough of it to granary. What the harvester ants live on." },
+  { id: "carrion", name: "Carrion field", kind: "protein", yield: 0.05, weight: 12,
+    note: "Something died here and nothing else has claimed it yet." },
+  { id: "midden", name: "Midden", kind: "egg", yield: 0.012, weight: 10,
+    note: "The refuse heap of a nest that is no longer there. Everything a brood chamber needs, already broken down." },
+  { id: "ridge", name: "Stony ridge", kind: "strength", yield: 0.06, weight: 10,
+    note: "High, hard, and defensible. An army that holds it is fighting downhill." },
+  { id: "loam", name: "Deep loam", kind: "cap", yield: 0.09, weight: 7,
+    note: "Soft going a long way down. Room for chambers without a season of digging." },
+  { id: "seep", name: "Warm seep", kind: "brood", yield: 0.07, weight: 5,
+    note: "Ground that stays warm and damp. Eggs left here come on faster than they have any right to." }
+];
+
+export function areaById(id) {
+  return AREAS.find(a => a.id === id) || AREAS[0];
+}
+
+const AREA_TOTAL = AREAS.reduce((n, a) => n + a.weight, 0);
+
+export function rollArea(rng) {
+  let roll = (rng || Math.random)() * AREA_TOTAL;
+  for (const a of AREAS) {
+    roll -= a.weight;
+    if (roll <= 0) return a.id;
+  }
+  return AREAS[0].id;
+}
+
 export function huntUnlocked(game) {
   return !!(game.hunt && game.hunt.open);
 }
 
 // ------------------------------------------------------------------ the board
-export function newBoard() {
+// A fresh circle is rolled, not laid out, so no two are the same and a player
+// is reading a new board each tier rather than the same thirty cells again.
+export function newBoard(rng) {
   const cells = [];
   for (let ring = 1; ring <= RINGS; ring++) {
     for (let sector = 0; sector < SECTORS; sector++) {
-      cells.push({ ring, sector, monster: null, mod: null, held: false, guard: 0 });
+      cells.push({ ring, sector, area: rollArea(rng), monster: null, mod: null,
+        held: false, guard: 0 });
     }
   }
   return cells;
@@ -105,13 +153,43 @@ export function boardClear(game) {
 // Held ground and merged tiers, as one multiplier on foraging. Read by
 // foodPenalty's sibling in ants.js -- it is a gain, so it does not belong in
 // the penalty term.
-export function territoryYield(game) {
+// What the ground pays, by kind. A cell is worth its area's yield scaled by how
+// far out it sits -- the deep ground costs more to take and is worth more to
+// hold. Merged circles keep paying into food for ever, which is what makes
+// finishing one worth doing.
+export function territoryOf(game, kind) {
   const h = game.hunt;
   if (!h || !h.open) return 1;
   let held = 0;
-  for (const c of h.cells) if (c.held && !c.monster) held += CELL_YIELD * c.ring;
-  const merged = TIER_YIELD * Math.sqrt(Math.max(0, h.tier || 0));
-  return 1 + held + merged;
+  for (const c of h.cells) {
+    if (!c.held || c.monster) continue;
+    const area = areaById(c.area);
+    if (area.kind !== kind) continue;
+    held += area.yield * c.ring;
+  }
+  if (kind === "food") {
+    held += TIER_YIELD * Math.sqrt(Math.max(0, h.tier || 0));
+  }
+  return 1 + held;
+}
+
+export function territoryYield(game) {
+  return territoryOf(game, "food");
+}
+
+export function territoryProtein(game) { return territoryOf(game, "protein"); }
+export function territoryStrength(game) { return territoryOf(game, "strength"); }
+export function territoryCap(game) { return territoryOf(game, "cap"); }
+export function territoryBrood(game) { return territoryOf(game, "brood"); }
+export function territoryEgg(game) {
+  // the midden makes an egg cheaper, so it moves the other way
+  return 1 / territoryOf(game, "egg");
+}
+
+// what a single cell is worth to hold, for the panel to say
+export function cellWorth(cell) {
+  const area = areaById(cell.area);
+  return { area, gain: area.yield * cell.ring };
 }
 
 // ------------------------------------------------------------- what lives there
@@ -230,6 +308,7 @@ export function mergeTier(game) {
   const h = game.hunt;
   if (!h || !boardClear(game)) return false;
   h.tier = (h.tier || 0) + 1;
+  // a new circle is rolled fresh, so the ground beyond is never the ground behind
   h.cells = newBoard();
   h.spawnTimer = SPAWN_SECONDS;
   h.advanceTimer = ADVANCE_SECONDS;

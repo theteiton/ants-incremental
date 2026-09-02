@@ -1,7 +1,7 @@
 import {
   instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours, instinctEggCost
 } from "./instincts.js";
-import { territoryYield } from "./hunt.js";
+import { territoryYield, territoryEgg, territoryCap, territoryBrood } from "./hunt.js";
 import { trophyTerritory, trophyMyth } from "./trophies.js";
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
@@ -888,7 +888,7 @@ export function populationCap(game) {
     : (BASE_POPULATION_CAP + prestigeBaseCap(game) + instinctBaseCap(game)) * sealedCapScale(game);
   return Math.max(1, Math.floor(
     (base + capPerExcavator(game) * game.ants.excavator) *
-    masteryCap(game) * speciesCapMult(game)));
+    masteryCap(game) * speciesCapMult(game) * territoryCap(game)));
 }
 
 export function hatchRate(game) {
@@ -912,7 +912,7 @@ export function broodCapacity(game) {
       slotsPerNurse(game) * game.ants.nurse +
       slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game) +
       speciesBroodAdd(game) + instinctBrood(game)) *
-    masteryBrood(game)
+    masteryBrood(game) * territoryBrood(game)
   ));
 }
 
@@ -973,7 +973,8 @@ export function eggCurve(game, casteId) {
 // is exactly how the cost and the "lay max" preview drifted apart before.
 function eggBase(game, curve) {
   if (!game) return curve.base;
-  return curve.base * eggCostMultiplier(game) * instinctEggCost(game) * passiveEggCost(game);
+  return curve.base * eggCostMultiplier(game) * instinctEggCost(game) *
+    passiveEggCost(game) * territoryEgg(game);
 }
 
 export function eggPrice(casteId, n, game) {

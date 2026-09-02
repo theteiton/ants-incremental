@@ -105,7 +105,7 @@ export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
   return power * passiveCombat(game) * instinctCombat(game) *
-    trophyStrength(game) * trophyMyth(game);
+    trophyStrength(game) * trophyMyth(game) * territoryStrength(game);
 }
 
 export function raidsSeen(game) {
@@ -262,7 +262,7 @@ export { MONSTERS, BANDS, BAND_TOP_GRADE, bandById } from "./bestiary.js";
 // separate crashes, each of which only fired on one code path.
 import { MODIFIERS, MODIFIER_WEIGHTS, modifierById, topGradeFor, monsterById,
   monsterChoices, monsterFullName, modifierPower } from "./bestiary.js";
-import { cellPower, marchShare } from "./hunt.js";
+import { cellPower, marchShare, territoryStrength, territoryProtein } from "./hunt.js";
 import { awardTrophy, trophyStrength, trophyProtein, trophySpeed,
   trophyMyth } from "./trophies.js";
 export { modifierById, topGradeFor, monsterById, monsterChoices, monsterFullName };
@@ -367,7 +367,8 @@ export function raidRewards(game, power) {
   return {
     protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
       (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) *
-      instinctProtein(game) * trophyProtein(game) * trophyMyth(game) * spoils)),
+      instinctProtein(game) * trophyProtein(game) * trophyMyth(game) *
+      territoryProtein(game) * spoils)),
     food: power * FOOD_PER_POWER * globalFoodMultiplier(game) * spoils
   };
 }

@@ -15,6 +15,36 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.3.1.0 — 31 August 2026
+
+**The ground is made of somewhere now, and the pacing test was lying.**
+
+**Every cell is an area.** The board was thirty identical cells, so the only
+decision it offered was how far out to push. Each cell rolls terrain when the
+circle is built — foraging ground, aphid pasture, seed bed, carrion field,
+midden, stony ridge, deep loam, warm seep — and holding it pays what that ground
+is actually good for. A midden makes eggs cheaper, a ridge is worth fighting
+from, carrion pays protein. Every circle rolls fresh, so the ground beyond is
+never the ground behind.
+
+**The pacing suite was reporting noise as signal.** On one unchanged build the
+same policy reaches 1,000 ants anywhere between 60.1m and 68.2m depending on the
+seed — a 12.7% spread against a 10% tolerance applied to a single seed. Rolling
+terrain shifted the random sequence and read as a 12% slowdown that was not
+there. It averages five seeds now.
+
+That retracts part of what 0.3.0.0 said: the rallying row's move was attributed
+to variance meeting a convex loss function, and while the reasoning holds, both
+figures sit inside the seed spread. A number quoted from one seeded run is not a
+measurement.
+
+**Three interface faults.** A bought upgrade went blank on the card and said only
+"Fully bought" in the inspector; it now states what it is doing, measured against
+the same colony without it. The inspector printed `() => m.name` for a trophy,
+because `watch()` takes plain values for title and body and only `note` may be a
+function. And a long cost line crushed the upgrade name to one word per line and
+overlapped it, because the card head was a flex that could not wrap.
+
 ## 0.3.0.2 — 31 August 2026
 
 **A trial was starting with a quarter of your food bank.**

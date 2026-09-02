@@ -575,14 +575,22 @@ ul { list-style: none; margin: 0; padding: 0; }
 .upgrade:not(:disabled):hover { background: var(--hover); }
 .upgrade.owned { opacity: 0.55; border-color: var(--good); }
 .upgrade.locked { opacity: 0.45; }
+/* The cost is nowrap and has grown long -- "720 food + 50.0K protein" -- so with
+   no wrapping it squeezed the name to one word a line and then overlapped it.
+   Wrapping lets a cost that does not fit drop to its own line whole, and the
+   name keeps at least a few characters of width whatever else is in the row. */
 .upgrade-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   align-items: baseline;
 }
-.upgrade-head b { font-size: 14px; }
-.upgrade-cost { color: var(--dim); font-size: 12px; white-space: nowrap; }
+.upgrade-head b { font-size: 14px; flex: 1 1 auto; min-width: 9ch; }
+.upgrade-cost {
+  color: var(--dim); font-size: 12px; white-space: nowrap;
+  flex: 0 1 auto; margin-left: auto;
+}
 .upgrade-cost.affordable { color: var(--good); font-weight: 600; }
 .upgrade-cost.owned-tag { color: var(--good); }
 .upgrade-desc { display: block; margin-top: 4px; font-size: 12px; color: var(--dim); }
@@ -869,8 +877,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   color: var(--accent-soft);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  margin-left: auto;
-  padding-right: 8px;
+  flex: 0 0 auto;
 }
 
 .rank-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }

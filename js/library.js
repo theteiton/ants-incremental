@@ -336,6 +336,14 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.3.1.0", name: "The ground is made of somewhere",
+    changes: [
+      "Every cell on the map is a place now, not just a square. Foraging ground, an aphid pasture you can milk, a seed bed, a carrion field, an old midden, a stony ridge, deep loam, a warm seep — and holding one pays what that ground is actually good for. A midden makes your eggs cheaper. A ridge makes your soldiers fight harder. Carrion pays protein.",
+      "Every circle is rolled fresh, so the ground beyond is never the ground behind, and which cell to take is a decision as well as how far out it is.",
+      "An upgrade you have finished buying now tells you what it is doing for you, instead of going blank and saying 'fully bought'. It compares your colony against the same colony without that line.",
+      "Fixed: the inspector printed a line of code instead of a trophy's name, and a long price could crush an upgrade's title into one word per line and overlap it."
+    ] },
+
   { version: "0.3.0.0", name: "The Hunt",
     changes: [
       "There is ground around the nest now, and a map of it under Combat. Thirty cells in five rings, with things walking inward across them. Ground you hold makes your foragers bring back more \u2014 which is the first time an army has ever paid for itself.",

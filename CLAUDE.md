@@ -549,6 +549,51 @@ believes a trial will start rich, and plans around a thing that no longer
 happens. `resets.mjs` sweeps **all nine trials and all six species** rather than
 sampling one of each, because a leak that shows on Sterile alone is still a leak.
 
+**The pacing suite was reporting noise as signal, and so was I.** Measured on
+one unchanged build, the same policy reaches 1,000 ants anywhere between **60.1m
+and 68.2m** depending on the seed — a spread of **12.7%**, wider than the 10%
+tolerance the suite applied to a *single* seed. Any change that merely consumed
+random numbers in a different order looked like a balance change; rolling
+terrain for the Hunt board did exactly that and read as +12%.
+
+It averages **five seeds** now, which cuts the noise on the mean to about 5.7%,
+against an 8% tolerance. The recorded figures are the five-seed means: idle
+**1.2 / 3.0 / 6.9 / 22.4 / 40.7 / 63.8 / 92.0**, rallying **1.2 / 2.6 / 5.7 /
+16.4 / 29.1 / 47.2 / 66.2**. The old single-seed numbers sat near the bottom of
+the range rather than in the middle of it.
+
+**This retracts part of what 0.3.0.0 claimed.** The rallying row was said to have
+moved 47.7 → 50.0m and 66.2 → 73.0m because mean-neutral variance meets a convex
+loss function. The reasoning is sound and the effect is real, but the *size* of
+it cannot be read off one seed — both figures sit inside the seed spread. **A
+number quoted from a single seeded run is not a measurement.**
+
+**Every cell is an area with a kind.** The board used to be thirty identical
+cells, so the only decision was how far out to push. Each cell rolls terrain when
+the circle is built — foraging ground, aphid pasture, seed bed, carrion field,
+midden, stony ridge, deep loam, warm seep — and holding it pays what that ground
+is good for: food, protein, a cheaper egg, fighting strength, cap, brood. So a
+fresh circle reads differently every tier and *which* cell to take is a decision
+as well as how far. **The weights lean hard towards the food kinds**, because a
+colony is food-bound sixty minutes out of sixty and a board full of loam and
+seeps would be a board full of nothing.
+
+**A bought upgrade says what it is doing.** A finished line went blank on the
+card and read *"Fully bought"* in the inspector, which tells a player nothing
+about what they are getting — and by then the card is the only record of what
+the line ever did. `ownedEffect()` compares this colony against the same colony
+with that line unbought, so it answers the question a finished card should
+answer.
+
+**`watch()` takes plain values for `title` and `body`; only `note` may be a
+function.** A function passed as a title is printed as its own source, which is
+why the inspector read `() => m.name`.
+
+**A long cost crushed the upgrade name.** `.upgrade-head` was a flex with no
+wrapping and `.upgrade-cost` is `white-space: nowrap`, so *"720 food + 50.0K
+protein"* squeezed the name to one word per line and then overlapped it. The head
+wraps now and the name keeps a 9ch floor.
+
 ---
 
 ## Prestige Layer 2 — the Matriline

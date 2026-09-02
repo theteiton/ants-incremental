@@ -555,6 +555,52 @@ function spentText(line) {
     : "Nothing left to gain — another level does not move any rate the colony has.";
 }
 
+// What a line is worth RIGHT NOW: this colony against the same colony with that
+// line unbought. It answers the question a finished card should answer -- not
+// "what does the next level add", which is nothing, but "what am I getting".
+const zeroLevels = { key: null, byLine: {} };
+
+function withoutLine(line) {
+  if (zeroLevels.key !== game.upgrades) {
+    zeroLevels.key = game.upgrades;
+    zeroLevels.byLine = {};
+  }
+  let levels = zeroLevels.byLine[line.id];
+  if (!levels) {
+    levels = Object.assign({}, game.upgrades);
+    delete levels[line.id];
+    zeroLevels.byLine[line.id] = levels;
+  }
+  return Object.assign({}, game, { upgrades: levels });
+}
+
+function ownedEffect(upgrade) {
+  const without = withoutLine(upgrade);
+  const type = upgrade.effect.type;
+  const f = (a, b) => fmt(b) + " against " + fmt(a) + " without it";
+  if (type === "excavatorCap") {
+    return "Cap " + f(populationCap(without), populationCap(game));
+  }
+  if (type === "soldierPower" || type === "combatForager" ||
+      type === "combatExcavator" || type === "combatNurse") {
+    return "Fighting strength " + f(combatPower(without), combatPower(game));
+  }
+  if (type === "proteinYield") {
+    const power = monsterPower(game);
+    return "Raid protein " + f(raidRewards(without, power).protein, raidRewards(game, power).protein);
+  }
+  if (type === "broodSlots" || type === "nurseSlots" || type === "naniticSlots") {
+    return "Brood " + f(broodCapacity(without), broodCapacity(game)) + " eggs at once";
+  }
+  const now = foodPerSecond(game);
+  const bare = foodPerSecond(without);
+  if (now > 0 && bare > 0 && Math.abs(now - bare) / now > 0.0005) {
+    return "Food " + fmt(bare) + "/s to " + fmt(now) + "/s — worth ×" +
+      fmtFactor(now / bare) + " to the colony as it stands";
+  }
+  return "Fully bought.";
+}
+
 function previewUpgrade(upgrade) {
   const probe = probeWith(upgrade);
   const type = upgrade.effect.type;
@@ -680,10 +726,20 @@ export function buildUpgrades(onChange) {
         const max = upgradeMaxLevel(game, upgrade);
         const head = upgrade.name + " — level " + held + " of " + max + ".";
         if (upgradeMaxed(game, upgrade)) {
-          return head + (upgrade.mastery
-            ? " Every level you have unlocked is bought. Clearing another level of the trial that pays in " +
-              upgrade.mastery + " raises this cap."
-            : " Fully bought.");
+          // A bought line said only "Fully bought", which tells the player
+          // nothing about what they are getting for it -- and by then the card
+          // is the only record of what the line ever did.
+          const lines = [head + (upgrade.mastery
+            ? " Every level you have unlocked is bought."
+            : " Fully bought.")];
+          const last = levelEffect(upgrade, Math.max(1, held));
+          if (last && last.desc) lines.push("", "WHAT IT DOES", last.desc);
+          lines.push("", "RIGHT NOW", ownedEffect(upgrade));
+          if (upgrade.mastery) {
+            lines.push("", "Clearing another level of the trial that pays in " +
+              upgrade.mastery + " raises this cap.");
+          }
+          return lines.join("\n");
         }
         const next = nextLevelOf(upgrade);
         const lines = [head, "", "NEXT — " + levelName(upgrade, next),
@@ -779,10 +835,18 @@ export function renderUpgrades() {
     // Measured at 0.70ms a frame for twelve lines, which is most of the panel's
     // cost -- and with a branch filter or Hide owned on, most of them are hidden.
     const shown = !ui.card.hidden;
-    if (!shown || isOwned || !isOpen) {
+    if (!shown || !isOpen) {
       previewCache.text[upgrade.id] = "";
       previewCache.formula[upgrade.id] = "";
       previewCache.spent[upgrade.id] = false;
+    } else if (isOwned) {
+      // A bought line still says what it is doing. Blank read as "this does
+      // nothing" rather than as "there is nothing left to buy".
+      if (fresh) {
+        previewCache.text[upgrade.id] = ownedEffect(upgrade);
+        previewCache.formula[upgrade.id] = "";
+        previewCache.spent[upgrade.id] = false;
+      }
     } else if (fresh) {
       const spent = levelIsSpent(upgrade);
       previewCache.spent[upgrade.id] = spent;

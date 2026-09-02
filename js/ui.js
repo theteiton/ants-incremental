@@ -745,7 +745,10 @@ function buildTrophies() {
       pips.className = "trophy-pips";
       card.appendChild(name);
       card.appendChild(pips);
-      watch(card, { title: () => m.name, body: () => m.note });
+      // title and body are plain values; only note may be a function -- a
+      // function here is printed as its own source, which is what "() => m.name"
+      // was doing in the inspector
+      watch(card, { title: m.name, body: m.note });
       grid.appendChild(card);
       cards[m.id] = { card, name, pips };
     }
