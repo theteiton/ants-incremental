@@ -870,11 +870,22 @@ visual check that does not need a screenshot**, and the rest still does.
 below the 4.5 floor for body text. It is every button in the game and the
 established look, so it is recorded here rather than changed.
 
-**A colony is food-bound sixty minutes out of sixty, and twelve species nodes
-were priced as though it were not.** Sampled once a minute across an hour,
-`colonyBottleneck()` never once said anything but *food-bound* — the population
-cap, the brood and the store never bind, because the egg curve outruns the food
-rate by construction. So every node that paid in room paid nothing at all:
+**The colony spends 79% of its food on foragers, and that number is the ceiling
+on every reward in the game.** Measured across two hours of automated play, the
+whole food budget goes: **foragers 79.4%, soldiers 15.8%, excavators 2.4%,
+nurses 2.3%, upgrades 0.1%**. Amdahl bounds a reward at `1/(1-f)` of the share it
+touches, so making the population cap **free** is worth at most ×1.02, and a free
+brood ×1.02 as well. Only the forager share is worth anything, at ×4.85.
+
+**This is not the same as saying the cap never binds** — an earlier note here
+said that and it was too simple. Cap *utilisation* sits at 86–89% for the whole
+run, because Standing Orders digs whenever the nest gets tight. The cap binds
+constantly; it is just that **satisfying it is cheap**, so a gift of room saves
+2.4% of the budget and no more. `colonyBottleneck()` reads *food-bound* sixty
+minutes out of sixty for the same reason: whatever else is tight, the colony is
+always about one second short of the next egg.
+
+**So every node that paid in room paid nothing at all:**
 Solenopsis, Camponotus and Myrmecocystus each spent three of their four
 adaptations on cap or storage, and their whole branch measured **×0.97, ×0.96
 and ×1.04** — fifty Haplotype for no change the colony could feel. The three
