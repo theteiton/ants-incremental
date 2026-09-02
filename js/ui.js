@@ -206,7 +206,8 @@ import { RAID_UNLOCK } from "./raids.js";
 import { huntTerritory } from "./ants.js";
 import { huntUnlocked, heldCells, occupied, cellAt, cellName, cellPower,
   marchReady, sendMarch, recallMarch, CELLS, SECTORS, RINGS } from "./hunt.js";
-import { BANDS, MONSTERS, topGradeFor, bandById } from "./bestiary.js";
+import { BANDS, MONSTERS, topGradeFor, bandById, trophyKindAt,
+  trophyGradeValue } from "./bestiary.js";
 import { bandMonsters, bandHeld, bandComplete, bandMultiplier, trophyGrade,
   trophyKills, trophyCount, trophyEffects, trophyNextGrade,
   kindName } from "./trophies.js";
@@ -715,34 +716,47 @@ function renderHunt() {
 
 // --------------------------------------------------------------- the trophies
 // Every grade pays a DIFFERENT kind, so the note is a ladder rather than a
-// number: what the trophy gives now, and what one grade further up would add.
+// number. It lists EVERY grade the creature can give, held or not, because a
+// trophy you have not taken is the one you most need to know the value of --
+// the wall is a catalogue of what is out there as much as a record of what you
+// have beaten.
 function trophyNote(m) {
   const grade = trophyGrade(game, m.id);
   const top = topGradeFor(m);
-  const lines = [(m.trophy ? m.trophy.name : m.name) + " — from a " + m.name +
-    ", grade " + grade + " of " + top + "."];
-  const held = trophyEffects(game, m.id);
-  if (held.length) {
-    lines.push("", "WHAT IT GIVES");
-    for (const e of held) {
-      lines.push("grade " + e.grade + " — +" + (100 * e.value).toFixed(1) + "% " + kindName(e.kind));
-    }
-  } else {
-    lines.push("", "Not taken yet. Beat one and it is yours at grade 1, whatever it was wearing.");
-  }
-  const next = trophyNextGrade(game, m.id);
-  if (next) {
-    lines.push("", "NEXT — grade " + next.grade,
-      "+" + (100 * next.value).toFixed(1) + "% " + kindName(next.kind) +
-      ", on top of everything above.",
-      "Beat one wearing a deeper word, or simply beat enough of them.");
-  } else if (grade > 0) {
-    lines.push("", "The best this creature can give.");
-  }
   const band = bandById(m.band);
+  const mult = bandMultiplier(game, m.band);
+  const kills = trophyKills(game, m.id);
+  const lines = [];
+
+  lines.push((m.trophy ? m.trophy.name : m.name) + " — from a " + m.name + ".");
+  lines.push("Band: " + band.name + ". Deepest grade it can ever give: " + top + ".");
+  lines.push(grade > 0
+    ? "You hold it at grade " + grade + " of " + top + ", from " + kills +
+      (kills === 1 ? " kill." : " kills.")
+    : "Not taken. Beat one and it is yours at grade 1, whatever it was wearing.");
+
+  lines.push("", "WHAT EACH GRADE GIVES");
+  for (let g = 1; g <= top; g++) {
+    const kind = trophyKindAt(m, g);
+    if (!kind) continue;
+    const value = trophyGradeValue(m, g) * mult;
+    lines.push((g <= grade ? "◆ " : "◇ ") + "grade " + g + " — +" +
+      (100 * value).toFixed(1) + "% " + kindName(kind) +
+      (g <= grade ? "" : "  (not yet)"));
+  }
+  lines.push("Grades stack: holding grade " + top + " pays every line above.");
+
+  if (grade < top) {
+    lines.push("", "HOW TO RAISE IT",
+      "Beat one wearing a deeper word — a Great, a Gravid, an Ancient — or simply " +
+      "beat enough of them. Luck can slow a grade down; it can never block one.");
+  }
+
   lines.push("", "BAND — " + band.name,
-    "Multiplies all of that by ×" + fmtFactor(bandMultiplier(game, m.band)) +
-    ", rising to ×" + fmtFactor(band.complete) + " once the band is complete.");
+    "Multiplies every figure above by ×" + fmtFactor(mult) +
+    ", rising to ×" + fmtFactor(band.complete) + " with all " +
+    bandMonsters(m.band).length + " of the band taken. " +
+    bandHeld(game, m.band) + " so far.");
   return lines.join("\n");
 }
 

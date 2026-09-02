@@ -622,6 +622,13 @@ and that no kind is authored which nothing actually grants. Full wall: strength
 band is no longer a special case, its creatures carry their own kinds like the
 rest.
 
+**The trophy wall lists every grade, held or not.** A trophy you have *not*
+taken is the one whose value you most need to know — the wall is a catalogue of
+what is out there as much as a record of what you have beaten — and the note
+showed only the grades already held, so an untaken card said nothing but "not
+taken yet". Every grade is listed now, filled or hollow, with what it pays and
+the band multiplier applied.
+
 **Combat stays open once she has flown.** A flight refounds the colony at zero
 ants, so the run peak fell below 256 and Combat, the Hunt and the trophy wall all
 vanished — taking away a board the player was working and a collection they were

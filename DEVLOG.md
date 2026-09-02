@@ -45,6 +45,12 @@ capture, territory, speed, cap, brood — and the suite checks that each is
 reachable, each is worth more than nothing with the wall complete, and that no
 kind exists which no creature grants.
 
+**The wall lists every grade, held or not.** An untaken trophy said only "not
+taken yet", which is the one card whose value a player most needs — the wall is
+a catalogue of what is out there as much as a record of what has been beaten. It
+lists every grade now, filled or hollow, with what each pays and the band
+multiplier already applied.
+
 **Combat stays open once she has flown.** A flight refounds the colony at zero
 ants, so the run peak dropped under 256 and Combat, the Hunt and the trophy wall
 all disappeared until the new colony clawed back — hiding a board being worked
