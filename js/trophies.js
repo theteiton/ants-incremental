@@ -1,6 +1,6 @@
 // What you keep from something you beat.
 //
-// Fifty creatures, five grades tall: the modifier words are grades of one
+// Forty-nine creatures, five grades tall: the modifier words are grades of one
 // trophy rather than 250 separate entries, so a creature already caught stays
 // worth meeting in a bigger form.
 //
@@ -10,9 +10,17 @@
 // was, which is the reason to hunt further out. And a kill count raises it
 // anyway, as a floor -- bad luck can slow a trophy down but never block one.
 //
+// EVERY GRADE PAYS A DIFFERENT KIND. A trophy is not a number that grows, it is
+// a thing that keeps opening up: the Aardvark Claw gives room at grade 1,
+// protein at 2, fighting strength at 3 and cheaper brood at 4, and holding it at
+// grade 4 pays all four. What each creature teaches matches what it is -- an
+// antlion teaches holding ground, a chimpanzee teaches technique, a pangolin
+// teaches armour.
+//
 // Imports only bestiary.js, which is a leaf.
 
-import { MONSTERS, BANDS, bandById, monsterById, topGradeFor } from "./bestiary.js";
+import { MONSTERS, BANDS, bandById, monsterById, topGradeFor,
+  trophyGradeValue, trophyKindAt, trophyName } from "./bestiary.js";
 
 // the chance a kill hands over the grade the creature actually was
 export const DROP_CHANCE = 0.22;
@@ -60,7 +68,8 @@ export function awardTrophy(game, monsterId, grade, rng) {
 
   if (want > had) {
     game.trophies[monsterId] = want;
-    return { id: monsterId, from: had, to: want, first: had === 0 };
+    return { id: monsterId, from: had, to: want, first: had === 0,
+      name: trophyName(monster), kind: trophyKindAt(monster, want) };
   }
   return null;
 }
@@ -83,46 +92,101 @@ export function trophyCount(game) {
   return MONSTERS.filter(m => trophyGrade(game, m.id) > 0).length;
 }
 
-// ---------------------------------------------------------------- what they pay
-//
-// A band gives a KIND and a trophy gives a value within it, so there are five
-// effects to measure rather than fifty -- which is the safeguard against fifty
-// inert rewards, the exact mistake 0.2.6.0 spent a release fixing.
-//
-// Grades are cumulative in the sense that matters: a trophy at grade g pays g
-// times what grade 1 paid, so a trophy never stops being worth what it already
-// was.
-//
-// These pay into fighting strength, protein, speed and TERRITORY, and that is
-// safe only because of the Hunt: territory multiplies foraging, so a combat
-// reward is no longer inert. It is still not a global food multiplier, so the
-// hardest rule in the canon holds.
-export function bandBonus(game, bandId) {
+// The band multiplies what its members are worth, ramping with how much of it
+// you hold and reaching the band's full figure when it is complete. So a band
+// pays continuously as it fills and completing one is the peak of it rather
+// than a cliff that only exists at the very end.
+export function bandMultiplier(game, bandId) {
   const band = bandById(bandId);
-  let sum = 0;
-  for (const m of bandMonsters(bandId)) sum += band.per * trophyGrade(game, m.id);
-  const complete = bandComplete(game, bandId) ? band.complete : 1;
-  return (1 + sum) * complete;
+  const all = bandMonsters(bandId);
+  if (!all.length) return 1;
+  const share = bandHeld(game, bandId) / all.length;
+  return 1 + (band.complete - 1) * share;
 }
 
+// ---------------------------------------------------------------- what they pay
+//
+// A trophy pays into whatever kind its grade names, multiplied by how far its
+// band has come. Grades are cumulative: holding grade 4 pays grades 1 to 4, in
+// four different kinds.
+//
+// These reach fighting strength, protein, hunting, salvage, capture, territory
+// and the egg price. That is safe because of the Hunt: territory multiplies
+// foraging, so a combat reward is no longer inert. `food` is here too but it is
+// the rarest kind by design, and no single trophy gives much of it.
 export function trophyBonus(game, kind) {
   let total = 1;
-  for (const band of BANDS) {
-    if (band.kind !== kind) continue;
-    total *= bandBonus(game, band.id);
+  for (const monster of MONSTERS) {
+    const grade = trophyGrade(game, monster.id);
+    if (!grade) continue;
+    let sum = 0;
+    for (let g = 1; g <= grade; g++) {
+      if (trophyKindAt(monster, g) === kind) sum += trophyGradeValue(monster, g);
+    }
+    if (sum > 0) total += sum * bandMultiplier(game, monster.band);
   }
   return total;
+}
+
+// what one held trophy is contributing, for the panel to say
+export function trophyEffects(game, monsterId) {
+  const monster = monsterById(monsterId);
+  const grade = trophyGrade(game, monsterId);
+  const out = [];
+  if (!monster || !grade) return out;
+  const band = bandMultiplier(game, monster.band);
+  for (let g = 1; g <= grade; g++) {
+    const kind = trophyKindAt(monster, g);
+    if (!kind) continue;
+    out.push({ grade: g, kind, value: trophyGradeValue(monster, g) * band });
+  }
+  return out;
+}
+
+// what a trophy WOULD give at a grade not yet held, so the wall can say what is
+// worth hunting for
+export function trophyNextGrade(game, monsterId) {
+  const monster = monsterById(monsterId);
+  if (!monster) return null;
+  const grade = trophyGrade(game, monsterId);
+  const top = topGradeFor(monster);
+  if (grade >= top) return null;
+  const next = grade + 1;
+  return { grade: next, kind: trophyKindAt(monster, next),
+    value: trophyGradeValue(monster, next) * bandMultiplier(game, monster.band) };
 }
 
 export function trophyStrength(game) { return trophyBonus(game, "strength"); }
 export function trophyProtein(game) { return trophyBonus(game, "protein"); }
 export function trophyTerritory(game) { return trophyBonus(game, "territory"); }
 export function trophySpeed(game) { return trophyBonus(game, "speed"); }
+export function trophyFood(game) { return trophyBonus(game, "food"); }
+export function trophyHunt(game) { return trophyBonus(game, "hunt"); }
+export function trophySalvage(game) { return trophyBonus(game, "salvage"); }
+export function trophyCapture(game) { return trophyBonus(game, "capture"); }
+export function trophyCap(game) { return trophyBonus(game, "cap"); }
+export function trophyBrood(game) { return trophyBonus(game, "brood"); }
 
-// The myth band does not behave like a trophy, which is the point of it: it
-// pays into every other kind at once, at a fraction. Nothing else in the game
-// multiplies four things, and nothing else costs seven creatures that only
-// appear once a nest holds hundreds of millions.
-export function trophyMyth(game) {
-  return trophyBonus(game, "myth");
+// the egg price moves the other way: a trophy that teaches the colony to raise
+// brood cheaply makes an egg cost LESS
+export function trophyEgg(game) { return 1 / trophyBonus(game, "egg"); }
+
+// Every kind a trophy can pay into, with a readable name. One table, so the
+// panel, the inspector and the away report cannot disagree about what a kind is.
+export const TROPHY_KINDS = {
+  food: "food",
+  egg: "cheaper eggs",
+  protein: "protein from raids",
+  hunt: "hunting",
+  strength: "fighting strength",
+  salvage: "salvage from a defeat",
+  capture: "ants captured",
+  territory: "what held ground pays",
+  speed: "speed",
+  cap: "population cap",
+  brood: "brood"
+};
+
+export function kindName(kind) {
+  return TROPHY_KINDS[kind] || kind;
 }

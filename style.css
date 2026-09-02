@@ -1169,3 +1169,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   display: block; margin-top: 3px; font-size: 11px; color: var(--dim);
   letter-spacing: 0.08em;
 }
+.trophy-gives {
+  display: block; margin-top: 4px; font-size: 11px; color: var(--good);
+  line-height: 1.35;
+}

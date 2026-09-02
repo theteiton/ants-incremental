@@ -105,7 +105,7 @@ export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
   return power * passiveCombat(game) * instinctCombat(game) *
-    trophyStrength(game) * trophyMyth(game) * territoryStrength(game);
+    trophyStrength(game) * territoryStrength(game);
 }
 
 export function raidsSeen(game) {
@@ -148,7 +148,7 @@ export function huntRate(game) {
   return huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
     (1 + effectTotal(game, "proteinYield")) *
     passiveHunt(game) * speciesHuntMult(game) * instinctProtein(game) *
-    trophySpeed(game) * trophyMyth(game);
+    trophySpeed(game) * trophyHunt(game);
 }
 
 
@@ -263,8 +263,8 @@ export { MONSTERS, BANDS, BAND_TOP_GRADE, bandById } from "./bestiary.js";
 import { MODIFIERS, MODIFIER_WEIGHTS, modifierById, topGradeFor, monsterById,
   monsterChoices, monsterFullName, modifierPower } from "./bestiary.js";
 import { cellPower, marchShare, territoryStrength, territoryProtein } from "./hunt.js";
-import { awardTrophy, trophyStrength, trophyProtein, trophySpeed,
-  trophyMyth } from "./trophies.js";
+import { awardTrophy, trophyStrength, trophyProtein, trophySpeed, trophyHunt,
+  trophySalvage, trophyCapture } from "./trophies.js";
 export { modifierById, topGradeFor, monsterById, monsterChoices, monsterFullName };
 
 // What arrives is a creature AND a modifier, so fifty bases read as hundreds of
@@ -367,7 +367,7 @@ export function raidRewards(game, power) {
   return {
     protein: Math.max(1, Math.round(power * PROTEIN_PER_POWER *
       (1 + effectTotal(game, "proteinYield")) * passiveProtein(game) *
-      instinctProtein(game) * trophyProtein(game) * trophyMyth(game) *
+      instinctProtein(game) * trophyProtein(game) *
       territoryProtein(game) * spoils)),
     food: power * FOOD_PER_POWER * globalFoodMultiplier(game) * spoils
   };
@@ -399,7 +399,13 @@ export function raidInterval(game) {
 }
 
 export function raidsUnlocked(game) {
-  return runPeakCount(game, "population") >= raidUnlockAt(game);
+  if (runPeakCount(game, "population") >= raidUnlockAt(game)) return true;
+  // ...and once she has flown, the line does not forget. A refounded colony
+  // starts at zero ants, which used to close Combat, the Hunt and the trophy
+  // wall until it clawed back to 256 -- hiding a board the player was working
+  // and a collection they were filling.
+  return ((game.prestige && game.prestige.flightsTaken) || 0) > 0 ||
+    (game.stats && game.stats.flightsEver > 0);
 }
 
 // A lost trial stops being attacked. The run is already over -- carrying on
@@ -490,7 +496,7 @@ function captureBrood(game) {
   // hour and a death spiral, because two captures a raid could not build an
   // army fast enough to keep winning them.
   const want = Math.max(CAPTURE_FLOOR,
-    Math.floor(population(game) * share * masteryCapture(game)));
+    Math.floor(population(game) * share * masteryCapture(game) * trophyCapture(game)));
   // A raided nest is a whole nest, so what comes back includes its diggers --
   // and it has to. Under dulosis no excavator can ever be laid, so without
   // captured ones the cap sits at its base for ever: measured, 30 ants in a
@@ -565,7 +571,8 @@ export function resolveRaid(game, cell) {
   const toll = Math.max(1, Math.floor(population(game) * cap * shortfall *
     speciesLossMult(game) * masteryLosses(game)));
   const dead = killAnts(game, toll);
-  const salvage = Math.round(reward.protein * (defence / power) * passiveSalvage(game));
+  const salvage = Math.round(reward.protein * (defence / power) *
+    passiveSalvage(game) * trophySalvage(game));
   game.protein += salvage;
   game.stats.proteinEarned = (game.stats.proteinEarned || 0) + salvage;
   game.raidsLost++;

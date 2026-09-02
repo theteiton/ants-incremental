@@ -1011,6 +1011,9 @@ function refoundColony(extra, keepFood) {
   // standing and not a field that persists.
   game.food = keptFood;
   // A fresh board on fresh ground, and the tiers already taken carried across.
+  // The board reopens straight away for a line that has already flown -- the
+  // ground is new, but knowing there IS ground is not something a colony
+  // relearns. openHunt() rolls a fresh circle on the next tick.
   game.hunt = { cells: null, tier: bankedTier, open: false, march: null,
     spawnTimer: 0, advanceTimer: 0 };
 }

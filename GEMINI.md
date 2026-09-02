@@ -596,6 +596,41 @@ wrapping and `.upgrade-cost` is `white-space: nowrap`, so *"720 food + 50.0K
 protein"* squeezed the name to one word per line and then overlapped it. The head
 wraps now and the name keeps a 9ch floor.
 
+**Every creature gives its own trophy, and every grade of it a different kind.**
+Forty-nine hand-authored trophies — the Aardvark Claw, the Termite Stick, the
+Mimic Gland — each naming what the colony *learns* from beating that thing:
+an antlion teaches holding ground, a chimpanzee teaches technique, a pangolin
+teaches armour. **A deeper grade pays a different kind rather than more of the
+same**, so a trophy keeps opening up as it improves: the Aardvark Claw gives room
+at grade 1, protein at 2, fighting strength at 3 and cheaper brood at 4, and
+holding it at 4 pays all four.
+
+**The character is authored and the magnitude is derived.** Which kinds a
+creature grants is written by hand, once, per creature; what each grade is
+*worth* comes from `trophyGradeValue()` — the creature's rank in power order for
+tier and the grade itself for rarity. So a Phorid Fly at grade 1 is +0.6% and a
+Sleeping Titan at grade 5 is +15.4%, and nothing in between needed tuning. Fifty
+hand-typed constants would have drifted against each other by the third edit.
+
+**The band multiplies what its members give, ramping with how much of it is
+held** and reaching the band's full figure when complete — so filling a band
+pays continuously rather than only at the last card.
+
+**Eleven kinds, and every one of them is checked.** food, cheaper eggs, protein,
+hunting, fighting strength, salvage, capture, territory, speed, cap, brood. The
+suite asserts each is reachable, each pays more than 1 with the wall complete,
+and that no kind is authored which nothing actually grants. Full wall: strength
+×3.16, food ×2.98, territory ×2.85, brood ×1.14. `trophyMyth` is gone — the myth
+band is no longer a special case, its creatures carry their own kinds like the
+rest.
+
+**Combat stays open once she has flown.** A flight refounds the colony at zero
+ants, so the run peak fell below 256 and Combat, the Hunt and the trophy wall all
+vanished — taking away a board the player was working and a collection they were
+filling, until they clawed back to 256. `raidsUnlocked()` returns true for any
+line that has taken a flight. The board itself reopens on the next tick with a
+fresh circle.
+
 ---
 
 ## Prestige Layer 2 — the Matriline

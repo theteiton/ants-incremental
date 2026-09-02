@@ -2,7 +2,8 @@ import {
   instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours, instinctEggCost
 } from "./instincts.js";
 import { territoryYield, territoryEgg, territoryCap, territoryBrood } from "./hunt.js";
-import { trophyTerritory, trophyMyth } from "./trophies.js";
+import { trophyTerritory, trophyFood, trophyEgg, trophyCap,
+  trophyBrood } from "./trophies.js";
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
@@ -753,14 +754,14 @@ export function hidingPenalty(game) {
 export function globalFoodMultiplier(game) {
   return productEffect(game, "globalFood") * achievementFoodBonus(game) *
     prestigeFoodMultiplier(game) * challengeReward(game) * masteryFood(game) *
-    huntTerritory(game);
+    huntTerritory(game) * trophyFood(game);
 }
 
 // Held ground, and the trophies that make holding it pay more. Bounded on
 // purpose: a full board is x1.72 and merged tiers go as the square root of the
 // count, so the map can never become the whole game however long it is played.
 export function huntTerritory(game) {
-  return territoryYield(game) * trophyTerritory(game) * trophyMyth(game);
+  return territoryYield(game) * trophyTerritory(game);
 }
 
 // Everything that takes food away, multiplied together. Trials plug in here,
@@ -888,7 +889,7 @@ export function populationCap(game) {
     : (BASE_POPULATION_CAP + prestigeBaseCap(game) + instinctBaseCap(game)) * sealedCapScale(game);
   return Math.max(1, Math.floor(
     (base + capPerExcavator(game) * game.ants.excavator) *
-    masteryCap(game) * speciesCapMult(game) * territoryCap(game)));
+    masteryCap(game) * speciesCapMult(game) * territoryCap(game) * trophyCap(game)));
 }
 
 export function hatchRate(game) {
@@ -912,7 +913,7 @@ export function broodCapacity(game) {
       slotsPerNurse(game) * game.ants.nurse +
       slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game) +
       speciesBroodAdd(game) + instinctBrood(game)) *
-    masteryBrood(game) * territoryBrood(game)
+    masteryBrood(game) * territoryBrood(game) * trophyBrood(game)
   ));
 }
 
@@ -974,7 +975,7 @@ export function eggCurve(game, casteId) {
 function eggBase(game, curve) {
   if (!game) return curve.base;
   return curve.base * eggCostMultiplier(game) * instinctEggCost(game) *
-    passiveEggCost(game) * territoryEgg(game);
+    passiveEggCost(game) * territoryEgg(game) * trophyEgg(game);
 }
 
 export function eggPrice(casteId, n, game) {

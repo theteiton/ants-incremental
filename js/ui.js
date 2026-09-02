@@ -206,9 +206,10 @@ import { RAID_UNLOCK } from "./raids.js";
 import { huntTerritory } from "./ants.js";
 import { huntUnlocked, heldCells, occupied, cellAt, cellName, cellPower,
   marchReady, sendMarch, recallMarch, CELLS, SECTORS, RINGS } from "./hunt.js";
-import { BANDS, MONSTERS, topGradeFor } from "./bestiary.js";
-import { bandMonsters, bandHeld, bandComplete, bandBonus, trophyGrade,
-  trophyKills, trophyCount } from "./trophies.js";
+import { BANDS, MONSTERS, topGradeFor, bandById } from "./bestiary.js";
+import { bandMonsters, bandHeld, bandComplete, bandMultiplier, trophyGrade,
+  trophyKills, trophyCount, trophyEffects, trophyNextGrade,
+  kindName } from "./trophies.js";
 
 const el = id => document.getElementById(id);
 const TABS = ["ants", "upgrades", "combat", "achievements", "prestige", "matriline", "challenges", "library", "settings"];
@@ -713,6 +714,38 @@ function renderHunt() {
 }
 
 // --------------------------------------------------------------- the trophies
+// Every grade pays a DIFFERENT kind, so the note is a ladder rather than a
+// number: what the trophy gives now, and what one grade further up would add.
+function trophyNote(m) {
+  const grade = trophyGrade(game, m.id);
+  const top = topGradeFor(m);
+  const lines = [(m.trophy ? m.trophy.name : m.name) + " — from a " + m.name +
+    ", grade " + grade + " of " + top + "."];
+  const held = trophyEffects(game, m.id);
+  if (held.length) {
+    lines.push("", "WHAT IT GIVES");
+    for (const e of held) {
+      lines.push("grade " + e.grade + " — +" + (100 * e.value).toFixed(1) + "% " + kindName(e.kind));
+    }
+  } else {
+    lines.push("", "Not taken yet. Beat one and it is yours at grade 1, whatever it was wearing.");
+  }
+  const next = trophyNextGrade(game, m.id);
+  if (next) {
+    lines.push("", "NEXT — grade " + next.grade,
+      "+" + (100 * next.value).toFixed(1) + "% " + kindName(next.kind) +
+      ", on top of everything above.",
+      "Beat one wearing a deeper word, or simply beat enough of them.");
+  } else if (grade > 0) {
+    lines.push("", "The best this creature can give.");
+  }
+  const band = bandById(m.band);
+  lines.push("", "BAND — " + band.name,
+    "Multiplies all of that by ×" + fmtFactor(bandMultiplier(game, m.band)) +
+    ", rising to ×" + fmtFactor(band.complete) + " once the band is complete.");
+  return lines.join("\n");
+}
+
 let trophyRows = null;
 
 function buildTrophies() {
@@ -743,14 +776,17 @@ function buildTrophies() {
       const name = document.createElement("b");
       const pips = document.createElement("span");
       pips.className = "trophy-pips";
+      const gives = document.createElement("span");
+      gives.className = "trophy-gives";
       card.appendChild(name);
       card.appendChild(pips);
+      card.appendChild(gives);
       // title and body are plain values; only note may be a function -- a
       // function here is printed as its own source, which is what "() => m.name"
       // was doing in the inspector
-      watch(card, { title: m.name, body: m.note });
+      watch(card, { title: m.name, body: m.note, note: () => trophyNote(m) });
       grid.appendChild(card);
-      cards[m.id] = { card, name, pips };
+      cards[m.id] = { card, name, pips, gives };
     }
     trophyRows[band.id] = { state, cards };
   }
@@ -768,19 +804,25 @@ function renderTrophies() {
     const all = bandMonsters(band.id);
     const have = bandHeld(game, band.id);
     const done = bandComplete(game, band.id);
-    setText(row.state, have + " of " + all.length +
-      (done ? " — complete, x" + fmtFactor(band.complete) + " on top" : "") +
-      "   ·   this band is worth x" + fmtFactor(bandBonus(game, band.id)));
+    setText(row.state, have + " of " + all.length + (done ? " — complete" : "") +
+      "   ·   the band multiplies what its trophies give by ×" +
+      fmtFactor(bandMultiplier(game, band.id)) +
+      (done ? "" : ", ×" + fmtFactor(band.complete) + " when it is finished"));
     for (const m of all) {
       const ui = row.cards[m.id];
       const grade = trophyGrade(game, m.id);
       const kills = trophyKills(game, m.id);
       setClass(ui.card, "trophy" + (grade > 0 ? " held" : ""));
-      setText(ui.name, grade > 0 ? m.name : "— — —");
+      setText(ui.name, grade > 0 ? (m.trophy ? m.trophy.name : m.name) : "— — —");
       const top = topGradeFor(m);
       let pips = "";
       for (let i = 1; i <= top; i++) pips += i <= grade ? "\u25c6" : "\u25c7";
       setText(ui.pips, grade > 0 ? pips + "  " + kills + (kills === 1 ? " kill" : " kills") : "");
+      // what it is actually giving, which is the whole reason to hold one
+      const effects = trophyEffects(game, m.id);
+      setText(ui.gives, effects.length
+        ? effects.map(e => "+" + (100 * e.value).toFixed(1) + "% " + kindName(e.kind)).join(", ")
+        : "");
     }
   }
 }

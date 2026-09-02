@@ -15,6 +15,42 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.3.1.1 — 31 August 2026
+
+**Forty-nine trophies that each do something, and combat that survives a flight.**
+
+Every creature now gives its own trophy — the Aardvark Claw, the Termite Stick,
+the Mimic Gland, the Wyrm Vertebra — and each names what the colony learns from
+beating that particular thing. An antlion teaches holding ground, a chimpanzee
+teaches technique, a pangolin teaches armour, a rove beetle teaches how brood
+care can be fooled.
+
+**Every grade pays a different kind.** A trophy is not a number that grows, it is
+a thing that keeps opening up: the Aardvark Claw gives room at grade 1, protein
+at 2, fighting strength at 3, cheaper brood at 4 — and holding it at grade 4 pays
+all four at once.
+
+**Authored character, derived magnitude.** Which kinds a creature grants is hand
+written per creature; what each grade is worth comes from how deep the creature
+is and how rare the grade. A Phorid Fly at grade 1 is +0.6%; a Sleeping Titan at
+grade 5 is +15.4%. Nothing in between needed a constant of its own, and nothing
+can drift against anything else.
+
+The band multiplies what its members give, ramping as it fills and reaching its
+full figure when complete, so progress pays the whole way rather than only on the
+last card.
+
+Eleven kinds — food, cheaper eggs, protein, hunting, fighting strength, salvage,
+capture, territory, speed, cap, brood — and the suite checks that each is
+reachable, each is worth more than nothing with the wall complete, and that no
+kind exists which no creature grants.
+
+**Combat stays open once she has flown.** A flight refounds the colony at zero
+ants, so the run peak dropped under 256 and Combat, the Hunt and the trophy wall
+all disappeared until the new colony clawed back — hiding a board being worked
+and a collection being filled. A line that has flown does not forget there is
+ground out there.
+
 ## 0.3.1.0 — 31 August 2026
 
 **The ground is made of somewhere now, and the pacing test was lying.**

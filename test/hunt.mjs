@@ -90,12 +90,20 @@ if (T.trophyStrength(none) !== 1 || T.trophyTerritory(none) !== 1) {
 }
 const full2 = { trophies: {} };
 for (const m of B.MONSTERS) full2.trophies[m.id] = B.topGradeFor(m);
-console.log("  every trophy at its top grade: strength x" + T.trophyStrength(full2).toFixed(2) +
-  ", territory x" + T.trophyTerritory(full2).toFixed(2) +
-  ", protein x" + T.trophyProtein(full2).toFixed(2) +
-  ", myth x" + T.trophyMyth(full2).toFixed(2));
-for (const kind of ["strength", "territory", "protein", "speed", "myth"]) {
-  if (!(T.trophyBonus(full2, kind) > 1)) bad.push(kind + " pays nothing even with every trophy");
+// Every kind a trophy can pay into must actually be reachable, and every one of
+// them must be worth something with the whole wall held. The myth band is no
+// longer a special case -- its creatures carry their own kinds like the rest.
+const KINDS = Object.keys(T.TROPHY_KINDS);
+console.log("  every trophy at its top grade:");
+for (const kind of KINDS) {
+  const v = kind === "egg" ? 1 / T.trophyEgg(full2) : T.trophyBonus(full2, kind);
+  console.log("    " + T.kindName(kind).padEnd(24) + "x" + v.toFixed(3));
+  if (!(v > 1)) bad.push(kind + " pays nothing even with every trophy held");
+}
+// and no kind may be authored that nothing actually grants
+for (const kind of KINDS) {
+  const granted = B.MONSTERS.some(m => m.trophy && m.trophy.kinds.indexOf(kind) >= 0);
+  if (!granted) bad.push("no creature anywhere grants " + kind);
 }
 
 // --- a flight keeps the trophies and the tiers ------------------------------

@@ -336,6 +336,15 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.3.1.1", name: "Every trophy does something",
+    changes: [
+      "All forty-nine trophies now give a real bonus, and each one matches what you took it from. An antlion teaches you to hold ground. A chimpanzee teaches technique, so your eggs cost less. A pangolin teaches armour. A rove beetle teaches how brood care gets fooled.",
+      "Every grade of a trophy gives a DIFFERENT bonus, not more of the same one. The Aardvark Claw gives you room at grade 1, protein at 2, fighting strength at 3 and cheaper brood at 4 — and at grade 4 you have all four.",
+      "Deeper, rarer things give more. A Phorid Fly is worth a fraction of a percent; an Ancient of something from the deep ground is worth fifteen.",
+      "A band multiplies everything its trophies give, and it climbs as you fill the band rather than waiting until the last one.",
+      "Combat, the Hunt and your trophy wall no longer vanish when you take a nuptial flight. A line that has flown does not forget there is ground out there."
+    ] },
+
   { version: "0.3.1.0", name: "The ground is made of somewhere",
     changes: [
       "Every cell on the map is a place now, not just a square. Foraging ground, an aphid pasture you can milk, a seed bed, a carrion field, an old midden, a stony ridge, deep loam, a warm seep — and holding one pays what that ground is actually good for. A midden makes your eggs cheaper. A ridge makes your soldiers fight harder. Carrion pays protein.",
