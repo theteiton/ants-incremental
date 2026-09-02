@@ -75,6 +75,34 @@ for (const [label, act, mayKeepFood] of CASES) {
   if (after.trophy !== before.trophy) bad.push(label + " changed a trophy " + before.trophy + " -> " + after.trophy);
 }
 
+// ...and not only the one trial and one species sampled above. A leak that
+// shows on Sterile alone, or on Eciton alone, is still a leak.
+console.log("=== EVERY TRIAL AND EVERY SPECIES STARTS WITH NOTHING ===");
+{
+  const C = await import("../js/challenges.js");
+  const S = await import("../js/species.js");
+  let leaks = 0;
+  for (const ch of C.CHALLENGES) {
+    deepColony();
+    if (!G.enterChallenge(ch.id)) continue;
+    if (game.food > 0 || game.protein > 0 || A.population(game) > 0) {
+      bad.push(ch.name + " began with " + game.food.toFixed(0) + " food, " +
+        game.protein.toFixed(0) + " protein, " + A.population(game) + " ants");
+      leaks++;
+    }
+  }
+  for (const sp of S.SPECIES) {
+    deepColony();
+    G.doMatrilineReset(sp.id);
+    if (game.food > 0 || game.protein > 0 || A.population(game) > 0) {
+      bad.push("a matriline as " + sp.name + " began with " + game.food.toFixed(0) + " food");
+      leaks++;
+    }
+  }
+  console.log("  " + C.CHALLENGES.length + " trials and " + S.SPECIES.length +
+    " species checked: " + (leaks ? leaks + " LEAKED" : "all start empty"));
+}
+
 console.log("\n  A trial founds a colony under conditions that should kill it, so it");
 console.log("  starts from nothing. Merged circles and trophies are banked against the");
 console.log("  line and no reset may take them.");

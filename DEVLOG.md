@@ -35,6 +35,11 @@ Abandoning one kept 6.3%, because the share compounded once per refound.
 Only the flight asks for it now. A trial and a matriline reset start from
 nothing, which is what they are for.
 
+Living Memory's own description still said the crop survives *"every reset — a
+nuptial flight, a matriline, a trial"*, which was a lie the moment the fix
+landed. It says what it does now: the crop goes with her on a flight, and a
+trial and a matriline both begin with nothing.
+
 **`resets.mjs` covers all four in one table** — what goes (ants, eggs, protein,
 food), what may stay (food, on a flight, through Living Memory) and what is
 banked against the line and can never be taken (merged circles, trophies).

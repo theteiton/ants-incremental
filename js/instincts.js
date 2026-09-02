@@ -41,7 +41,10 @@ export const INSTINCTS = [
     desc: "The colony works far longer without being watched. +8 hours of offline progress.",
     effect: { type: "offlineHours", add: 8 } },
   { id: "inst_keepfood", name: "Living Memory", cost: 50,
-    desc: "A daughter leaves with a full crop. A quarter of the colony's food survives every reset — a nuptial flight, a matriline, a trial.",
+    // Only the flight. It used to say "every reset" and to mean it, which let a
+    // trial begin with a quarter of the bank -- and a trial that starts rich is
+    // not a trial. The wording has to match what it does.
+    desc: "A daughter leaves with a full crop. A quarter of the colony's food goes with her on a nuptial flight. A trial and a matriline both begin with nothing, as they are meant to.",
     effect: { type: "keepFood", share: 0.25 } }
 ];
 

@@ -544,6 +544,13 @@ ants, no eggs, no protein — food survives only a flight and only through Livin
 Memory, and the banked things (merged circles, trophies) survive all four. Every
 reset in the game is now covered by one table.
 
+**Living Memory's own text said "every reset — a nuptial flight, a matriline, a
+trial", and it has to say what it does.** Once the crop was scoped to the flight
+the description was a lie, which is worse than the bug: a player reads it,
+believes a trial will start rich, and plans around a thing that no longer
+happens. `resets.mjs` sweeps **all nine trials and all six species** rather than
+sampling one of each, because a leak that shows on Sterile alone is still a leak.
+
 ---
 
 ## Prestige Layer 2 — the Matriline
