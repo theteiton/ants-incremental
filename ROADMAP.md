@@ -205,7 +205,7 @@ player can see, and because it pays rather than punishes.
 
 ### The map
 
-**6 sectors × 5 rings = 30 cells**, nest at the centre, drawn in `sprites.js`.
+**Thirty cells shown at a time**, nest at the centre, drawn in `sprites.js`.
 A cell is empty, held, garrisoned or occupied. A new **Hunt** sub-tab under
 Combat.
 
@@ -218,6 +218,85 @@ Combat.
 - **Reaching ring 0 is an assault**, which is the raid the game already resolves.
   `monsterPower`, `DEATH_ORDER`, salvage and the four difficulty settings all
   keep working underneath.
+
+### The board telescopes, so the map has no edge
+
+Decided 31 August 2026, replacing the three bounded options that were offered.
+
+**Thirty cells are visible at any time.** Clear all of them and the whole ring
+collapses inward — it **merges into the nest**, becomes permanently held, and a
+fresh thirty appear outside it. The circle grows outward for ever and the board
+the player reads never gets bigger.
+
+That gives combat the shape the achievement ladders already have: an endless
+climb with a fixed-size readout. Each completed circle is a **tier**, and a tier
+is permanent — its foraging bonus is banked and can never be walked back into.
+
+- Monster strength is `base × DISTANCE^ring × TIER^tier`, so distance is the
+  difficulty inside a circle and the tier is the difficulty between them.
+- A merged tier keeps paying, so the food multiplier from ground is cumulative
+  across tiers. **This is the number that has to be watched**: it is a permanent
+  multiplier on the 79.4% share and it compounds every tier. `TIER` and the
+  per-cell bonus together decide whether the whole game is eventually just the
+  map. It wants measuring before anything else in the feature is tuned.
+- **Regions have their own shapes.** Not every circle is the same arrangement;
+  different terrain gives differently shaped boards. Deliberately left unspecced
+  — shape is judged by eye, so it is Gemini's, and the mechanic does not depend
+  on it.
+
+### Held ground is nest, and that is what a defence battle is
+
+**A monster entering ground you hold triggers a defence battle immediately.**
+There is no separate "it reached the centre" event: held ground counts as the
+nest, so any incursion is an assault on it. The existing raid resolution is what
+runs.
+
+This is the self-balancing part of the design. The further out the frontier, the
+longer the perimeter to be attacked along, so expansion pays in food and costs in
+exposure without either needing a hand-tuned penalty.
+
+**An ungarrisoned cell therefore does not quietly revert.** It is defended, or it
+is lost in a battle the player sees.
+
+### A lost push strands the survivors
+
+A clearing attempt that fails loses a share of the detachment, scaled by how
+badly it was outmatched — the rule raids already use — and **the survivors hold
+where they are and must be recalled**, taking travel time to come home. So a
+misread costs soldiers and leaves the army out of position, which is the failure
+this kind of map should have.
+
+### The bestiary: about fifty, times five words
+
+The game has 21 named attackers today, drawn from the band their strength falls
+in. The map needs far more variety, because a monster is now a place as well as a
+number.
+
+**About fifty base creatures**, keeping the existing progression — real ant
+predators while the colony is a plausible size (phorid fly, antlion, assassin
+bug, army ant raiders, pangolin, aardvark, giant anteater), then mythical once a
+nest holds millions (basilisk, wyvern, chimera, dragon).
+
+**Five modifier words** in front, each changing the numbers rather than only the
+name, so fifty bases read as hundreds of encounters:
+
+| word | what it does |
+|---|---|
+| **Starveling** | weaker, and advances a ring faster — the one that reaches you first |
+| **Great** | much stronger, slower, worth more |
+| **Gravid** | killing it puts another on the board |
+| **Ancient** | high strength and high reward, deep rings only |
+| **Blighted** | strongest of all, outer tiers only |
+
+The words are the tuning surface: the same aardvark is an early nuisance as a
+Starveling and a wall as an Ancient, so a base creature stays useful across many
+tiers instead of scrolling past.
+
+### First sight, at 256 ants
+
+**Mostly empty, filling as you watch.** A few monsters on the outer ring and room
+to breathe. The board should read as somewhere to go rather than as a siege
+already lost — a full circle of red on the first frame reads as a defeat screen.
 
 ### The two pressures
 
@@ -237,10 +316,16 @@ A cleared cell pays a foraging bonus weighted by its ring. Full control should
 land near **×2–×3 food** — inside the ×4.85 ceiling, and not so large it eats the
 upgrade tree.
 
-**A cleared cell pays immediately and can be walked back into. Garrisoning locks
-it, and garrisoning is what Phragmotic Guards do.** They are living doors, they
-already never hunt, and this is the first job that is theirs alone. A Guard spent
-holding a cell is a Guard not fighting.
+**Garrisoning decides who answers the door.** Held ground is nest, so anything
+walking into it starts a defence battle either way — the question is who fights
+it. **A garrisoned cell defends itself**; an ungarrisoned one pulls the home army
+out to the frontier, and the home army cannot be in two places.
+
+**That is what Phragmotic Guards are for.** They are living doors, they already
+never hunt, and this is the first job that is theirs alone: a Guard on a cell is
+the difference between a battle that resolves where it happens and one that drags
+the army across the map. A Guard spent holding is a Guard not fighting, so a long
+frontier is only as safe as it is garrisoned.
 
 That gives the four ranks distinct roles rather than bigger numbers: Guards hold,
 Supermajors take the deep cells, Majors are the field army, plain soldiers defend
@@ -288,16 +373,14 @@ on top compounds that instead of fixing it.
 
 ### Open, for the map
 
-- **Does a lost clearing attempt lose the whole detachment, or a share?** A share
-  matches how raids already work; the whole detachment makes distance genuinely
-  frightening.
-- **Can two monsters occupy one cell, or does the map cap them?** A cap makes the
-  board readable and makes "the board is full" a real failure state.
-- **Does territory decay?** If a held, ungarrisoned cell reverts on a timer,
-  Guards become mandatory rather than a choice, which is probably worse.
-- **What does the map look like before soldiers exist?** It should stay hidden
-  until 256 ants, like raids — but then the first sight of it is a board already
-  full of monsters, which may read as a loss rather than an opening.
+- **What is the per-cell foraging bonus, and what is `TIER`?** Together they
+  decide whether the map eventually becomes the whole game, because a merged
+  tier pays for ever and tiers do not stop. Measure before tuning anything else.
+- **Can the frontier be attacked in more than one place at once?** One battle at
+  a time is readable; several is what a long perimeter should actually feel like.
+- **Do soldiers in the field keep hunting protein?** They are out there, which
+  argues yes, and it makes a stranded detachment less pure loss.
+- **Region shapes.** Left to Gemini, and nothing mechanical depends on them.
 
 ---
 
