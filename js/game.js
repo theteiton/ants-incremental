@@ -958,7 +958,7 @@ export function doFlight() {
   flown[line] = (flown[line] || 0) + 1;
   game.stats.speciesFlights = flown;
 
-  refoundColony();
+  refoundColony(null, true);
   return earned;
 }
 
@@ -969,7 +969,10 @@ export function doFlight() {
 // against the line rather than the nest. So the board resets and the tier
 // count does not, which is what makes pushing a circle to completion worth
 // doing before flying.
-function refoundColony(extra) {
+// `keepFood` is opt-in and only the flight asks for it. Every other caller
+// founds a colony that genuinely starts from nothing, which is what a trial and
+// a matriline reset are FOR.
+function refoundColony(extra, keepFood) {
   const bankedTier = (game.hunt && game.hunt.tier) || 0;
   const surviving = {
     prestige: game.prestige,
@@ -999,7 +1002,7 @@ function refoundColony(extra) {
     trophies: game.trophies,
     trophyKills: game.trophyKills
   };
-  const keptFood = (game.food || 0) * instinctKeptFood(game);
+  const keptFood = keepFood ? (game.food || 0) * instinctKeptFood(game) : 0;
   Object.assign(game, blankGame());
   Object.assign(game, surviving, extra || {});
   touchBrood();

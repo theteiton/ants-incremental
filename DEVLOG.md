@@ -15,6 +15,30 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.3.0.2 — 31 August 2026
+
+**A trial was starting with a quarter of your food bank.**
+
+Living Memory keeps a share of the food standing when the colony is refounded.
+It is *"a daughter leaves with a full crop"* — written for the nuptial flight —
+but the effect lived inside `refoundColony()`, and the flight, entering a trial,
+abandoning one and a matriline reset all call that.
+
+Measured on a colony holding 3.97 million food: the flight kept 991,000, which
+is what it is for. **A matriline reset kept 991,000**, so committing to a new
+species began with a million food and no early game at all — which is what
+Teiton reported. **Entering a trial kept 991,000**, which is worse: a trial
+founds a colony under conditions meant to kill it, and it was starting with the
+bank intact. Every trial has been easier than the figures in the canon say.
+Abandoning one kept 6.3%, because the share compounded once per refound.
+
+Only the flight asks for it now. A trial and a matriline reset start from
+nothing, which is what they are for.
+
+**`resets.mjs` covers all four in one table** — what goes (ants, eggs, protein,
+food), what may stay (food, on a flight, through Living Memory) and what is
+banked against the line and can never be taken (merged circles, trophies).
+
 ## 0.3.0.1 — 31 August 2026
 
 **The Hunt and the Trophies pages were blank, and the tests were green.**

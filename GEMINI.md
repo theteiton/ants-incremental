@@ -526,6 +526,24 @@ likely to be lost, and the away report said nothing about it — it now carries
 held cells before and after, circles taken, and trophies picked up, with the
 frontier being pushed back called out by name.
 
+**An effect written for one caller must not live in the function four callers
+share.** Living Memory is *"a daughter leaves with a full crop"* — it is about
+the nuptial flight — and its share was applied inside `refoundColony()`, which
+the flight, entering a trial, abandoning one and a matriline reset all call.
+Measured on a colony holding 3.97e6 food: the flight kept 991,000, which is
+right; a matriline reset kept 991,000, so a fresh commitment to a species began
+with a million food; **entering a trial kept 991,000**, which defeats the whole
+idea of founding a colony under conditions that should kill it and made every
+trial far easier than the times recorded here; and abandoning one kept 6.3%,
+which is 0.25 squared, because the share compounded once per refound.
+`refoundColony(extra, keepFood)` takes it as an opt-in flag and only `doFlight()`
+asks.
+
+**`resets.mjs` checks what each of the four keeps.** The colony always goes — no
+ants, no eggs, no protein — food survives only a flight and only through Living
+Memory, and the banked things (merged circles, trophies) survive all four. Every
+reset in the game is now covered by one table.
+
 ---
 
 ## Prestige Layer 2 — the Matriline
