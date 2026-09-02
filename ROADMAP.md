@@ -5,7 +5,7 @@
 undecided, and every line of it is arguable until it lands. When something here
 ships, it moves into the canon files and comes out of this one.
 
-Last updated 29 August 2026, against 0.2.1.0.
+Last updated 31 August 2026, against 0.2.5.1.
 
 ---
 
@@ -168,6 +168,136 @@ was meant as one.
    Ladders every trial, runs 48 hours of a mastered colony, plays 24 hours of
    each species, and fails on an unreachable target, a NaN, or a population above
    its cap. Every one of those checks caught something real this time.
+
+---
+
+## 0.3.0.0 — The Hunt
+
+Chosen 31 August 2026. Five things were on the table and the map subsumes one of
+them, so it is four.
+
+### The number the whole release answers
+
+Measured across two hours of automated play, the colony's food budget is
+**foragers 79.4%, soldiers 15.8%, excavators 2.4%, nurses 2.3%, upgrades 0.1%**.
+Amdahl bounds a reward at `1/(1-f)` of the share it touches, so making the
+population cap free is worth **×1.02** and a free brood the same. Only the
+forager share is worth anything, at **×4.85**.
+
+That is why ten of twelve upgrade lines move nothing, why four of eight Instincts
+are near-inert, why twelve species nodes measured ×0.97, and why finishing a
+species is not felt in a growth run. **They all aim at the 20% that is not
+foragers.** It is also why the upgrade tab has no interesting decision: the whole
+upgrade system consumes one part in a thousand of the colony's food.
+
+### The idea
+
+Combat is a side system because soldiers buy nothing the colony grows on. Make
+**cleared ground multiply foraging** and the army becomes leverage on the 79.4%
+rather than a tax on it:
+
+> The colony's food rate scales with how much ground it holds, and holding
+> ground is what the army is for.
+
+This is the "second cost" the roadmap wanted, arrived at from the other side. It
+is better than an abstract foraging-distance penalty because it is a thing the
+player can see, and because it pays rather than punishes.
+
+### The map
+
+**6 sectors × 5 rings = 30 cells**, nest at the centre, drawn in `sprites.js`.
+A cell is empty, held, garrisoned or occupied. A new **Hunt** sub-tab under
+Combat.
+
+- Monster strength at ring `r` is `monsterPower() × DISTANCE_SCALE^r`, about
+  ×1.6 a ring, so the outer ring is ten times the inner. Reward scales the same
+  way. **Distance is the difficulty dial.**
+- Monsters advance one ring roughly every 90s. From ring 5 that is about seven
+  and a half minutes to the nest, deliberately near today's six-minute raid
+  cadence so the feel does not lurch.
+- **Reaching ring 0 is an assault**, which is the raid the game already resolves.
+  `monsterPower`, `DEATH_ORDER`, salvage and the four difficulty settings all
+  keep working underneath.
+
+### The two pressures
+
+**Defending** is what the game already does. Winning kills the nearest attacker
+and the rest press one ring closer, so defence alone never clears the board —
+which is what pushes the player out.
+
+**Clearing** is new. A detachment is sent to a cell, travels for a time
+proportional to the ring, and fights on arrival with only the soldiers sent.
+**Soldiers in the field cannot defend the nest.** That is the decision: push out
+to grow, or hold back to survive. Sending is a click; nothing dispatches an army
+on the player's behalf.
+
+### What ground pays, and what a Guard is for
+
+A cleared cell pays a foraging bonus weighted by its ring. Full control should
+land near **×2–×3 food** — inside the ×4.85 ceiling, and not so large it eats the
+upgrade tree.
+
+**A cleared cell pays immediately and can be walked back into. Garrisoning locks
+it, and garrisoning is what Phragmotic Guards do.** They are living doors, they
+already never hunt, and this is the first job that is theirs alone. A Guard spent
+holding a cell is a Guard not fighting.
+
+That gives the four ranks distinct roles rather than bigger numbers: Guards hold,
+Supermajors take the deep cells, Majors are the field army, plain soldiers defend
+and hunt. **No heroes** — the tiers are the whole RPG element, by decision.
+
+### Folding into what exists
+
+- `inHiding()` becomes **ceding ground**: no soldiers means monsters advance
+  freely and the ×0.5 stands, so the death spiral is still capped but now
+  visible on a map instead of being a line of text.
+- Hunting protein comes from held cells rather than from nowhere.
+- Save **v9**, migrating an existing colony to an empty map and zero held cells,
+  so nothing is lost and nothing is granted.
+
+### Blast radius: all three, as a sequence
+
+1. **Species-scoped first**, the way the garden proved the territory idea before
+   it was general.
+2. **Then a layer on top**, biting only past a colony size the current opening
+   never reaches, so the measured 1.2 / 3.1 / 7.1 / 22.8 / 41.4 / 60.9 / 87.9
+   is untouched.
+3. **Then rebalance the curves** into one economy, re-taking every pacing number
+   in the canon.
+
+Each step ships on its own and the risky one is last.
+
+### Order of the release
+
+1. **The regression harness into the repo.** Cheapest, and it protects
+   everything after it. It found all five layer-2 bugs, the three cap bypasses
+   and the founders' trap, and it dies with every session.
+2. **The Amdahl audit.** Re-aim the four cap/brood/hatch Instincts and the six
+   species passives at the forager share, the way the species nodes were fixed
+   in 0.2.5.0. Small and surgical.
+3. **The Hunt**, in the three stages above.
+4. **The three matriline trials.** Layer 2's missing length — 0.9 hours measured
+   against a 40-hour intent, and a trial is the only thing in this game that
+   takes real time. The Slave-Maker gets cheaper once territory capture exists.
+
+Also in, from the small pile: **sub-batch egg destroying** (open since Akami's
+report) and **Eciton's species-scoped flight gate**.
+
+**Not in: layer 3.** Layer 2 is 0.9 hours of a 40-hour intent, and a third layer
+on top compounds that instead of fixing it.
+
+### Open, for the map
+
+- **Does a lost clearing attempt lose the whole detachment, or a share?** A share
+  matches how raids already work; the whole detachment makes distance genuinely
+  frightening.
+- **Can two monsters occupy one cell, or does the map cap them?** A cap makes the
+  board readable and makes "the board is full" a real failure state.
+- **Does territory decay?** If a held, ungarrisoned cell reverts on a timer,
+  Guards become mandatory rather than a choice, which is probably worse.
+- **What does the map look like before soldiers exist?** It should stay hidden
+  until 256 ants, like raids — but then the first sight of it is a board already
+  full of monsters, which may read as a loss rather than an opening.
 
 ---
 
