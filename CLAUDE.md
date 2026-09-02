@@ -498,6 +498,32 @@ A trophy is what the line has ever beaten, like an achievement; a merged circle
 was taken permanently; the ground under a colony that has flown away is not its
 ground any more.
 
+**0.3.0.1 — two failures that shipped green, and the coverage holes behind
+them.** The Hunt and Trophies panels threw `fmtFactor is not defined` on every
+frame: `render()` died before either wrote anything, so the static headings
+showed and none of the live content did. **`tabs.mjs` clicked every sub-tab
+button without opening the tab it belonged to**, so `activeTab` was whatever had
+been clicked last, the dispatch skipped the branch, and neither render function
+had ever been executed by a test at all. Clicking a sub-tab proves nothing unless
+its tab is on screen.
+
+**`SAVE_VERSION` stayed at 8 while `SAVE_KEY` went to v9**, so every save was
+stamped version 8 and the v8-to-v9 migration fired on **every load**, wiping the
+board and every trophy each time the game was opened. `migrations.mjs` tested
+old-to-new and never new-to-new. It now asserts that the version the game stamps
+equals `SAVE_VERSION` and that `migrate()` on a current save is a no-op — and its
+old assertion was hard-coded to 8, which had gone stale the moment v9 landed, so
+it reads the constant now.
+
+**Both holes are the same shape: a test that exercises the setup but not the
+thing.** Each is now proven by breaking the code deliberately and watching the
+suite go red.
+
+**Coming back says what the ground did.** An absence is when territory is most
+likely to be lost, and the away report said nothing about it — it now carries
+held cells before and after, circles taken, and trophies picked up, with the
+frontier being pushed back called out by name.
+
 ---
 
 ## Prestige Layer 2 — the Matriline

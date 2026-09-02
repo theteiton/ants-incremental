@@ -1,5 +1,6 @@
 import { G, A, C, game, seed, reset, grantAllLineage, play } from "./harness.mjs";
 
+const { SAVE_VERSION } = await import("../js/save.js");
 const fails = [];
 console.log("=== A SAVE FROM EVERY VERSION STILL LOADS ===");
 // build a real v8 save, then strip it back to look like each older version
@@ -32,7 +33,11 @@ for (let v = 1; v <= 8; v++) {
     if (!Number.isFinite(game.food) || game.food < 0) bad.push("food " + game.food);
     if (!Number.isFinite(A.population(game))) bad.push("population");
     if (!Number.isFinite(A.foodPerSecond(game))) bad.push("food/s");
-    if (game.version !== 8) bad.push("version " + game.version);
+    // read from the module rather than typed in, so bumping the save shape
+    // does not silently leave this assertion behind -- it was hard-coded to 8
+    // and went stale the moment v9 landed
+    if (game.version !== SAVE_VERSION) bad.push("migrated to version " + game.version +
+      ", expected " + SAVE_VERSION);
     if (!game.matriline) bad.push("no matriline block");
     if (!Array.isArray(game.instincts)) bad.push("no instincts array");
     if (typeof game.challenges !== "object") bad.push("challenges not an object");
@@ -53,6 +58,36 @@ for (const junk of ["", "not a save", "e30=", Buffer.from('{"ants":null}').toStr
   try { out = G.importSave(junk); } catch (e) { threw = e.message; }
   console.log(`  ${JSON.stringify(junk.slice(0, 24)).padEnd(28)} -> ${threw ? "THREW: " + threw : out}`);
   if (threw) fails.push("garbage import threw: " + threw);
+}
+
+
+// A save written by the CURRENT game must never be migrated. SAVE_KEY was
+// bumped to v9 while SAVE_VERSION stayed at 8, so every save was stamped
+// version 8 and the v8 -> v9 migration fired on EVERY load, wiping the Hunt
+// board and every trophy each time the game was opened. This suite tested
+// old -> new and never tested new -> new.
+console.log("=== A CURRENT SAVE IS NEVER MIGRATED ===");
+{
+  const S2 = await import("../js/save.js");
+  G.hardReset();
+  G.shedWings();
+  const stamped = G.game.version;
+  const decoded = JSON.parse(decodeURIComponent(escape(atob(G.exportSave()))));
+  console.log("  the game stamps version " + stamped + ", SAVE_VERSION is " + S2.SAVE_VERSION);
+  if (stamped !== S2.SAVE_VERSION) {
+    fails.push("the game stamps version " + stamped + " but SAVE_VERSION is " +
+      S2.SAVE_VERSION + " -- every save is migrated on every load");
+  }
+  if (decoded.version !== S2.SAVE_VERSION) {
+    fails.push("an exported save says version " + decoded.version);
+  }
+  const copy = JSON.parse(JSON.stringify(decoded));
+  S2.migrate(copy);
+  console.log("  migrate() on a current save: " +
+    (copy.version === decoded.version ? "no-op, as it must be" : "IT MIGRATED IT"));
+  if (copy.version !== decoded.version) {
+    fails.push("migrate() changed a current save from " + decoded.version + " to " + copy.version);
+  }
 }
 
 console.log("\n--- failures ---");

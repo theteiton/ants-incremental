@@ -2,7 +2,7 @@ import { RAID_INTERVAL } from "./raids.js";
 
 export const SAVE_KEY = "ants_save_v9";
 export const LEGACY_SAVE_KEYS = ["ants_save_v8", "ants_save_v7", "ants_save_v6", "ants_save_v5", "ants_save_v4", "ants_save_v3", "ants_save_v2", "ants_save_v1"];
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 export const LOCK_KEY = "ants_lock";
 
 // the tab the player most recently opened owns the save; older tabs go quiet

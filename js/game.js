@@ -133,11 +133,11 @@ export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
 // a real import, not a re-export: speciesRatios is USED below, and a re-export
 // creates no local binding
 import { speciesRatios } from "./species.js";
-import { initHunt, huntTick, huntUnlocked, marchTick, mergeTier,
+import { initHunt, huntTick, huntUnlocked, marchTick, mergeTier, heldCells,
   SPAWN_SECONDS, ADVANCE_SECONDS } from "./hunt.js";
 // real imports, not re-exports: these are USED in tick() below
 import { monsterPower, raidsUnlocked as raidsOpen } from "./raids.js";
-import { awardTrophy } from "./trophies.js";
+import { awardTrophy, trophyCount } from "./trophies.js";
 export { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctsSpent, affordableInstincts,
   instinctBaseCap, instinctBrood, instinctCombat, instinctProtein, instinctHatch,
   instinctOfflineHours, instinctKeptFood } from "./instincts.js";
@@ -1401,7 +1401,12 @@ export function load() {
   const elapsed = Math.min(requested, cap);
   const before = { food: game.stats.foodEarned, protein: game.stats.proteinEarned,
     hatched: game.stats.eggsHatched, won: game.raidsWon, lost: game.raidsLost,
-    population: population(game), jelly: (game.prestige && game.prestige.royalJelly) || 0 };
+    population: population(game), jelly: (game.prestige && game.prestige.royalJelly) || 0,
+    // the ground, so the report can say what the frontier did while nobody was
+    // watching -- an absence is when territory is most likely to be lost
+    held: huntUnlocked(game) ? heldCells(game).length : 0,
+    tier: (game.hunt && game.hunt.tier) || 0,
+    trophies: trophyCount(game) };
   const step = Math.max(1, elapsed / 600);
   for (let done = 0; done < elapsed; done += step) {
     tick(Math.min(step, elapsed - done));
@@ -1416,6 +1421,12 @@ export function load() {
       hatched: game.stats.eggsHatched - before.hatched,
       won: game.raidsWon - before.won, lost: game.raidsLost - before.lost,
       popBefore: before.population, popAfter: population(game),
+      // what the ground did: held cells before and after, circles taken, and
+      // trophies picked up on the way
+      heldBefore: before.held, heldAfter: huntUnlocked(game) ? heldCells(game).length : 0,
+      tiers: ((game.hunt && game.hunt.tier) || 0) - before.tier,
+      trophies: trophyCount(game) - before.trophies,
+      onMap: huntUnlocked(game),
       hiding: !!game.hiding, seen: false };
   }
   return elapsed;

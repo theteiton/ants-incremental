@@ -198,6 +198,12 @@ import {
 import { drawSprite, spriteFor } from "./sprites.js";
 import { LIBRARY, LIBRARY_GROUPS, entryState, libraryCounts, libraryUnlocked,
   libraryUnread, UPDATES, latestVersion, updatesUnread } from "./library.js";
+// Everything renderHunt and renderTrophies actually USE. fmtFactor threw on
+// every frame, which killed render() before either panel wrote anything -- so
+// the static headings showed and none of the live content did.
+import { fmtFactor } from "./panels.js";
+import { RAID_UNLOCK } from "./raids.js";
+import { huntTerritory } from "./ants.js";
 import { huntUnlocked, heldCells, occupied, cellAt, cellName, cellPower,
   marchReady, sendMarch, recallMarch, CELLS, SECTORS, RINGS } from "./hunt.js";
 import { BANDS, MONSTERS, topGradeFor } from "./bestiary.js";
@@ -2185,7 +2191,8 @@ let awayAnim = null;
 
 function buildAwayReport() {
   const list = el("awayRows");
-  for (let i = 0; i < 6; i++) {
+  // eight, because the ground and the trophies added rows of their own
+  for (let i = 0; i < 8; i++) {
     const row = document.createElement("div");
     row.className = "away-row";
     row.innerHTML = '<span class="away-label"></span><b class="away-value"></b>';
@@ -2210,8 +2217,22 @@ function awayFigures(away) {
       " ants (" + (grew > 0 ? "+" : "") + fmt(grew) + ")"]);
   }
   if (away.won > 0 || away.lost > 0) {
-    rows.push(["Raids", () => away.won + " won, " + away.lost + " lost"]);
+    rows.push(["Raids", () => away.won + " won, " + away.lost + " lost" +
+      (away.lost > 0 ? " — a loss costs ants" : "")]);
   }
+  // What the ground did. An absence is when territory is most likely to be
+  // lost, and the report said nothing about it at all.
+  if (away.onMap) {
+    const moved = (away.heldAfter || 0) - (away.heldBefore || 0);
+    if (moved !== 0 || away.heldAfter > 0) {
+      rows.push(["Ground held", () => fmt(away.heldBefore || 0) + " → " + fmt(away.heldAfter || 0) +
+        " of " + CELLS + (moved < 0 ? " — the frontier was pushed back" : moved > 0 ? " — gained" : "")]);
+    }
+    if (away.tiers > 0) {
+      rows.push(["Circles taken", () => "+" + away.tiers + ", for good"]);
+    }
+  }
+  if (away.trophies > 0) rows.push(["Trophies taken", () => "+" + away.trophies]);
   return rows.slice(0, awayRows.length);
 }
 

@@ -27,13 +27,38 @@ for (const tab of TABS) {
   console.log(`  ${tab.padEnd(13)} ok`);
 }
 
-console.log("\n=== EVERY SUB-TAB ===");
-for (const bar of ["achievementTabs", "matTabs", "combatTabs", "settingsTabs", "libraryTabs", "upgradeFilters"]) {
+// EVERY SUB-TAB, WITH ITS PARENT TAB OPEN.
+//
+// This used to click the sub-tab buttons without opening the tab they belong
+// to -- so activeTab was whatever had been clicked last, render() skipped the
+// branch entirely, and the sub-panel's render function never ran at all. That
+// is how the Hunt and Trophies panels shipped throwing "fmtFactor is not
+// defined" on every frame with this suite green.
+//
+// Clicking a sub-tab proves nothing unless the tab it lives in is on screen.
+const SUB_BARS = {
+  achievementTabs: "achievements",
+  matTabs: "matriline",
+  combatTabs: "combat",
+  settingsTabs: "settings",
+  libraryTabs: "library",
+  upgradeFilters: "upgrades"
+};
+console.log("\n=== EVERY SUB-TAB, WITH ITS TAB OPEN ===");
+for (const [bar, parent] of Object.entries(SUB_BARS)) {
   const node = elementFor(bar);
   if (!node) { console.log(`  ${bar.padEnd(16)} (absent)`); continue; }
+  const open = elementFor("tabButton-" + parent);
   let n = 0;
-  for (const child of node.children) { tryIt(bar + " child " + n, () => child.fire("click")); n++; }
-  console.log(`  ${bar.padEnd(16)} ${n} buttons clicked`);
+  for (const child of node.children) {
+    if (open) tryIt("open " + parent, () => open.fire("click"));
+    tryIt(parent + " sub-tab " + n, () => child.fire("click"));
+    // twice, because a memoised render behaves differently on the frame after
+    // the one that built its nodes
+    if (open) tryIt(parent + " sub-tab " + n + " re-render", () => open.fire("click"));
+    n++;
+  }
+  console.log(`  ${bar.padEnd(16)} ${n} sub-tabs, each with ${parent} open`);
 }
 
 console.log("\n=== EVERY CARD IN EVERY LIST ===");

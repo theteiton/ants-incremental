@@ -15,6 +15,33 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.3.0.1 — 31 August 2026
+
+**The Hunt and the Trophies pages were blank, and the tests were green.**
+
+Both threw `fmtFactor is not defined` on every frame. `render()` died before
+either panel wrote anything, which is why the headings showed and nothing under
+them did.
+
+The reason it shipped is worse than the bug. **`tabs.mjs` clicked every sub-tab
+button without first opening the tab it lives in**, so `activeTab` was whatever
+had been clicked last, `render()` skipped the combat branch entirely, and
+`renderHunt` and `renderTrophies` had never been executed by any test. Clicking
+a sub-tab proves nothing unless its tab is on screen. Fixed, and proven by
+breaking the import again and watching the suite go red.
+
+**And every save was being migrated on every load.** `SAVE_VERSION` stayed at 8
+while `SAVE_KEY` went to v9, so saves were stamped 8 and the v8-to-v9 migration
+fired each time the game opened — wiping the board and every trophy. The
+migrations suite tested old saves loading and never tested that a *current* save
+is left alone. It does now. Its own version assertion was hard-coded to 8 and had
+gone stale the moment v9 landed, so it reads the constant instead.
+
+**Coming back says what the ground did.** Held cells before and after, circles
+taken, trophies picked up — and it names it plainly when the frontier has been
+pushed back. An absence is exactly when territory is most likely to be lost, and
+the report was silent about it.
+
 ## 0.3.0.0 — 31 August 2026
 
 **The Hunt: the ground around the nest, and what you keep from it.**
