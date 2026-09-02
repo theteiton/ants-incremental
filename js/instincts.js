@@ -21,10 +21,10 @@
 export const INSTINCTS = [
   { id: "inst_cap_1", name: "Deep Chambers", cost: 8,
     desc: "The line remembers how deep to dig. Base population cap +40.",
-    effect: { type: "baseCap", add: 40 } },
+    effect: { type: "baseCap", add: 40, also: { type: "eggCost", mult: 0.94 } } },
   { id: "inst_brood_1", name: "Wide Brood", cost: 14,
     desc: "More of the nest is nursery. +2 brood slots in every colony.",
-    effect: { type: "brood", add: 2 } },
+    effect: { type: "brood", add: 2, also: { type: "eggCost", mult: 0.93 } } },
   { id: "inst_combat", name: "Hard Carapace", cost: 20,
     desc: "Every generation is a little harder to break. Fighting strength ×1.5.",
     effect: { type: "combat", mult: 1.5 } },
@@ -33,10 +33,10 @@ export const INSTINCTS = [
     effect: { type: "protein", mult: 1.5 } },
   { id: "inst_hatch", name: "Quick Larvae", cost: 32,
     desc: "Brood that knows what it is becoming. Hatch speed ×1.25.",
-    effect: { type: "hatch", mult: 1.25 } },
+    effect: { type: "hatch", mult: 1.25, also: { type: "eggCost", mult: 0.93 } } },
   { id: "inst_cap_2", name: "Deeper Chambers", cost: 38,
     desc: "Galleries below the frost line. Base population cap +150.",
-    effect: { type: "baseCap", add: 150 } },
+    effect: { type: "baseCap", add: 150, also: { type: "eggCost", mult: 0.92 } } },
   { id: "inst_offline", name: "Full Crop", cost: 44,
     desc: "The colony works far longer without being watched. +8 hours of offline progress.",
     effect: { type: "offlineHours", add: 8 } },
@@ -86,14 +86,26 @@ function sum(game, type) {
 function product(game, type) {
   let total = 1;
   for (const i of INSTINCTS) {
-    if (i.effect.type !== type || !instinctOwned(game, i.id)) continue;
-    total *= i.effect.mult;
+    if (!instinctOwned(game, i.id)) continue;
+    if (i.effect.type === type && i.effect.mult !== undefined) total *= i.effect.mult;
+    const also = i.effect.also;
+    if (also && also.type === type && also.mult !== undefined) total *= also.mult;
   }
   return total;
 }
 
 export function instinctBaseCap(game) {
   return sum(game, "baseCap");
+}
+
+// What an egg costs, as a multiplier. Measured, the colony spends 79.4% of its
+// food on eggs and 2.4% on room, so this is the only lever an instinct has that
+// reaches the part of the loop that actually binds -- and it is not a global
+// food multiplier, which the design refuses: it lowers the sink rather than
+// raising the income, and it is self-limiting, because eggs approaching free
+// hands the constraint back to the cap and the brood.
+export function instinctEggCost(game) {
+  return product(game, "eggCost");
 }
 
 export function instinctBrood(game) {

@@ -1,15 +1,16 @@
 import {
-  instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours
+  instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours, instinctEggCost
 } from "./instincts.js";
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
-  speciesFoodCapPerAnt, dulosis, passiveOfflineHours, eggCostMultiplier
+  speciesFoodCapPerAnt, dulosis, passiveOfflineHours, eggCostMultiplier, passiveEggCost
 } from "./matriline.js";
 import { CHALLENGES, bestTrialLevel, challengeDebuff, challengeReward, masteryFood,
   siegeActive, SIEGE_UNLOCK, barrenActive, sealedActive, sterileActive,
   barrenHatchScale, sealedCapScale, sterileAllowance,
   callowActive, callowCrowding, masteryNanitic, naniticsImmortal,
+  blightThrottle, repletePerAnt, masteryOffline,
   masteryBrood, masteryCap, masteryUpgradeStrength, masteryUpgradeLevels } from "./challenges.js";
 import {
   prestigeFoodMultiplier,
@@ -798,21 +799,29 @@ export function gardenThrottle(game) {
 // Everything that takes food away, multiplied together. Trials plug in here,
 // and so does whatever comes after them.
 export function foodPenalty(game) {
-  return hidingPenalty(game) * challengeDebuff(game) * gardenThrottle(game);
+  // blightThrottle needs the headcount, which challenges.js cannot compute --
+  // it cannot import this file, because this file imports it
+  return hidingPenalty(game) * challengeDebuff(game) * gardenThrottle(game) *
+    blightThrottle(game, population(game));
 }
 
 // Myrmecocystus keeps its store in the bodies of living ants, so what the
 // colony can bank is set by how many of them there are and anything gathered
 // beyond it is lost. 0 means no cap, which is every other line.
 export function foodCap(game) {
-  const per = speciesFoodCapPerAnt(game);
+  // the trial and the species do the same thing; the trial wins where both
+  // apply, because it is the harder of the two and it is what is being tested
+  const per = repletePerAnt(game) || speciesFoodCapPerAnt(game);
   return per > 0 ? per * Math.max(1, population(game)) : 0;
 }
 
 // Myrmecocystus banks its own passive here too -- the social stomach is what
 // keeps the colony working while nobody is watching.
+// masteryOffline is what clearing the Repletes pays: the colony that learned to
+// hang its food from the ceiling keeps working longer while nobody is watching.
 export function offlineCapSeconds(game) {
-  return (8 + passiveOfflineHours(game) + instinctOfflineHours(game)) * 3600;
+  return (8 + passiveOfflineHours(game) + instinctOfflineHours(game)) *
+    masteryOffline(game) * 3600;
 }
 
 export function bigForagerThreshold(game) {
@@ -953,7 +962,8 @@ export function eggCurve(game, casteId) {
 // they would otherwise disagree the moment a species cheapened the brood, which
 // is exactly how the cost and the "lay max" preview drifted apart before.
 function eggBase(game, curve) {
-  return curve.base * (game ? eggCostMultiplier(game) : 1);
+  if (!game) return curve.base;
+  return curve.base * eggCostMultiplier(game) * instinctEggCost(game) * passiveEggCost(game);
 }
 
 export function eggPrice(casteId, n, game) {

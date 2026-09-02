@@ -64,7 +64,10 @@ export const SPECIES = [
     activeText: "Foragers bring leaves rather than food, and only the fungus garden turns leaves into food. Gathering more than the garden can turn over wastes the rest, and nurses are what widen it — so food stops being the thing you are short of.",
     passiveName: "Gongylidia",
     passiveText: "The colony knows how to grow a nutrient-rich hyphal tip. A share of eggs are fed without spending protein.",
-    passive: { kind: "feedFree", add: 0.25 },
+    // feedFree alone measured x0.99 to a growth run: protein is not what the
+    // colony is short of. The garden feeds the brood as well as the colony, so
+    // it also cheapens an egg, which is where 79.4% of the food goes.
+    passive: { kind: "feedFree", add: 0.25, eggCost: 0.92 },
     active: { garden: true },
     // Measured across an hour: 5% nurses reaches 1,433 ants, 15% reaches 3,551
     // and 20% reaches 3,647. 15% rather than her raw peak, because at 20% she

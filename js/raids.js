@@ -8,6 +8,7 @@ import {
 } from "./matriline.js";
 import { masterySoldier, bestTrialLevel, siegeActive, siegeThreatScale, challengeFailed,
   SIEGE_UNLOCK, SIEGE_INTERVAL, SIEGE_REFERENCE, SIEGE_BASE, SIEGE_LOSS_CAP,
+  masteryLosses, masteryCapture,
   SIEGE_RAMP } from "./challenges.js";
 
 export const RAID_UNLOCK = 256;
@@ -491,7 +492,8 @@ function captureBrood(game) {
   // Polyergus has no other way to grow at all -- measured, 21 ants after an
   // hour and a death spiral, because two captures a raid could not build an
   // army fast enough to keep winning them.
-  const want = Math.max(CAPTURE_FLOOR, Math.floor(population(game) * share));
+  const want = Math.max(CAPTURE_FLOOR,
+    Math.floor(population(game) * share * masteryCapture(game)));
   // A raided nest is a whole nest, so what comes back includes its diggers --
   // and it has to. Under dulosis no excavator can ever be laid, so without
   // captured ones the cap sits at its base for ever: measured, 30 ants in a
@@ -544,7 +546,8 @@ export function resolveRaid(game) {
 
   const shortfall = Math.min(1, (power - defence) / power);
   const cap = siegeActive(game) ? SIEGE_LOSS_CAP : LOSS_CAP;
-  const toll = Math.max(1, Math.floor(population(game) * cap * shortfall * speciesLossMult(game)));
+  const toll = Math.max(1, Math.floor(population(game) * cap * shortfall *
+    speciesLossMult(game) * masteryLosses(game)));
   const dead = killAnts(game, toll);
   const salvage = Math.round(reward.protein * (defence / power) * passiveSalvage(game));
   game.protein += salvage;

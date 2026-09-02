@@ -5,7 +5,7 @@
 undecided, and every line of it is arguable until it lands. When something here
 ships, it moves into the canon files and comes out of this one.
 
-Last updated 31 August 2026, against 0.2.5.1.
+Last updated 31 August 2026, against 0.2.6.0.
 
 ---
 
@@ -59,10 +59,11 @@ feature-complete rather than layer-complete.
 
 ---
 
-## Next: the three matriline trials
+## Built in 0.2.6.0: the three matriline trials
 
-Specced but not built. Same rule as layer 1: each takes one thing away and gives
-that same thing back.
+**Built and measured in 0.2.6.0.** Kept here because the reasoning is worth
+reading next to the rest of the plan; the measured figures live in the canon.
+Same rule as layer 1: each takes one thing away and gives that same thing back.
 
 **None of the three pays a global food multiplier**, deliberately. Deep Cisterns
 is the one mastery with *f* = 1 and it silently broke three of six trials until
@@ -354,19 +355,12 @@ Each step ships on its own and the risky one is last.
 
 ### Order of the release
 
-1. **The regression harness into the repo.** Cheapest, and it protects
-   everything after it. It found all five layer-2 bugs, the three cap bypasses
-   and the founders' trap, and it dies with every session.
-2. **The Amdahl audit.** Re-aim the four cap/brood/hatch Instincts and the six
-   species passives at the forager share, the way the species nodes were fixed
-   in 0.2.5.0. Small and surgical.
-3. **The Hunt**, in the three stages above.
-4. **The three matriline trials.** Layer 2's missing length — 0.9 hours measured
-   against a 40-hour intent, and a trial is the only thing in this game that
-   takes real time. The Slave-Maker gets cheaper once territory capture exists.
+**Shipped in 0.2.6.0**, and out of this file: the regression harness, the
+Amdahl audit, the three matriline trials, sub-batch egg destroying and Eciton's
+species-scoped flight gate. What they measured is in the canon.
 
-Also in, from the small pile: **sub-batch egg destroying** (open since Akami's
-report) and **Eciton's species-scoped flight gate**.
+**Left for 0.3.0.0: the Hunt**, in the three stages above, and nothing else.
+It is the whole release now.
 
 **Not in: layer 3.** Layer 2 is 0.9 hours of a 40-hour intent, and a third layer
 on top compounds that instead of fixing it.

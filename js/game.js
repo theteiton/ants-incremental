@@ -81,11 +81,15 @@ import {
   challengeProgress,
   sterileActive,
   callowActive,
+  blightActive,
+  blightRate,
+  masteryLosses,
+  BLIGHT_SEED,
   CHALLENGE_TARGET
 } from "./challenges.js";
 import {
   GENERIC, SPECIES, currentSpecies, speciesById, checkSpeciesFinished,
-  matrilineReady, matrilineJellyNeeded, matrilineVisible, matrilineCount,
+  matrilineReady, matrilineJellyNeeded, matrilineVisible, matrilineCount, speciesFlightGate,
   haplotypeEarned, haplotype, jellyBanked, jellyKept, inheritedPrestige,
   matrilineUpgradeById, matrilineUpgradeOwned, LINEAGE_COST,
   speciesProteinCostMult, passiveFeedFree, dulosis, gardenActive,
@@ -796,6 +800,13 @@ export function exile(casteId, count) {
   if (!(allowed > 0)) return 0;
   game.ants[casteId] -= allowed;
   game.stats.exiled += allowed;
+  // Under the Blight, exiling is the cure and the only one. The ants carried out
+  // are the sick ones first -- a colony that can tell which of its workers the
+  // fungus has is doing the one thing this trial is about -- so the count falls
+  // by what was taken, never below nothing.
+  if (blightActive(game) && game.run) {
+    game.run.infected = Math.max(0, (game.run.infected || 0) - allowed);
+  }
   return allowed;
 }
 
@@ -829,7 +840,10 @@ export function trainSoldiers(index, count) {
   game.protein -= n * to.cost;
   game.ants[from.id] -= n;
   let lost = 0;
-  for (let i = 0; i < n; i++) if (Math.random() < to.loss) lost++;
+  // Metapleural Gland shrinks this too. The mastery says every kind of ant
+  // loss, and a moult gone wrong is one.
+  const chance = to.loss * masteryLosses(game);
+  for (let i = 0; i < n; i++) if (Math.random() < chance) lost++;
   game.ants[to.id] = (game.ants[to.id] || 0) + (n - lost);
   game.stats.trainingDeaths = (game.stats.trainingDeaths || 0) + lost;
   game.stats.trained = (game.stats.trained || 0) + (n - lost);
@@ -882,12 +896,19 @@ export function hardReset() {
 // No flying out of a trial. doFlight() refounds the colony, which would clear
 // game.challenge as a side effect -- so a colony that pushed past 1,000 inside
 // a trial could leave it through the Nuptial tab and be paid jelly for it.
+// The gate a species with a hard cap is held to, which is the flat figure for
+// everyone else. One source, so the milestone line, the Nuptial tab and the
+// flight itself cannot disagree about what it takes.
+export function flightGate(game) {
+  return speciesFlightGate(game, PRESTIGE_UNLOCK);
+}
+
 export function flightReady() {
-  return !challengeActive(game) && population(game) >= PRESTIGE_UNLOCK;
+  return !challengeActive(game) && population(game) >= flightGate(game);
 }
 
 export function flightReward() {
-  return royalJellyEarned(game, population(game), achievementJellyBonus(game));
+  return royalJellyEarned(game, population(game), achievementJellyBonus(game), flightGate(game));
 }
 
 export function doFlight() {
@@ -1228,6 +1249,19 @@ export function tick(dt) {
       game.eggs.splice(i, 1);
       touchBrood();
     }
+  }
+
+  // The Blight. Infection grows on the infected and on the share it already
+  // holds, so it compounds -- and it is capped at the live headcount, because
+  // exiling is a cure and the count must fall with the colony rather than
+  // outliving the ants it was counting.
+  if (blightActive(game)) {
+    const run = game.run || (game.run = {});
+    const pop = population(game);
+    if (!(run.infected > 0)) run.infected = Math.min(pop, BLIGHT_SEED);
+    const share = pop > 0 ? run.infected / pop : 0;
+    run.infected = Math.min(pop, run.infected + blightRate(game) * run.infected * (1 + share) * dt);
+    run.population = pop;
   }
 
   if (!game.naniticsDied && game.runTime >= naniticLifespan(game) && game.ants.nanitic > 0) {

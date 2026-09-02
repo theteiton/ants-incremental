@@ -90,8 +90,8 @@ export const JELLY_EXPONENT = 0.8;
 // paid exactly 1 whatever the colony did: tripling a run from 1,000 to 3,000
 // ants moved the raw value from 1.00 to 1.73 and still rounded to 1, so
 // pushing a run was punished and the whole tree took 35 identical flights.
-export function royalJellyEarned(game, population, jellyBonus) {
-  if (population < PRESTIGE_UNLOCK) return 0;
+export function royalJellyEarned(game, population, jellyBonus, gate) {
+  if (population < (gate || PRESTIGE_UNLOCK)) return 0;
   const raw = JELLY_SCALE *
     Math.pow(population / PRESTIGE_UNLOCK, JELLY_EXPONENT) *
     (1 + (game.raidsWon || 0) / 20) *

@@ -22,13 +22,56 @@ export const TARGET_KINDS = {
   // a trial about holding output up over time cannot be measured on a rate,
   // which a handful of ants meets in the first minute
   runFood: { noun: "food", verb: "Gather", gerund: "gathering",
-    of: "with this one colony", scalesWithFood: true }
+    of: "with this one colony", scalesWithFood: true },
+  // the repletes are asked for food STANDING rather than food gathered: the
+  // whole trial is that there is nowhere to put it, so banking it is the test
+  banked: { noun: "food banked at once", verb: "Bank", gerund: "banking",
+    of: "in the bodies of living ants", scalesWithFood: true }
 };
 
 // A trial can be LOST as well as won. Declared per trial so the next ones can
 // each fail in their own way, and read from the colony rather than stored --
 // there is no separate failure flag to keep in step with the save.
+// ---------------------------------------------------------- the three matriline
+// trials. Same rule as layer 1: each takes one thing away and gives that same
+// thing back. None of the three pays a global food multiplier -- Deep Cisterns
+// is the only mastery with f = 1 and it silently broke three trials once.
+
+// The Blight. Ophiocordyceps unilateralis, which is real and does exactly this.
+// Infection grows on the infected, so it compounds -- and exiling is the only
+// cure, which is what makes a button nobody presses into the core loop of a
+// trial without inventing a mechanic for it.
+export const BLIGHT_RATE = 0.0016;        // per infected ant per second
+export const BLIGHT_SEED = 3;             // infected on the day the trial opens
+export const BLIGHT_CEILING = 0.62;       // this share infected ends the run
+export const BLIGHT_HOLD = 0.35;          // and the target must be met under this
+export const BLIGHT_SCALE = 1.34;         // per level
+export const BLIGHT_TARGET = 500;
+
+// The Slave-Maker. Polyergus, which raids other nests for brood and cannot feed
+// itself. The mechanic is already built as her active; this applies the same
+// rewrite to whatever species is playing.
+export const DULOSIS_TARGET = 300;
+// What a won raid captures, as a share of the colony -- the trial has to grant
+// this, because dulosis without capture cannot grow by a single ant. It shrinks
+// with each attempt, which is where the difficulty lives.
+export const DULOSIS_CAPTURE = 0.05;
+export const DULOSIS_SCALE = 0.78;
+
+// The Repletes. Myrmecocystus, whose repletes hang from the ceiling as living
+// jars. Also already built as an active, and measured -- 800 per ant is where
+// the store sits full without blocking upgrades.
+export const REPLETE_PER_ANT = 800;
+export const REPLETE_SCALE = 0.62;        // per level
+export const REPLETE_TARGET_FOOD = 400000;
+
 export const FAIL_KINDS = {
+  blight: {
+    test: game => blightShare(game) >= BLIGHT_CEILING,
+    rule: "The colony falls when the infected are " +
+      Math.round(100 * BLIGHT_CEILING) + "% of it. Exiling is the only cure.",
+    lost: "The fungus has the nest. Abandon the trial to found a clean colony."
+  },
   raidLost: {
     test: game => (game.raidsLost || 0) > 0,
     rule: "One defeat ends it. The line holds for every attack or the trial is lost.",
@@ -256,6 +299,49 @@ export const CHALLENGES = [
     plan: ""
   },
   {
+    id: "blight",
+    name: "The Blight",
+    open: true,
+    kind: "blight",
+    matriline: true,
+    flavour: "A fungus takes the workers one at a time. It grows in them, steers them, and puts them where its spores will carry furthest. Ophiocordyceps unilateralis, which does exactly this and is not invented.",
+    debuff: "An infection spreads through the colony and grows on itself. An infected ant gathers nothing, and exiling her is the only cure.",
+    // it takes ants, so it gives back every ant you would otherwise lose
+    target: { kind: "population", amount: BLIGHT_TARGET },
+    fail: "blight",
+    mastery: { type: "losses", step: 0.72, name: "Metapleural Gland",
+      desc: "What the colony learned from the Blight. Every level of it cuts every kind of ant loss -- raids, training, all of it -- for good." },
+    plan: ""
+  },
+  {
+    id: "dulosis",
+    name: "The Slave-Maker",
+    open: true,
+    kind: "dulosis",
+    matriline: true,
+    flavour: "She cannot feed herself. Her mandibles are sabres, good for one thing, and the nest is run entirely by workers she stole as brood. Polyergus.",
+    debuff: "No worker caste can be laid at all. Only soldiers -- and every worker in the nest is one you captured.",
+    // it denies you a workforce, so it gives you one that never leaves
+    target: { kind: "population", amount: DULOSIS_TARGET },
+    mastery: { type: "capture", step: 1.6, name: "Dulotic Instinct",
+      desc: "What the colony learned raiding. Every level of it captures more from a won raid, in every colony afterwards." },
+    plan: ""
+  },
+  {
+    id: "repletes",
+    name: "The Repletes",
+    open: true,
+    kind: "repletes",
+    matriline: true,
+    flavour: "There is nowhere to put it. Some of the workers swell until they cannot walk and hang from the ceiling as living jars, and that is the whole granary. Myrmecocystus.",
+    debuff: "Food cannot be banked above what the living ants can hold, and each attempt gives them less room.",
+    // it denies you a store, so it gives you the longest store there is
+    target: { kind: "banked", amount: REPLETE_TARGET_FOOD },
+    mastery: { type: "offline", step: 1.5, name: "Social Stomach",
+      desc: "What the colony learned hanging from the ceiling. Every level of it lengthens how long the colony keeps working while nobody is watching." },
+    plan: ""
+  },
+  {
     id: "sealed",
     name: "Sealed Nest",
     open: true,
@@ -412,6 +498,81 @@ export function sterileActive(game) {
 
 export function callowActive(game) {
   return challengeKind(game) === "callow";
+}
+
+export function blightActive(game) {
+  return challengeKind(game) === "blight";
+}
+
+export function dulosisTrial(game) {
+  return challengeKind(game) === "dulosis";
+}
+
+// A won raid brings brood home, and under this trial that is the ONLY way the
+// colony grows. Shrinks with each attempt.
+export function dulosisCapture(game) {
+  if (!dulosisTrial(game)) return 0;
+  const level = Math.min(challengeLevel(game, "dulosis"), CHALLENGE_MAX_LEVEL - 1);
+  return DULOSIS_CAPTURE * Math.pow(DULOSIS_SCALE, level);
+}
+
+export function repleteActive(game) {
+  return challengeKind(game) === "repletes";
+}
+
+// ------------------------------------------------------------------ the Blight
+//
+// The infection grows ON the infected, so it compounds, and it grows faster the
+// larger a share of the colony it already holds. That shape is what makes
+// exiling worth doing early and hopeless late.
+export function blightCount(game) {
+  return Math.max(0, (game.run && game.run.infected) || 0);
+}
+
+// The headcount is passed in where the caller has it, and read from the last
+// tick where it does not -- challenges.js cannot import ants.js, because ants.js
+// imports this file.
+export function blightShare(game, pop) {
+  if (!blightActive(game)) return 0;
+  const total = pop === undefined ? ((game.run && game.run.population) || 0) : pop;
+  if (!(total > 0)) return 0;
+  return Math.min(1, blightCount(game) / total);
+}
+
+// how fast it spreads, steepening with each attempt
+export function blightRate(game) {
+  const level = Math.min(challengeLevel(game, "blight"), CHALLENGE_MAX_LEVEL - 1);
+  return BLIGHT_RATE * Math.pow(BLIGHT_SCALE, level);
+}
+
+// an infected ant gathers nothing, so the colony produces what is left of it
+export function blightThrottle(game, pop) {
+  if (!blightActive(game)) return 1;
+  return Math.max(0, 1 - blightShare(game, pop));
+}
+
+// What the repletes can hold per ant, shrinking with each attempt.
+export function repletePerAnt(game) {
+  if (!repleteActive(game)) return 0;
+  const level = Math.min(challengeLevel(game, "repletes"), CHALLENGE_MAX_LEVEL - 1);
+  return REPLETE_PER_ANT * Math.pow(REPLETE_SCALE, level);
+}
+
+// ---------------------------------------------------------------- the masteries
+//
+// Each gives back exactly what its trial took. None of them multiplies all food.
+export function masteryLosses(game) {
+  // a SHRINKING multiplier: 0.72 per level cleared, floored so it can never
+  // make a loss into a gain
+  return Math.max(0.05, masteryOf(game, "losses"));
+}
+
+export function masteryCapture(game) {
+  return masteryOf(game, "capture");
+}
+
+export function masteryOffline(game) {
+  return masteryOf(game, "offline");
 }
 
 // How much faster the generation fades for being crowded. Every founder shortens
@@ -576,6 +737,7 @@ export function challengeProgress(game, values) {
   if (kind === "raids") return game.raidsWon || 0;
   if (kind === "foodRate") return (values && values.foodRate) || 0;
   if (kind === "runFood") return (values && values.runFood) || 0;
+  if (kind === "banked") return game.food || 0;
   return (values && values.population) || 0;
 }
 

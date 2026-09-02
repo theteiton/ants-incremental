@@ -14,7 +14,7 @@ import {
   speciesFinished, passiveOf, activeValue, activeIs
 } from "./species.js";
 import { PRESTIGE_UPGRADES } from "./prestige.js";
-import { CHALLENGES, speciesTrialLevel } from "./challenges.js";
+import { CHALLENGES, speciesTrialLevel, dulosisTrial, dulosisCapture } from "./challenges.js";
 
 // what the whole Royal Lineage costs, which is the cap on what Retained
 // Royalty can hand the next matriline -- at most the tree, never a snowball
@@ -339,6 +339,18 @@ export function passiveSalvage(game) {
   return passiveOf(game, "salvage", passiveScale(game));
 }
 
+// What a finished species' passive takes off the egg price, multiplied across
+// all of them. Not passiveOf(), which sums or scales a named kind -- this is a
+// second effect hanging off a passive of any kind, so it is walked directly.
+export function passiveEggCost(game) {
+  let total = 1;
+  for (const s of SPECIES) {
+    if (!s.passive || !s.passive.eggCost || !speciesFinished(game, s.id)) continue;
+    total *= s.passive.eggCost;
+  }
+  return total;
+}
+
 // ------------------------------------------------------- the active wrappers
 
 export function gardenActive(game) {
@@ -395,12 +407,27 @@ export function nomadCap(game) {
   return activeValue(game, "nomadCap", 0) * activeMult(game, "nomadCapMult");
 }
 
+// What this colony must reach to take the nuptial flight. A species with a hard
+// ceiling is asked for half of it instead of the flat figure, because it cannot
+// simply grow past a gate the way an uncapped colony can.
+export const NOMAD_FLIGHT_SHARE = 0.5;
+
+export function speciesFlightGate(game, standard) {
+  const cap = nomadCap(game);
+  if (!(cap > 0)) return standard;
+  return Math.min(standard, Math.round(cap * NOMAD_FLIGHT_SHARE));
+}
+
 export function speciesRaidIntervalMult(game) {
   return activeValue(game, "raidIntervalMult", 1) * activeMult(game, "raidIntervalNode");
 }
 
+// The Slave-Maker grants the same capture the species has, because dulosis
+// without it is a colony that cannot grow by a single ant -- measured, 30 ants
+// after ninety minutes at every level, which is the Polyergus bug again.
 export function speciesCapture(game) {
-  return activeValue(game, "capture", 0) * activeMult(game, "captureMult");
+  const own = activeValue(game, "capture", 0);
+  return Math.max(own, dulosisCapture(game)) * activeMult(game, "captureMult");
 }
 
 export function speciesHuntMult(game) {
@@ -408,7 +435,9 @@ export function speciesHuntMult(game) {
 }
 
 export function dulosis(game) {
-  return activeIs(game, "dulosis");
+  // the species has it as an active; the trial applies the same rewrite to
+  // whatever species happens to be playing, which is what makes it cheap
+  return activeIs(game, "dulosis") || dulosisTrial(game);
 }
 
 export function speciesFoodCapPerAnt(game) {

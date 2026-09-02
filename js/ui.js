@@ -101,6 +101,7 @@ import {
   layEggs,
   load,
   PRESTIGE_UNLOCK,
+  flightGate,
   PRESTIGE_UPGRADES,
   prestigeUpgradeOwned,
   proteinUnlocked,
@@ -330,7 +331,10 @@ function milestoneText() {
   // reads the run high-water mark, the same figure the gates themselves read,
   // so a lost raid never walks the milestone backwards
   const reach = runPeakCount(game, "population");
-  const next = MILESTONES.find(milestone => reach < milestone.at);
+  const gate = flightGate(game);
+  const next = MILESTONES
+    .map(m => m.at === PRESTIGE_UNLOCK ? { at: gate, text: m.text } : m)
+    .find(milestone => reach < milestone.at);
   if (next) {
     return "Next milestone at " + fmt(next.at) + " ants — " + next.text +
       " " + fmt(reach) + " so far, " + fmt(next.at - reach) + " to go.";
@@ -1254,14 +1258,18 @@ function renderPrestige() {
   const projected = flightReward();
   el("btnFlight").disabled = !ready;
   const perHour = jellyPerHour(projected, game.runTime || 0);
+  // the gate, not the flat figure: a species with a hard ceiling is held to half
+  // of it, and a tab saying 1,000 while the button unlocks at 700 is worse than
+  // no number at all
+  const gate = flightGate(game);
   el("flightYield").textContent = ready
-    ? "Colony is mature (" + fmt(pop) + " / " + fmt(PRESTIGE_UNLOCK) + " ants) — taking flight now yields +" +
+    ? "Colony is mature (" + fmt(pop) + " / " + fmt(gate) + " ants) — taking flight now yields +" +
       fmt(projected) + " Royal Jelly" +
       (perHour > 0 ? ", which is " + fmt(perHour) + " an hour for this colony so far." : ".")
     : activeChallenge(game)
       ? "The queen cannot fly out of a trial. Claim or abandon " +
         activeChallenge(game).name + " on the Trials tab first."
-      : "Colony needs " + fmt(PRESTIGE_UNLOCK) + " ants to take flight (currently " + fmt(pop) + ").";
+      : "Colony needs " + fmt(gate) + " ants to take flight (currently " + fmt(pop) + ").";
 
   // the tree is finite, and running out of it should read as the edge of what
   // is built rather than as something broken
@@ -2111,6 +2119,22 @@ function waitingRuns(limit) {
   return runs;
 }
 
+// How many eggs at most, counted outward from the egg that was picked. Empty,
+// zero or unreadable means no limit, which is what the window did before this
+// existed -- runs were the unit, so a 400-egg batch went whole or not at all and
+// trimming a queue to length was impossible.
+//
+// It counts from the PICK rather than from the end of the range, because the
+// pick is the thing the player is pointing at: reaching backwards takes the
+// picked egg and the next n behind it, reaching forwards takes the picked egg
+// and the n ahead of it.
+function broodLimit() {
+  const raw = el("broodLimit").value.trim();
+  if (!raw) return 0;
+  const n = parseAmount(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
 // the stretch of the queue the current scope allows to be taken
 function broodRegion() {
   return { first: broodScope() === "all" ? 0 : tendedCount(), last: game.eggs.length - 1 };
@@ -2132,8 +2156,16 @@ function broodRange() {
   const region = broodRegion();
   if (!pick || region.last < region.first) return null;
   if (pick.to < region.first) return null;   // a tended egg while the scope protects them
-  const from = broodDirection() === "back" ? Math.max(pick.from, region.first) : region.first;
-  const to = broodDirection() === "back" ? region.last : Math.min(pick.to, region.last);
+  let from = broodDirection() === "back" ? Math.max(pick.from, region.first) : region.first;
+  let to = broodDirection() === "back" ? region.last : Math.min(pick.to, region.last);
+  if (to < from) return null;
+  // trim to the limit, from the picked end -- so "at most 10" reaching back
+  // takes the picked egg and nine behind it, not ten from the far end
+  const limit = broodLimit();
+  if (limit > 0 && to - from + 1 > limit) {
+    if (broodDirection() === "back") to = from + limit - 1;
+    else from = to - limit + 1;
+  }
   return to >= from ? { from, to } : null;
 }
 
@@ -2231,6 +2263,9 @@ function updateBroodDialog() {
 
   el("broodScope").value = broodScope();
   el("broodDirection").value = broodDirection();
+  if (document.activeElement !== el("broodLimit")) {
+    el("broodLimit").value = game.settings.broodLimit || "";
+  }
 
   const count = range ? range.to - range.from + 1 : 0;
   el("broodPlan").textContent = range
@@ -2285,6 +2320,10 @@ el("broodScope").onchange = event => {
 };
 el("broodDirection").onchange = event => {
   setSetting("broodDirection", event.target.value);
+  updateBroodDialog();
+};
+el("broodLimit").oninput = event => {
+  setSetting("broodLimit", event.target.value.trim());
   updateBroodDialog();
 };
 el("tutorialSkip").onclick = () => { dismissTutorial(); render(); };

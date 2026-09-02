@@ -15,6 +15,51 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.2.6.0 — 31 August 2026
+
+**The harness moves into the repo, and five rewards that paid nothing start
+paying.**
+
+**`node test/run.mjs` is the gate.** Twenty suites, twenty-eight seconds, plain
+node with no dependencies and no build step. It used to be a scratch directory
+that died with the session, so every check had to be rebuilt before it could be
+re-run — and between them these suites had already caught all five of layer 2's
+bugs, three population-cap bypasses, the founders'-chambers trap and two buttons
+painted their own background colour. `test/` never ships: it is not in the
+itch.io zip and `index.html` does not load it.
+
+**`pacing` is the suite that matters when balance moves.** It plays the ordinary
+run on a fixed seed and fails when any milestone drifts more than 10%. It
+reproduces the recorded idle row exactly. Nothing in this release moved it: every
+milestone is inside 1.4%, most at 0.0%.
+
+**Three matriline trials.** The Blight, the Slave-Maker and the Repletes —
+layer 2's missing length. Measured at levels 1 / 3 / 5: Blight 29.7 / 26.4 /
+46.9m, Slave-Maker 73.0 / 61.0 / 55.3m, Repletes 40.9 / 31.5 / 89.0m.
+
+Two of them were broken in ways worth recording. **The Slave-Maker was
+unwinnable** — 30 ants after ninety minutes at every level — because dulosis
+means no excavator can ever be laid, so nothing raised the cap. That is the
+Polyergus bug again: the trial borrowed her restriction without the capture that
+makes it survivable. And **the Blight was not broken at all; the measurement
+was.** It read LOST at levels 3 and 5 through three retunings, because the
+simulated player never exiled and exiling is the Blight's only cure. A trial
+whose loop is a player action cannot be measured by a policy that never takes it.
+
+**Five rewards that paid nothing now pay.** Measured, all eight instincts and all
+six species passives moved a growth run by ×0.98–×1.00. Four of the instincts are
+correctly scoped to combat, protein and the offline cap, which a one-hour
+measurement cannot see; the five that claimed to grow the colony and did not now
+also cheapen an egg. Deep Chambers ×1.035, Quick Larvae ×1.042, Wide Brood
+×1.062, Deeper Chambers ×1.069, Gongylidia ×1.086.
+
+**Eciton can fly on her own terms.** Her nomadic cap was 1,400 purely to clear a
+1,000-ant gate. The gate is half a hard cap now, so she flies at 700 — and
+earns less for it, because the payout still divides by the flat figure. The
+payout function returned zero below that figure and would have paid her nothing.
+
+**Destroying takes a count**, not only a whole batch. Open since Akami's report.
+
 ## 0.2.5.1 — 31 August 2026
 
 **Two buttons nobody could read, in any theme.**

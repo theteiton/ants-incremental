@@ -336,6 +336,16 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.2.6.0", name: "Three new trials, and rewards that finally pay",
+    changes: [
+      "Three new trials, and these ones are asked of every matriline. The Blight: a fungus spreads through the colony, an infected ant gathers nothing, and carrying her out is the only cure \u2014 so exiling, which you have probably never once used, becomes the whole loop. Clearing it means every ant you lose anywhere, to anything, you lose fewer of.",
+      "The Slave-Maker: no worker caste can be laid at all, only soldiers, and every worker in the nest is one you captured. Clearing it means a won raid brings brood home in every colony afterwards.",
+      "The Repletes: food cannot be banked above what your living ants can physically hold, and each attempt gives them less room. Clearing it means the colony keeps working for longer while you are away.",
+      "Five things you had bought were doing nothing. Deep Chambers, Deeper Chambers, Wide Brood, Quick Larvae and the Leafcutter\u0027s Gongylidia all paid in room or in protein \u2014 and a colony is almost never short of either. Each still does what it did, and now also makes eggs cheaper, which is what a colony really is short of.",
+      "The Army ant flies at 700 ants instead of 1,000. Her column has a hard ceiling no other species has, so being asked for the same headcount meant filling three quarters of everything she could ever hold. She earns less per flight for it.",
+      "Destroying eggs takes a number now. There is an \u0027at most\u0027 box, so you can trim ten off the front of a batch instead of losing all four hundred."
+    ] },
+
   { version: "0.2.5.0", name: "Three species that were doing nothing",
     changes: [
       "Fire ant, Carpenter ant and Honeypot ant each spent three of their four adaptations on room \u2014 a bigger nest, deeper galleries, a fuller store \u2014 and a colony is almost never short of room. Their whole branch was worth nothing at all. Each of those adaptations still does what it did, and now also makes eggs cheaper, which is the thing a colony really is short of.",

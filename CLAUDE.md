@@ -92,6 +92,8 @@ js/challenges.js    the trials: debuff and reward curves, what each one does
 js/library.js       the lexicon and the player-facing changelog
 js/sprites.js       pixel art drawn onto canvas
 js/ui.js            tab shell, header, brood controls, frame loop
+test/               the regression harness -- plain node, no deps, never shipped
+test/run.mjs        the gate: node test/run.mjs, or --slow for pacing and fuzz
 CLAUDE.md           this file (instructions for Claude)
 GEMINI.md           instructions for Gemini
 ROADMAP.md          what is planned and not yet settled
@@ -869,6 +871,99 @@ visual check that does not need a screenshot**, and the rest still does.
 **The filled primary button is 3.87:1 in dark** — `--btn-text` on `--accent`,
 below the 4.5 floor for body text. It is every button in the game and the
 established look, so it is recorded here rather than changed.
+
+**Three matriline trials, and the two that reused an existing mechanic were the
+cheap ones.** The Blight, the Slave-Maker and the Repletes. Same rule as layer 1
+— each takes one thing away and gives that same thing back — and none of the
+three pays a global food multiplier, which is still the hardest rule in these
+files. Measured, levels 1 / 3 / 5 with a colony holding nothing: Blight 29.7 /
+26.4 / 46.9m, Slave-Maker 73.0 / 61.0 / 55.3m, Repletes 40.9 / 31.5 / 89.0m.
+
+**The Slave-Maker was unwinnable by construction, which is the Polyergus bug in
+a new coat.** Measured at 30 ants after ninety minutes at every level: under
+dulosis no excavator can ever be laid, so nothing raises the cap and the nest
+sits at its base for ever. The species survives it because she also *captures*;
+the trial imposed the restriction without the thing that makes it survivable.
+`speciesCapture()` now takes the larger of the species' own share and the
+trial's. **A trial that borrows a species' restriction has to borrow whatever
+makes that species viable, or it is not the same mechanic.**
+
+**The Blight looked unwinnable and the measurement was what was wrong.** It ran
+LOST at levels 3 and 5 through three separate attempts at retuning the spread
+rate — because the simulated player never exiled, and **exiling is the Blight's
+only cure and its entire loop**. It was measuring a colony being watched as it
+died. With a curing policy it clears every level. `handCure()` is part of the
+harness now: **a trial whose loop is a player action cannot be measured by a
+policy that never takes it.**
+
+**Metapleural Gland is the one mastery that shrinks rather than grows.**
+`masteryOf` raises the step to the power of the level, so a step below 1 works
+unchanged — 0.72 a level, floored at 0.05 so a reduction can never turn a loss
+into a gain. It cuts every kind of ant loss, and that has to mean every kind:
+raid deaths and the 10/20/35% a training batch loses alike, or the wording is a
+lie.
+
+**A colony is not food-bound because nothing else binds — it is food-bound
+because meeting everything else is cheap.** The food budget is foragers 79.4%,
+soldiers 15.8%, excavators 2.4%, nurses 2.3%, upgrades 0.1%, so Amdahl bounds a
+free population cap at ×1.02 and a free brood the same. Measured against that:
+**all eight instincts and all six species passives moved a growth run by
+×0.98–×1.00**. Four of the instincts are correctly scoped elsewhere — combat,
+protein, the offline cap and what survives a reset — and a one-hour measurement
+structurally cannot see any of those. The five that claimed to grow the colony
+and did not now also cheapen an egg: Deep Chambers ×1.035, Quick Larvae ×1.042,
+Wide Brood ×1.062, Deeper Chambers ×1.069, Gongylidia ×1.086. Fully stacked
+against the species nodes the discount reaches ×2.27 on the forager share,
+inside the ×4.85 ceiling.
+
+**`eggBase()` is the single source and now reads three of them** — matriline
+nodes, instincts and finished-species passives. `eggBatchCost()` sums the curve
+in closed form and would miss any of them, so the single price and the "lay max"
+preview would disagree the moment one moved.
+
+**A species with a hard ceiling cannot be asked for the same headcount as one
+without.** Eciton's nomadic cap was 1,400 for no reason except clearing a
+1,000-ant gate — the gate driving the design rather than the other way round,
+and she was the only species for whom flying meant filling 71% of everything she
+could ever hold. `speciesFlightGate()` asks half of a hard cap, so she flies at
+700 and the cap is free to be tuned on its own merits. **The payout deliberately
+still divides by `PRESTIGE_UNLOCK`**, so she flies sooner and earns less each
+time. `royalJellyEarned` returned **0** below the flat figure and had to be
+given the gate, or her flights would have paid nothing at all.
+
+**Destroying takes a count now, not only a run.** An "at most" field, counted
+outward from the egg that was picked — reaching back takes that egg and the next
+n behind it, reaching forward takes it and the n ahead. Empty or unreadable
+means no limit, which is exactly what the window did before. Open since Akami
+reported it.
+
+**The harness lives in the repo now, and `node test/run.mjs` is the gate.** It
+used to be a scratch directory that died with the session, so every check had to
+be rebuilt before it could be re-run — and between them these suites had already
+caught all five of layer 2's bugs, three separate population-cap bypasses, the
+founders'-chambers trap, two buttons painted their own background colour, and a
+ladder that would have taken tiers from saves that had earned them. Eighteen
+suites, about twenty-five seconds, no dependencies and no build step. `test/` is
+never shipped: it is not in the itch.io zip and `index.html` does not load it.
+
+**`pacing` is the suite that matters when balance moves.** It plays the ordinary
+run on a fixed seed with the automation standing in for a competent hand — the
+policy the canon table was measured under — and fails when any milestone drifts
+more than 10%. It reproduces the recorded idle row exactly: 1.2 / 3.1 / 7.1 /
+22.8 / 41.4 / 60.9 / 87.9. **A failure there is not automatically a bug**; it
+means the change altered how long the game takes, which has to be deliberate,
+explained and written into the table rather than discovered by a player.
+
+**The rallying row now has all seven figures.** Only the 1,000-ant one was ever
+recorded — 47.7m, which the harness reproduces exactly — because the older full
+row in the pacing table predates the achievement rework and was superseded
+without being re-taken. Measured 31 August 2026: **1.2 / 2.7 / 6.0 / 16.6 / 29.3
+/ 47.7 / 66.2**.
+
+**The shim cannot see appearance, and that has not changed.** It is built from
+the real `index.html` so `ui.js` runs its whole build path, but it has no CSS, no
+layout and no class selectors. Contrast is the one visual property it checks,
+because that is arithmetic on the palette rather than a matter of taste.
 
 **The colony spends 79% of its food on foragers, and that number is the ceiling
 on every reward in the game.** Measured across two hours of automated play, the
