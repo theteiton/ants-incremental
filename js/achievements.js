@@ -2,7 +2,9 @@ import { ACHIEVEMENT_FOOD_RATE, ACHIEVEMENT_HATCH_RATE, ACHIEVEMENT_JELLY_RATE,
   achievementTop, registerAchievementCap,
   achievementFoodBonus, achievementHatchBonus, achievementJellyBonus,
   population, UPGRADES, upgradeBranch, levelsOwned, definedLevelsIn,
-  upgradeLevel } from "./ants.js";
+  upgradeLevel,
+  achievementSpawnBonus, achievementSpawnUnlocked,
+  ACHIEVEMENT_SPAWN_RATE, ACHIEVEMENT_SPAWN_UNLOCK} from "./ants.js";
 import { autoShedOn, autoShedUnlocked } from "./game.js";
 import {
   CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
@@ -12,6 +14,8 @@ import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
 import { fmt, watch, setText, setClass, setWidth } from "./panels.js";
 
 import { INSTINCTS, instinctOwned, instinctPoints, instinctsSpent } from "./instincts.js";
+import { trophyCount } from "./trophies.js";
+import { CELLS } from "./hunt.js";
 
 const el = id => document.getElementById(id);
 
@@ -104,14 +108,21 @@ function ownedIn(game, branch) {
   return Math.max(owned, peaks[branch || "all"] || 0);
 }
 
-// Defined levels, so the ladders stay at 29 / 21 / 8 exactly as before. Levels
-// a trial unlocks past those deliberately add no tiers: these ladders are built
-// once from a module constant and cannot grow per save.
-const BRANCH_TOTALS = {
-  all: definedLevelsIn(null),
-  colony: definedLevelsIn("colony"),
-  combat: definedLevelsIn("combat")
-};
+// LITERALS, and they must stay literals. `upgradeSteps` walks a fixed sequence
+// -- 1, 3, 7, 13, 21, 31 -- and then appends the total as a final rung, so the
+// stepped rungs are stable and THE APPENDED TOP IS NOT. Reading these from
+// `definedLevelsIn()` meant that adding the three War Parties levels moved the
+// totals from 29 / 21 / 8 to 32 / 21 / 11, and with them the last rung: swept,
+// a save holding 29 or 30 upgrades lost a tier, and one holding 8, 9 or 10
+// combat upgrades lost a tier. That is the rule this game has broken before --
+// an achievement level once earned is never taken back, and it pays food and
+// hatch bonuses, so a live save must never score fewer tiers than it did.
+//
+// Pinned, the ladders are byte-identical to the shipped ones and the softcap
+// carries a player past 29 the way it does on every other track. This is the
+// same fault as TRIAL_TIER_TOP, one indirection further out: **do not compute a
+// ladder top from anything that can grow.**
+const BRANCH_TOTALS = { all: 29, colony: 21, combat: 8 };
 
 // ---------------------------------------------------------------- the ladders
 //
@@ -136,7 +147,14 @@ export const RUNG_HOURS = 2;
 // trial opened, and because ladder() interpolates, moving the top shifts every
 // rung under it: going from two playable trials to five pushed the fifth rung
 // from 5 to 6 and took a tier off anyone standing on it.
-export const TRIAL_TIER_TOP = CHALLENGE_MAX_LEVEL * CHALLENGES.length;
+// ...and it is a LITERAL, because deriving it from `CHALLENGES.length` was the
+// very bug this comment warns about, one indirection further out. Opening the
+// six species trials took the list from 9 to 15 and moved this from 45 to 75 on
+// its own, shifting every rung underneath exactly as described above. Pinned at
+// 45 the shipped ladder is untouched, and the softcap carries a player past it
+// the way it does on every other track. Do not compute this from anything that
+// can grow.
+export const TRIAL_TIER_TOP = 45;
 
 // rounds to something a player would recognise: 1, 1.5, 2, 3, 5, 7 x 10^k
 const NICE = [1, 1.5, 2, 3, 5, 7];
@@ -302,6 +320,25 @@ export const ACHIEVEMENT_TRACKS = [
     desc: "The heaviest grade the colony can make. Her head is the door.",
     value: g => peakOf(g, "guard"),
     thresholds: ladder(1, 2000, 1.9) },
+
+  // The Hunt paid no tiers at all until now: three systems -- ground, circles
+  // and the trophy wall -- and not one of the twenty-three tracks looked at any
+  // of them. All three read lifetime figures, because a flight refounds the
+  // colony at zero ants and a track must never lose a tier to a reset.
+  { id: "held", name: "Ground held", unit: "cells",
+    desc: "The most of the board this line has held at once. Thirty cells to a circle.",
+    value: g => (g.stats && g.stats.peakHeld) || 0,
+    thresholds: ladder(1, CELLS, 1.35) },
+
+  { id: "circles", name: "Circles merged", unit: "circles",
+    desc: "Rings taken whole and folded into the nest. Each one is ground the colony keeps for good.",
+    value: g => (g.stats && g.stats.circlesEver) || 0,
+    thresholds: ladder(1, 40, 1.35) },
+
+  { id: "trophies", name: "Trophies taken", unit: "trophies",
+    desc: "How much of the wall is filled. Forty-nine creatures, and every one of them keeps something.",
+    value: g => trophyCount(g),
+    thresholds: ladder(1, 49, 1.3) },
 
   { id: "deepest", name: "Deepest adaptation", unit: "levels",
     desc: "The highest level reached on any single upgrade line.",
@@ -502,6 +539,25 @@ const BONUS_BOXES = [
     note: game => "Level " + game.achievementLevel +
       ". Every level is the same step up, and each costs more than the last. " +
       "It multiplies what every nuptial flight pays." },
+  // The first achievement bonus that is not another multiplier on growth, and
+  // the only one with a gate. It answers a problem that only exists very late:
+  // a colony that outguns the whole board and marches without stopping still
+  // cannot finish a circle, because the ground offers a new creature every 110
+  // seconds. Below the unlock level it pays nothing and says so.
+  { id: "spawn", name: "Restless ground", locked: game => !achievementSpawnUnlocked(game),
+    desc: "A line that has hunted long enough finds quarry faster. Creatures come to the board sooner.",
+    value: game => achievementSpawnUnlocked(game)
+      ? "×" + fmt(achievementSpawnBonus(game)) + " spawn rate"
+      : "locked until level " + ACHIEVEMENT_SPAWN_UNLOCK,
+    formula: game => "×" + ACHIEVEMENT_SPAWN_RATE + " for every level past " +
+      ACHIEVEMENT_SPAWN_UNLOCK + " — you are at " + game.achievementLevel +
+      " = ×" + fmt(achievementSpawnBonus(game)),
+    note: game => achievementSpawnUnlocked(game)
+      ? "Level " + game.achievementLevel + ". Four columns in the field are worth " +
+        "nothing if there is nothing to march at, so this is what keeps a mastered " +
+        "colony's board full. The trophy wall speeds it too."
+      : "Nothing until level " + ACHIEVEMENT_SPAWN_UNLOCK + ", and deliberately so: " +
+        "a faster board is only useful to a colony that has already outgrown it." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",

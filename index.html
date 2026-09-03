@@ -190,6 +190,11 @@
           </label>
           <button id="huntSend">Send them</button>
         </div>
+        <div class="hunt-controls" id="huntGarrison" hidden>
+          <span id="huntGarrisonState"></span>
+          <button id="huntPost">Post a Guard</button>
+          <button id="huntUnpost" hidden>Bring her home</button>
+        </div>
         <p class="hunt-march" id="huntMarch" hidden></p>
         <button id="huntRecall" hidden>Call them home</button>
       </div>
@@ -273,6 +278,15 @@
   </section>
 
   <section class="panel tab" id="tab-matriline" hidden>
+    <div id="networkBox" hidden>
+      <h2>The supercolony</h2>
+      <p class="dim" id="networkNote"></p>
+      <ul id="networkList"></ul>
+      <div class="hunt-controls" id="networkBud" hidden>
+        <span id="networkBudNote"></span>
+        <button id="networkBudBtn">Send a daughter out</button>
+      </div>
+    </div>
     <div class="panel-head">
       <span class="tally" id="matHaploTally">0 Haplotype</span>
       <span class="dim" id="matSpeciesTally"></span>
@@ -402,6 +416,9 @@
         <div>Nuptial flights<span id="statFlights">0</span></div>
         <div>Royal Jelly gathered<span id="statJelly">0</span></div>
       </div>
+      <h2>The chronicle</h2>
+      <p class="dim" id="chronicleNote"></p>
+      <ul id="chronicleList"></ul>
     </div>
 
     <div id="settingsPanel-save" hidden>

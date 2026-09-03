@@ -101,11 +101,33 @@ export function combatPerCaste(game, caste) {
   return effect ? effectTotal(game, effect) : 0;
 }
 
+// Everything that multiplies the whole army, in one place. The nest, a
+// garrison and a marching detachment are all the same soldiers under the same
+// bonuses, so they read this rather than each repeating the product -- three
+// copies of it would drift the first time a source was added.
+export function combatMultiplier(game) {
+  return passiveCombat(game) * instinctCombat(game) *
+    trophyStrength(game) * territoryStrength(game);
+}
+
 export function combatPower(game) {
   let power = 0;
   for (const id in game.ants) power += game.ants[id] * combatPerCaste(game, id);
-  return power * passiveCombat(game) * instinctCombat(game) *
-    trophyStrength(game) * territoryStrength(game);
+  return power * combatMultiplier(game);
+}
+
+// What one garrisoned cell fights with: its own Guards and nothing else.
+export function cellDefence(game, cell) {
+  if (!cell || !cell.guard) return 0;
+  return cell.guard * combatPerRank(game, "guard") * combatMultiplier(game);
+}
+
+// What stands at the gate. Guards posted on the frontier are not at the gate,
+// and neither is anything away with the march -- one is a standing commitment
+// and the other is a temporary one, but the nest feels them the same way.
+export function homeDefence(game) {
+  const posted = garrisonedGuards(game) * combatPerRank(game, "guard") * combatMultiplier(game);
+  return Math.max(0, combatPower(game) - posted) * (1 - marchShare(game));
 }
 
 export function raidsSeen(game) {
@@ -143,9 +165,16 @@ export function huntingSoldiers(game) {
   return effective;
 }
 
+// A detachment in the field is still out there, and still eating what it kills
+// -- but it is marching and fighting rather than working a trail, so it brings
+// back half of what it would at home. Without this, sending the army away cost
+// nothing at all in protein, which made the march decision cheaper than it is.
+export const MARCH_HUNT_SHARE = 0.5;
+
 export function huntRate(game) {
   if (!hunting(game)) return 0;
-  return huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
+  const away = marchShare(game) * (1 - MARCH_HUNT_SHARE);
+  return (1 - away) * huntingSoldiers(game) * HUNT_PROTEIN_PER_SOLDIER *
     (1 + effectTotal(game, "proteinYield")) *
     passiveHunt(game) * speciesHuntMult(game) * instinctProtein(game) *
     trophySpeed(game) * trophyHunt(game);
@@ -262,7 +291,8 @@ export { MONSTERS, BANDS, BAND_TOP_GRADE, bandById } from "./bestiary.js";
 // separate crashes, each of which only fired on one code path.
 import { MODIFIERS, MODIFIER_WEIGHTS, modifierById, topGradeFor, monsterById,
   monsterChoices, monsterFullName, modifierPower } from "./bestiary.js";
-import { cellPower, marchShare, territoryStrength, territoryProtein } from "./hunt.js";
+import { cellPower, marchShare, territoryStrength, territoryProtein,
+  garrisonedGuards, clampGarrisons, holdPressure, clearBase } from "./hunt.js";
 import { awardTrophy, trophyStrength, trophyProtein, trophySpeed, trophyHunt,
   trophySalvage, trophyCapture } from "./trophies.js";
 export { modifierById, topGradeFor, monsterById, monsterChoices, monsterFullName };
@@ -437,6 +467,8 @@ function killSoldiers(game, toll) {
     dead[id] = taken;
     remaining -= taken;
   }
+  // a Guard who died is no longer holding a door
+  if (dead.guard) clampGarrisons(game);
   return dead;
 }
 
@@ -481,6 +513,7 @@ function killAnts(game, toll) {
     dead[caste] = taken;
     remaining -= taken;
   }
+  if (dead.guard) clampGarrisons(game);
   return dead;
 }
 
@@ -524,18 +557,32 @@ function captureBrood(game) {
   return diggers + rest;
 }
 
-export function resolveRaid(game, cell) {
+export function resolveRaid(game, cell, attacking) {
   // A cell fights with its own creature and its own strength; the timer's raid
   // uses whatever is currently rolled. Either way the modifier is what decides
   // the trophy grade.
   const mod = cell ? modifierById(cell.mod) : currentModifier(game);
   const which = cell ? cell.monster : game.monster;
-  const power = cell
+  // A defence battle scales with how much of the circle the colony occupies:
+  // gently at a fifth of it, x5 with the whole of it held. Expansion pays in
+  // food and costs in exposure, so rushing every cell is not free.
+  const pressure = attacking ? 1 : holdPressure(game);
+  const power = (cell
     ? cellPower(game, cell, monsterPower(game))
-    : monsterPower(game) * modifierPower(monsterById(which), game.monsterMod);
-  // Soldiers away with the march cannot defend the nest. That is the decision
-  // the Hunt exists to create: push out to grow, or hold back to survive.
-  const defence = combatPower(game) * (1 - marchShare(game));
+    : monsterPower(game) * modifierPower(monsterById(which), game.monsterMod)) * pressure;
+  // Three different bodies of soldiers can be the ones fighting, and which it
+  // is depends entirely on where the battle is:
+  //
+  //   attacking   the detachment, fighting with what was SENT
+  //   garrisoned  that cell's own Guards, alone, and the nest never stirs
+  //   otherwise   the home army, less anything posted or away
+  //
+  // The march used to read `1 - share`, so a detachment fought with whatever
+  // stayed behind and committing the whole army fought at zero.
+  const garrison = !attacking && cell ? cellDefence(game, cell) : 0;
+  const defence = attacking
+    ? combatPower(game) * marchShare(game)
+    : (garrison > 0 ? garrison : homeDefence(game));
   const won = defence >= power;
   const reward = raidRewards(game, power);
   reward.protein = Math.round(reward.protein * mod.reward);
@@ -545,7 +592,9 @@ export function resolveRaid(game, cell) {
     // what you keep from it
     const taken = which ? awardTrophy(game, which, mod.grade) : null;
     if (cell) {
-      // the ground is the colony's again
+      // the ground is the colony's again -- and if this was one of the circle's
+      // residents, that is one fewer standing between the colony and open ground
+      clearBase(game, cell);
       cell.monster = null;
       cell.mod = null;
       cell.held = true;
@@ -567,10 +616,24 @@ export function resolveRaid(game, cell) {
   }
 
   const shortfall = Math.min(1, (power - defence) / power);
-  const cap = siegeActive(game) ? SIEGE_LOSS_CAP : LOSS_CAP;
-  const toll = Math.max(1, Math.floor(population(game) * cap * shortfall *
-    speciesLossMult(game) * masteryLosses(game)));
-  const dead = killAnts(game, toll);
+  // A garrison that loses is overrun where it stands. The Guards posted there
+  // die and the rest of the nest is untouched -- which is the point of posting
+  // them: the cell is defended instead of the colony being dragged into it.
+  let dead;
+  if (garrison > 0) {
+    const lost = Math.max(1, Math.floor(cell.guard * shortfall *
+      speciesLossMult(game) * masteryLosses(game)));
+    const fell = Math.min(cell.guard, lost, game.ants.guard || 0);
+    game.ants.guard = Math.max(0, (game.ants.guard || 0) - fell);
+    cell.guard = Math.max(0, cell.guard - fell);
+    clampGarrisons(game);
+    dead = fell > 0 ? { guard: fell } : {};
+  } else {
+    const cap = siegeActive(game) ? SIEGE_LOSS_CAP : LOSS_CAP;
+    const toll = Math.max(1, Math.floor(population(game) * cap * shortfall *
+      speciesLossMult(game) * masteryLosses(game)));
+    dead = killAnts(game, toll);
+  }
   const salvage = Math.round(reward.protein * (defence / power) *
     passiveSalvage(game) * trophySalvage(game));
   game.protein += salvage;

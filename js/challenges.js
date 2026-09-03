@@ -13,20 +13,20 @@ import { currentSpecies } from "./species.js";
 export const CHALLENGE_TARGET = 600;
 
 export const TARGET_KINDS = {
-  population: { noun: "ants", verb: "Raise", gerund: "raising", of: "in one colony" },
+  population: { noun: "ants", verb: "Raise", gerund: "raising", of: "in one colony", scales: 0.25 },
   raids: { noun: "raids", verb: "Win", gerund: "winning", of: "without the nest falling" },
   // a colony that is not allowed to grow cannot be asked for a headcount, so
   // the sealed nest is asked to make what little it has produce instead
   foodRate: { noun: "food a second", verb: "Reach", gerund: "reaching",
-    of: "from a nest that cannot widen", rate: true, scalesWithFood: true },
+    of: "from a nest that cannot widen", rate: true, scales: 0.25 },
   // a trial about holding output up over time cannot be measured on a rate,
   // which a handful of ants meets in the first minute
   runFood: { noun: "food", verb: "Gather", gerund: "gathering",
-    of: "with this one colony", scalesWithFood: true },
+    of: "with this one colony", scales: 0.25 },
   // the repletes are asked for food STANDING rather than food gathered: the
   // whole trial is that there is nowhere to put it, so banking it is the test
   banked: { noun: "food banked at once", verb: "Bank", gerund: "banking",
-    of: "in the bodies of living ants", scalesWithFood: true }
+    of: "in the bodies of living ants", scales: 0.5 }
 };
 
 // A trial can be LOST as well as won. Declared per trial so the next ones can
@@ -110,11 +110,51 @@ export function targetKind(challenge) {
 //
 // Only the food-measured kinds scale. A headcount is bounded by the cap and a
 // raid count by the clock, and neither moves with a food multiplier.
+// What an unmastered line produces by the time the trials open to it. The
+// target constants below were all calibrated against exactly that colony, so
+// scaling by `peak / REFERENCE` leaves a first-time player facing the number
+// this file already records and raises it for everyone who has grown past it.
+export const REFERENCE_FOOD_RATE = 5e6;
+
+// A trial colony is refounded at nothing and grows for one sitting, so what it
+// can reach is NOT proportional to its parent's peak -- a line a million times
+// richer does not build a million-ant nest in half an hour. The ask therefore
+// goes as a fractional power of how far the line has come. At 1 the food trials
+// became unclearable and at 0.25, which is what reading `masteryFood` alone
+// amounted to, every trial fell to about two minutes.
+// ...and the power is per KIND, because the kinds are dimensionally different
+// and one exponent cannot serve them. Swept on a mastered colony at level 5,
+// against a 2.2-minute baseline:
+//
+//   power   drought   sealed   barren   callow  repletes
+//   0.25      18.9m     0.1m    20.2m     0.1m      7.4m
+//   0.35      61.5m     0.1m    43.7m     0.1m      7.4m
+//   0.42     110.0m     0.1m    83.0m     0.2m      7.4m
+//   0.50      >120m     0.1m    >120m    >120m     25.4m
+//
+// A headcount grows sub-linearly with how rich the line is -- 0.25 puts the two
+// population trials at about twenty minutes, which is the half-hour median the
+// ladder is sized in. A banked total tracks the rate much more closely and wants
+// 0.5, measured at 25.4m. The rate- and run-total kinds are left at 0.25, which
+// is what reading `masteryFood` alone already amounted to, because they do not
+// respond at all until 0.5 and then cliff straight past reachable -- the Nanitic
+// Line especially, whose ceiling is hard by construction. Those two need their
+// own calibration and should not be guessed at.
+export function colonyScale(game, power) {
+  const peak = (game.stats && game.stats.peakFoodRate) || 0;
+  const ratio = Math.max(1, peak / REFERENCE_FOOD_RATE);
+  return Math.pow(ratio, power > 0 ? power : 0.25);
+}
+
+// A headcount was assumed to be bounded by the cap and so left unscaled. It is
+// not: the cap mastery is x2 a level, so five levels is x32 room and 600 ants
+// is a rounding error to a mastered colony. Every kind that grows with the
+// colony scales; a raid count is bounded by the clock and does not.
 export function challengeTargetAmount(game, challenge) {
   const target = challengeTarget(challenge);
   const kind = TARGET_KINDS[target.kind];
-  return kind && kind.scalesWithFood
-    ? target.amount * masteryFood(game) : target.amount;
+  return kind && kind.scales
+    ? Math.round(target.amount * colonyScale(game, kind.scales)) : target.amount;
 }
 
 // the debuff for the level being attempted, and the permanent reward held from
@@ -397,6 +437,79 @@ export const CHALLENGES = [
     // bought upgrades, which no other trial touches.
     plan: ""
   },
+  // ---------------------------------------------------------- species trials
+  //
+  // Layer 2 is 0.9 hours because finishing a species is twenty points and a
+  // nuptial flight -- worth one of them -- takes half a minute on a mastered
+  // colony. No repricing fixes that: forty flights is the same minute forty
+  // times. The only unit in this game that costs real time is a trial level,
+  // now that the target scales with the colony.
+  //
+  // Each one takes away THE THING THAT SPECIES IS, which is why they are cheap
+  // to build and impossible to confuse: the debuff is a scale on that species'
+  // own active, and the mastery gives the same active back. A species trial can
+  // only be entered while playing her, so `speciesTrialLevel` already records
+  // them correctly and no new save shape is needed.
+  {
+    id: "sp_atta", name: "The Blighted Garden", open: true, kind: "species",
+    species: "atta", matriline: true,
+    flavour: "Escovopsis is in the beds. The fungus the colony eats is being eaten, and the leaves come back to a garden that cannot turn them over.",
+    debuff: "The garden turns over a fraction of what it should, and less with every attempt. Foragers still bring leaves; nothing downstream can use them.",
+    target: { kind: "population", amount: 500 },
+    mastery: { type: "garden", step: 1.6, name: "Fungal Husbandry",
+      desc: "What the colony learned when the beds failed. Every level widens the garden for good." },
+    plan: ""
+  },
+  {
+    id: "sp_solenopsis", name: "The Single Queen", open: true, kind: "species",
+    species: "solenopsis", matriline: true,
+    flavour: "The other queens are dead. What was a nest of many laying chambers is one ordinary colony with a great many mouths.",
+    debuff: "The polygyne cap bonus collapses towards nothing, and further with every attempt — and a lost raid still costs what a fire ant colony pays.",
+    target: { kind: "population", amount: 500 },
+    mastery: { type: "queens", step: 1.5, name: "Pleometrosis",
+      desc: "What the line learned burying its queens. Every level raises the cap a polygyne nest holds, for good." },
+    plan: ""
+  },
+  {
+    id: "sp_camponotus", name: "Aposymbiotic", open: true, kind: "species",
+    species: "camponotus", matriline: true,
+    flavour: "Blochmannia is gone from the gut. Nitrogen that was recycled for nothing must now be caught, killed and carried.",
+    debuff: "Feeding the brood costs far more protein rather than half, and more with every attempt.",
+    target: { kind: "population", amount: 500 },
+    mastery: { type: "symbiont", step: 0.7, name: "Bacteriocytes",
+      desc: "What the line learned without its endosymbiont. Every level cuts what feeding the brood costs, for good." },
+    plan: ""
+  },
+  {
+    id: "sp_eciton", name: "The Halted Column", open: true, kind: "species",
+    species: "eciton", matriline: true,
+    flavour: "The column cannot move. A colony that is its own nest and has stopped walking is a colony with no nest at all.",
+    debuff: "The column holds a fraction of what it should, and less with every attempt. Excavators still dig nothing.",
+    target: { kind: "population", amount: 400 },
+    mastery: { type: "column", step: 1.5, name: "Statary Phase",
+      desc: "What the line learned standing still. Every level lets the column hold more, for good." },
+    plan: ""
+  },
+  {
+    id: "sp_myrmecocystus", name: "The Broken Jars", open: true, kind: "species",
+    species: "myrmecocystus", matriline: true,
+    flavour: "The repletes have been raided. What hung from the ceiling is on the floor, and the colony has nowhere to put tomorrow.",
+    debuff: "Each living ant holds a fraction of the food she should, and less with every attempt.",
+    target: { kind: "banked", amount: 200000 },
+    mastery: { type: "crop", step: 1.6, name: "Distended Crop",
+      desc: "What the line learned with its jars broken. Every level lets each ant hold more, for good." },
+    plan: ""
+  },
+  {
+    id: "sp_polyergus", name: "The Failed Raid", open: true, kind: "species",
+    species: "polyergus", matriline: true,
+    flavour: "The nests she found were empty, or ready. A slave-maker who takes no brood has no workers, and a queen with sabres for jaws cannot feed herself.",
+    debuff: "A won raid captures a fraction of the brood it should, and less with every attempt — and dulosis means there is no other way to grow.",
+    target: { kind: "population", amount: 300 },
+    mastery: { type: "sabre", step: 1.5, name: "Pheromone Mimicry",
+      desc: "What the line learned coming home empty. Every level takes more from a nest you beat, for good." },
+    plan: ""
+  },
   {
     id: "callow",
     name: "Nanitic Line",
@@ -435,6 +548,31 @@ export function activeChallenge(game) {
 
 export function challengeActive(game) {
   return !!activeChallenge(game);
+}
+
+// A species trial belongs to one species and is only offered while she is the
+// one being played. Everything else is open to any line.
+export function challengeAvailable(game, challenge) {
+  return !challenge.species || challenge.species === currentSpecies(game);
+}
+
+export function playableChallenges(game) {
+  return CHALLENGES.filter(ch => challengeAvailable(game, ch));
+}
+
+export function speciesTrialActive(game) {
+  const ch = activeChallenge(game);
+  return ch && ch.kind === "species" ? ch : null;
+}
+
+// What a species trial does to the active it is about: the same shape every
+// other debuff uses, so the ramp and the mastery race work identically. A
+// species whose trial is not running is untouched, which is what lets the
+// consuming sites read this unconditionally.
+export function speciesTrialScale(game, speciesId) {
+  const ch = speciesTrialActive(game);
+  if (!ch || ch.species !== speciesId) return 1;
+  return challengeDebuff(game);
 }
 
 // Trial clears are recorded per species. Playing as Atta re-earns the ladders
@@ -674,6 +812,23 @@ export function challengeReward(game) {
 // whole game and no reset of any kind can walk it back. The per-species record
 // still exists and still matters: it is what a species is finished on and why
 // the ladders are worth replaying. It just does not gate the bonus.
+// `bestTrialLevel` walks every line's record and `masteryOf` calls it once per
+// trial, so the six species masteries -- which sit on hot paths like
+// `speciesCapMult` and `nomadCap` -- turned one tick from 0.077ms into 0.242ms,
+// a 3.1x regression measured the moment they were wired.
+//
+// Invalidation is EXPLICIT, the same rule the brood tally follows: a cleared
+// level is the only thing that can move any of these, and inferring it from the
+// shape of `game.challenges` would mean walking the thing being cached.
+// A cache was tried here and taken out again. Memoising these on an explicit
+// `touchTrials()` made a tick about 10% faster and made every mastery read
+// STALE for any code that writes `game.challenges` or `stats.bestTrial`
+// directly -- which the trial harness does, and which is a silent wrong number
+// rather than a crash. The brood tally can be cached because six functions own
+// every write to the brood; trial records have no such choke point. Ten percent
+// of a tick that is already 1.5% of a frame is not worth a class of silent bug.
+export function touchTrials() {}
+
 export function bestTrialLevel(game, id) {
   let top = 0;
   const best = (game.stats && game.stats.bestTrial) || {};
@@ -708,6 +863,13 @@ export function masteryOf(game, type) {
   }
   return total;
 }
+
+export function masteryGarden(game) { return masteryOf(game, "garden"); }
+export function masteryQueens(game) { return masteryOf(game, "queens"); }
+export function masterySymbiont(game) { return masteryOf(game, "symbiont"); }
+export function masteryColumn(game) { return masteryOf(game, "column"); }
+export function masteryCrop(game) { return masteryOf(game, "crop"); }
+export function masterySabre(game) { return masteryOf(game, "sabre"); }
 
 export function masteryFood(game) {
   return masteryOf(game, "food");

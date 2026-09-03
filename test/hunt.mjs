@@ -53,13 +53,13 @@ if (H.marchReady(game)) bad.push("a second march was allowed while one was out")
 
 // it arrives, fights, and comes home
 let fought = 0;
-for (let i = 0; i < 400 && game.hunt.march; i++) {
+for (let i = 0; i < 400 && H.marchesOut(game).length; i++) {
   H.marchTick(game, 1, c => { fought++; c.monster = null; c.mod = null; c.held = true; return {}; });
 }
 console.log("  it arrived, fought " + fought + " time(s), and came home: march is " +
-  (game.hunt.march ? "still out" : "back"));
+  (H.marchesOut(game).length ? "still out" : "back"));
 if (fought !== 1) bad.push("the march fought " + fought + " times, expected 1");
-if (game.hunt.march) bad.push("the march never came home");
+if (H.marchesOut(game).length) bad.push("the march never came home");
 
 // --- trophies ---------------------------------------------------------------
 console.log("");
@@ -110,7 +110,7 @@ for (const kind of KINDS) {
 reset(); seed(3); grantAllLineage();
 game.trophies = { aardvark: 3 };
 game.trophyKills = { aardvark: 40 };
-game.hunt = { cells: H.newBoard(), tier: 4, open: true, march: null, spawnTimer: 1, advanceTimer: 1 };
+game.hunt = { cells: H.newBoard(), tier: 4, open: true, marches: [], spawnTimer: 1, advanceTimer: 1 };
 game.hunt.cells[0].held = true;
 while (A.population(game) < 1000) play(60, { hand: true });
 G.doFlight();
@@ -120,6 +120,55 @@ console.log("  after a flight: trophies kept " + (T.trophyGrade(game, "aardvark"
 if (T.trophyGrade(game, "aardvark") !== 3) bad.push("a flight took a trophy back");
 if (game.hunt.tier !== 4) bad.push("a flight lost the banked tiers");
 if (H.heldCells(game).length !== 0) bad.push("a flight kept the standing board");
+
+
+// ---------------------------------------------------------- War Parties
+// One column was the whole decision the board offered, and on a mastered colony
+// it became the wall: x643-x3,907 power against the weakest cell, marching
+// 97.8% of the time, and no circle merged in four hours.
+console.log("=== SEVERAL COLUMNS AT ONCE ===");
+G.hardReset();
+G.game.ants.soldier = 4000;
+G.game.run.peakPopulation = 4000; G.game.peakPopulation = 4000;
+G.openHunt();
+const board = G.game.hunt.cells;
+for (let i = 0; i < 6; i++) { board[i].monster = "phorid"; board[i].mod = "plain"; board[i].held = false; }
+
+if (!H.marchReady(G.game, 1)) bad.push("no column could be sent at all");
+H.sendMarch(G.game, 0, 0.2, 1);
+if (H.marchReady(G.game, 1)) bad.push("a second column was allowed at max 1");
+if (!H.marchReady(G.game, 3)) bad.push("a second column was refused at max 3");
+H.sendMarch(G.game, 1, 0.2, 3);
+H.sendMarch(G.game, 2, 0.2, 3);
+if (H.marchesOut(G.game).length !== 3) bad.push("three columns did not go out");
+if (H.sendMarch(G.game, 3, 0.2, 3)) bad.push("a fourth column went out at max 3");
+console.log("  columns out: " + H.marchesOut(G.game).length +
+  ", committed " + Math.round(H.marchShare(G.game) * 100) + "%, " +
+  Math.round((1 - H.marchShare(G.game)) * 100) + "% left at the gate");
+if (Math.abs(H.marchShare(G.game) - 0.6) > 1e-9) bad.push("shares do not add up across columns");
+if (H.sendMarch(G.game, 0, 0.1, 9)) bad.push("two columns were sent to one cell");
+
+G.game.hunt.marches = [];
+H.sendMarch(G.game, 0, 0.9, 9);
+H.sendMarch(G.game, 1, 0.9, 9);
+console.log("  after asking for 90% twice, committed " +
+  Math.round(H.marchShare(G.game) * 100) + "%");
+if (H.marchShare(G.game) > 1.0000001) bad.push("more than the whole army was committed");
+
+let hits = 0;
+for (let i = 0; i < 400 && H.marchesOut(G.game).length; i++) {
+  H.marchTick(G.game, 1, c => { hits++; c.monster = null; c.held = true; return {}; });
+}
+console.log("  " + hits + " separate fights resolved, all columns home");
+if (hits !== 2) bad.push("expected 2 fights from 2 columns, got " + hits);
+
+G.game.hunt = { cells: H.newBoard(), tier: 0, open: true,
+  march: { cell: 3, share: 0.5, out: 5, home: 0 }, spawnTimer: 1, advanceTimer: 1 };
+H.initHunt(G.game);
+console.log("  a v9 save's single march migrated to a list of " +
+  H.marchesOut(G.game).length + ", old field gone: " + !("march" in G.game.hunt));
+if (H.marchesOut(G.game).length !== 1) bad.push("the old single march did not migrate");
+if ("march" in G.game.hunt) bad.push("the old march field survived the migration");
 
 console.log("\n--- " + (bad.length ? bad.join("\n") : "the map, the march, the merge and the trophies all hold") + " ---");
 process.exit(bad.length ? 1 : 0);

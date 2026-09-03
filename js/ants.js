@@ -1,9 +1,10 @@
+import { traitFood, traitCap, traitBrood, traitEgg } from "./supercolony.js";
 import {
   instinctBaseCap, instinctBrood, instinctHatch, instinctOfflineHours, instinctEggCost
 } from "./instincts.js";
 import { territoryYield, territoryEgg, territoryCap, territoryBrood } from "./hunt.js";
 import { trophyTerritory, trophyFood, trophyEgg, trophyCap,
-  trophyBrood } from "./trophies.js";
+  trophyBrood, trophySpeed} from "./trophies.js";
 import {
   gardenActive, gardenMultiplier, gardenNurseMultiplier, speciesCapMult, speciesBroodAdd,
   speciesExcavatorCapMult, speciesNaniticHalflifeMult, nomadic, nomadCap,
@@ -117,6 +118,41 @@ export function soldierCount(game) {
 
 export const NANITIC_GENERATION = 4;
 export const EGG_TIME = 24;
+
+// The brood is a nursery, not a queue. A real ant develops through three
+// distinct forms and only ONE of them eats: the egg is yolk, the pupa is sealed
+// inside its own cuticle and takes nothing at all, and everything the adult
+// will be is built during the larval stage in between.
+//
+// The stage is DERIVED from progress rather than stored, which is what lets
+// this land without a save migration: every egg already carries the only number
+// it needs. The spans are shares of EGG_TIME and must sum to 1.
+export const BROOD_STAGES = [
+  { id: "egg", name: "Egg", upto: 0.30,
+    note: "Yolk and nothing else. It needs warmth and no food at all." },
+  { id: "larva", name: "Larva", upto: 0.80,
+    note: "The only stage that eats. Everything the adult will be is built here, out of what the nurses bring." },
+  { id: "pupa", name: "Pupa", upto: 1.00,
+    note: "Sealed in, rebuilding. It takes nothing and cannot be hurried by feeding." }
+];
+
+export const LARVA_FROM = BROOD_STAGES[0].upto;
+export const LARVA_TO = BROOD_STAGES[1].upto;
+export const LARVA_SPAN = (LARVA_TO - LARVA_FROM) * EGG_TIME;
+
+export function broodStage(egg) {
+  const share = (egg.progress || 0) / EGG_TIME;
+  for (const stage of BROOD_STAGES) if (share < stage.upto) return stage;
+  return BROOD_STAGES[BROOD_STAGES.length - 1];
+}
+
+// How much of its protein this larva has actually had, 0 to 1. Saves written
+// before the nursery existed paid at laying and stored only the flag, so an egg
+// with no `paid` is read from `fed` -- which is why this needs no migration and
+// why an in-flight egg is never charged twice.
+export function broodFedShare(egg) {
+  return egg.paid !== undefined ? egg.paid : (egg.fed ? 1 : 0);
+}
 export const BASE_POPULATION_CAP = 30;
 export const CAP_PER_EXCAVATOR = 12;
 export const RESERVE_EGG_COST = 20;
@@ -171,6 +207,36 @@ export const HIDING_FOOD_PENALTY = 0.5;
 export const ACHIEVEMENT_FOOD_RATE = 1.0479;
 export const ACHIEVEMENT_HATCH_RATE = 1.0274;
 export const ACHIEVEMENT_JELLY_RATE = 1.0643;
+
+// How fast the ground refills. Four columns in the field is worth nothing if
+// there is nothing to march at: measured, a mastered colony outguns the weakest
+// cell by up to x3,907 and marches 97.8% of the time and still merges no
+// circles, because the board only offers a new creature every 110 seconds.
+//
+// This is the FIRST achievement bonus that is not simply another multiplier on
+// growth, and it is gated late on purpose -- it is only a bottleneck for a
+// colony that has already outgrown the board. Nothing below the unlock level
+// notices it exists.
+export const ACHIEVEMENT_SPAWN_UNLOCK = 25;
+export const ACHIEVEMENT_SPAWN_RATE = 1.05;
+
+// Levels below the unlock pay nothing at all, so this cannot quietly speed up
+// an early colony's board.
+export function achievementSpawnBonus(game) {
+  const over = (game.achievementLevel || 0) - ACHIEVEMENT_SPAWN_UNLOCK;
+  return over > 0 ? Math.pow(ACHIEVEMENT_SPAWN_RATE, over) : 1;
+}
+
+export function achievementSpawnUnlocked(game) {
+  return (game.achievementLevel || 0) >= ACHIEVEMENT_SPAWN_UNLOCK;
+}
+
+// ...and the trophy wall speeds it too, through the `speed` kind it already
+// has. A wall built by hunting is what teaches a colony to find the next thing
+// worth hunting.
+export function spawnRate(game) {
+  return achievementSpawnBonus(game) * trophySpeed(game);
+}
 
 // The cap lives in achievements.js, which already imports this file. Rather than
 // import it back -- a cycle that would evaluate achievements.js before UPGRADES
@@ -362,6 +428,29 @@ export const UPGRADES = [
         desc: "Kills are stripped to the shell. Raids yield 50% more protein." },
       { name: "Butchery", cost: 700, req: { caste: "soldier", count: 50 }, add: 1,
         desc: "Nothing of the carcass is left. Raid protein +100%." }
+    ] },
+
+  // Deliberately NOT tagged with a mastery. Every other combat line can be
+  // pushed past its defined levels by clearing the Endless Siege, and extended
+  // levels are worth half a defined one -- which would mean half an army, and
+  // an army is a whole thing. The number of columns a colony can field is a
+  // small hard number by design; what a trial should buy is stronger soldiers,
+  // not more places to put them.
+  //
+  // Measured on a mastered colony: it outguns the weakest cell on the board by
+  // x643 to x3,907 and marches 97.8% of the time, and still merges no circles
+  // in four hours, because one column cannot walk to thirty cells faster than
+  // they refill. Power stopped being the constraint long before this; the road
+  // did not.
+  { id: "war_parties", name: "War Parties", branch: "combat", currency: "protein",
+    effect: { type: "marchCount" },
+    levels: [
+      { name: "Second Column", cost: 1500, req: { caste: "soldier", count: 150 }, add: 1,
+        desc: "The nest can hold two frontiers at once. A second army may be in the field." },
+      { name: "Third Column", cost: 15000, req: { caste: "soldier", count: 400 }, add: 1,
+        desc: "Scouts, runners and a chain of command. A third army may march." },
+      { name: "Fourth Column", cost: 120000, req: { caste: "soldier", count: 1000 }, add: 1,
+        desc: "The colony fights on four fronts and keeps a gate behind it. A fourth army may march." }
     ] },
 
   { id: "brood_slots", name: "Royal Larder", branch: "combat", currency: "protein",
@@ -752,9 +841,13 @@ export function hidingPenalty(game) {
 // they live in foodPenalty(), so a debuff is one term in one place rather than
 // something hidden inside a factor called "colony".
 export function globalFoodMultiplier(game) {
-  return productEffect(game, "globalFood") * achievementFoodBonus(game) *
+  // A nest's own traits are worth something only in that nest. This is not the
+  // global food multiplier the design refuses: every other nest in the network
+  // is untouched by it, and a trait is earned by one colony's history.
+  const nestOwn = traitFood(game);
+  return nestOwn * (productEffect(game, "globalFood") * achievementFoodBonus(game) *
     prestigeFoodMultiplier(game) * challengeReward(game) * masteryFood(game) *
-    huntTerritory(game) * trophyFood(game);
+    huntTerritory(game) * trophyFood(game));
 }
 
 // Held ground, and the trophies that make holding it pay more. Bounded on
@@ -855,6 +948,60 @@ export function bigForagerBonus(game) {
   return (game.prestige && game.prestige.flightsTaken || 0) > 0 ? BIG_FORAGER_PRESTIGE_MULT : 1;
 }
 
+// A colony of nine thousand is a number. A Big Forager is not: she is one ant,
+// she has a birthday, she grows stronger every minute she survives, and there
+// are rarely more than a dozen of her. Naming her is the cheapest thing this
+// game can do to stop reading like a spreadsheet.
+//
+// The name is DERIVED from her birth time rather than stored, so the roster
+// stays an array of numbers and no save changes. Real ants have no names, so
+// these are keeper's epithets -- what you would call her to tell her apart.
+const BIG_NAMES_A = ["Broad", "Long", "Grey", "Pale", "Dark", "Split", "Bent",
+  "Bright", "Old", "Iron", "Copper", "Ash", "Amber", "Scarred", "Quick", "Heavy",
+  "Red", "Blunt", "Keen", "Rough", "Still", "Deep", "Gilt", "Crook"];
+const BIG_NAMES_B = ["Jaw", "Shanks", "Mandible", "Antenna", "Carapace", "Femur",
+  "Claw", "Back", "Gaster", "Palp", "Tarsus", "Crest", "Shoulder", "Thorax",
+  "Scape", "Spur"];
+
+export function bigForagerName(bornAt) {
+  // a cheap integer hash of the birth second, stable for the life of the ant
+  let h = Math.floor((bornAt || 0) * 1000) >>> 0;
+  h = (h ^ 61) ^ (h >>> 16);
+  h = (h + (h << 3)) >>> 0;
+  h = (h ^ (h >>> 4)) >>> 0;
+  h = Math.imul(h, 0x27d4eb2d) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return BIG_NAMES_A[h % BIG_NAMES_A.length] + "-" +
+    BIG_NAMES_B[(h >>> 8) % BIG_NAMES_B.length];
+}
+
+// Her whole story, for the roster: who she is, how long she has been at it and
+// what she is worth right now. Sorted oldest first, because the oldest is the
+// strongest and she is the one worth looking at.
+export function bigForagerRoster(game) {
+  if (!game.bigForagers || !game.bigForagers.length) return [];
+  const each = BIG_FORAGER_BASE * bigForagerBonus(game) * casteFoodPerSecond(game, "forager");
+  const now = (game.stats && game.stats.playtime) || 0;
+  const roster = game.bigForagers.map(bornAt => ({
+    bornAt,
+    name: bigForagerName(bornAt),
+    minutes: Math.max(0, (now - bornAt) / 60),
+    mult: bigForagerMultiplier(game, bornAt),
+    rate: each * bigForagerMultiplier(game, bornAt)
+  })).sort((x, y) => x.bornAt - y.bornAt);
+  // The name is a hash of the birth time and there are only a few hundred of
+  // them, so with a dozen sisters alive a collision is likely rather than rare
+  // -- the birthday problem. Two ants with one name is worse than a plain
+  // count, so the roster numbers a repeat rather than the namer trying to be
+  // unique: derivation stays pure and the display stays unambiguous.
+  const seen = {};
+  for (const ant of roster) {
+    const n = (seen[ant.name] = (seen[ant.name] || 0) + 1);
+    if (n > 1) ant.name += " " + "II III IV V VI VII VIII IX X".split(" ")[n - 2];
+  }
+  return roster;
+}
+
 export function bigForagerOutput(game) {
   if (!game.bigForagers || game.bigForagers.length === 0) return 0;
   const each = BIG_FORAGER_BASE * bigForagerBonus(game) * casteFoodPerSecond(game, "forager");
@@ -873,6 +1020,12 @@ export function foodPerSecond(game) {
 // sets like stone and diggers widen it not at all -- and the dig-out rule has to
 // read this rather than assume it: an excavator is only allowed past the cap
 // because she raises it, and where she does not, the exemption never closes.
+// How many columns can be in the field at once. One always, plus what War
+// Parties has bought.
+export function maxMarches(game) {
+  return 1 + sumEffect(game, "marchCount");
+}
+
 export function capPerExcavator(game) {
   if (sealedActive(game)) return 0;
   // A nomadic column has no nest to widen, so a digger digs nothing -- the same
@@ -884,12 +1037,13 @@ export function capPerExcavator(game) {
 }
 
 export function populationCap(game) {
+  const nestCapTrait = traitCap(game);
   const base = nomadic(game)
     ? nomadCap(game) + instinctBaseCap(game)
     : (BASE_POPULATION_CAP + prestigeBaseCap(game) + instinctBaseCap(game)) * sealedCapScale(game);
-  return Math.max(1, Math.floor(
+  return nestCapTrait * (Math.max(1, Math.floor(
     (base + capPerExcavator(game) * game.ants.excavator) *
-    masteryCap(game) * speciesCapMult(game) * territoryCap(game) * trophyCap(game)));
+    masteryCap(game) * speciesCapMult(game) * territoryCap(game) * trophyCap(game))));
 }
 
 export function hatchRate(game) {
@@ -908,13 +1062,14 @@ export function slotsPerNurse(game) {
 }
 
 export function broodCapacity(game) {
-  return Math.max(1, Math.floor(
+  const nestBroodTrait = traitBrood(game);
+  return nestBroodTrait + (Math.max(1, Math.floor(
     (BASE_BROOD_SLOTS + prestigeBroodSlots(game) + sumEffect(game, "broodSlots") +
       slotsPerNurse(game) * game.ants.nurse +
       slotsPerNanitic(game) * game.ants.nanitic * masteryNanitic(game) +
       speciesBroodAdd(game) + instinctBrood(game)) *
     masteryBrood(game) * territoryBrood(game) * trophyBrood(game)
-  ));
+  )));
 }
 
 export function incubationTime(game) {

@@ -5,6 +5,12 @@ import { challengesUnlocked, challengeLevelsTotal, bestTrialLevel } from "./chal
 import { SPECIES, currentSpecies, speciesFinished, matrilineVisible, matrilineCount,
   gardenActive, haplotype } from "./matriline.js";
 import { prestigeUpgradeOwned, PRESTIGE_UPGRADES } from "./prestige.js";
+import { BROOD_STAGES } from "./ants.js";
+import { nests as nestList, INHERIT_WIDTH, nestTraits } from "./supercolony.js";
+import { huntUnlocked, heldCells, AREAS, CELLS, RINGS, TIER_YIELD,
+  territoryYield, garrisonedGuards } from "./hunt.js";
+import { trophyCount, bandHeld, KILL_LADDER } from "./trophies.js";
+import { MONSTERS, BANDS } from "./bestiary.js";
 
 // The colony's own record of what the words mean. Raised because a playtester
 // who had reached 187,000 ants said he understood "less than half" of what the
@@ -25,12 +31,59 @@ export const LIBRARY_GROUPS = [
   { id: "upgrades", name: "Adaptations" },
   { id: "prestige", name: "The lineage" },
   { id: "trials", name: "The trials" },
+  { id: "hunt", name: "The Hunt" },
   { id: "matriline", name: "The matriline" }
 ];
 
 const held = (game, caste) => peakCasteCount(game, caste) > 0;
 
 export const LIBRARY = [
+
+  // ------------------------------------------------------------- the Hunt
+  // The newest and most complicated system in the game shipped with no entry at
+  // all, which is exactly the fault the library was built to fix.
+  { id: "territory", group: "hunt", term: "Held ground",
+    known: game => huntUnlocked(game),
+    short: "The ground around the nest, thirty cells of it. Ground the colony holds feeds it — and held ground counts as the nest, so anything walking into it starts a battle where it stands.",
+    done: game => heldCells(game).length > 0,
+    full: "This is what makes the army worth its food. The colony spends about four fifths of everything it gathers on foragers and a sixth on soldiers, and until there was ground to hold, the soldiers bought nothing the colony grows on. Every held cell pays what that ground is good for, and the deeper cells pay more because they cost more to take." },
+
+  { id: "area", group: "hunt", term: "Terrain",
+    known: game => huntUnlocked(game),
+    short: "Every cell is a kind of place, rolled when the circle is built. What holding it pays is what that ground is actually good for.",
+    done: game => heldCells(game).length > 2,
+    full: "There are " + AREAS.length + " kinds — foraging ground, aphid pasture, seed bed, carrion field, midden, stony ridge, deep loam and warm seep — paying into food, protein, a cheaper egg, fighting strength, room and brood. The weights lean hard towards the food kinds on purpose: a colony is food-bound sixty minutes out of sixty, so a board full of loam would be a board full of nothing. Which cell to take is a decision as well as how far out to go." },
+
+  { id: "march", group: "hunt", term: "The march",
+    known: game => huntUnlocked(game),
+    short: "Sending part of the army out to clear a cell. One march at a time, and the soldiers sent cannot defend the nest while they are gone.",
+    done: game => !!(game.hunt && game.hunt.march),
+    full: "That is the decision the board exists to create: push out to grow, or hold back to survive. A detachment fights with what was sent and travels for a time set by how far out the cell is, so a deep push is a long window with a thin nest behind it. They keep hunting while they are away, but at half the rate — they are marching and fighting rather than working a trail." },
+
+  { id: "garrison", group: "hunt", term: "Garrison",
+    known: game => huntUnlocked(game),
+    short: "Phragmotic Guards posted on a cell you hold. A garrisoned cell defends itself; an ungarrisoned one pulls the whole army out to the frontier.",
+    done: game => garrisonedGuards(game) > 0,
+    full: "Held ground is the nest, so something walking into it starts a defence battle either way — the only question is who fights it. This is the one job that is a Guard's alone: she is a living door, she never hunts, and posting her costs the nest nothing in protein and everything in flexibility. Measured, a colony that posts its Guards holds about five times the ground of one that does not, and ends larger than a colony that never played the board at all — because the nest is no longer dragged across the map every time the frontier is touched." },
+
+  { id: "circle", group: "hunt", term: "Circles and tiers",
+    known: game => huntUnlocked(game),
+    short: "Clear all thirty cells and the whole circle folds into the nest for good. A fresh thirty appear outside it, harder than the last.",
+    done: game => !!(game.hunt && game.hunt.tier > 0),
+    full: "So the board has no edge and never gets bigger to read: it is always thirty cells, and the difficulty lives in how many circles are already behind you. A merged circle keeps paying for ever, and it survives a nuptial flight — the ground was taken permanently. What it pays goes as the square root of how many you hold, because circles do not stop and a straight line would eventually make the map the whole game." },
+
+  { id: "trophy", group: "hunt", term: "Trophies",
+    known: game => huntUnlocked(game),
+    short: "What the colony keeps from something it beat. Forty-nine creatures, five grades deep, and the first kill always gives you one.",
+    done: game => trophyCount(game) > 0,
+    full: "Three ways to earn one, mixed, because each alone has a flaw. The first kill always gives the trophy, so a fight is never wasted. Every kill after that rolls for the grade the creature actually wore, which is the reason to hunt further out. And a kill count raises it anyway as a floor, so bad luck can slow a trophy down but never block one. Every grade pays a different KIND — the Aardvark Claw gives room, then protein, then fighting strength, then cheaper brood — so a trophy keeps opening up rather than being a number that grows." },
+
+  { id: "band", group: "hunt", term: "Bands and grades",
+    known: game => trophyCount(game) > 0,
+    short: "The creatures come in five bands, and a band caps the grade its members can ever drop.",
+    done: game => BANDS.some(b => bandHeld(game, b.id) >= 3),
+    full: "So a Phorid Fly is a low grade for ever however lucky or persistent you are, and the ladder is climbed by hunting further out rather than by farming what is nearest. A band multiplies what all of its members give, ramping as it fills and reaching its full figure when complete — so filling one pays the whole way rather than only on the last card. What a creature teaches matches what it is: an antlion teaches holding ground, a pangolin teaches armour, a rove beetle teaches how brood care can be fooled." },
+
   // ------------------------------------------------------------- castes
   { id: "queen", group: "castes", term: "Queen",
     known: () => true,
@@ -110,6 +163,19 @@ export const LIBRARY = [
     short: "The second resource. It comes off the things that attack the nest, and off what the soldiers hunt between attacks.",
     done: game => game.stats.proteinEarned > 100,
     full: "Protein feeds the brood so eggs develop twice as fast, buys the Combat adaptations, trains soldiers into higher grades, and pays for upgrade levels past their designed top. It can also be traded for food in the rendering pit, at a rate read from what the colony actually earns." },
+
+  { id: "supercolony", group: "matriline", term: "Supercolony",
+    known: game => Array.isArray(game.matriline && game.matriline.finished) &&
+      game.matriline.finished.length >= 1,
+    short: "The line stops resetting and starts adding. A daughter walks out to ground you hold and founds a nest of her own, and both keep running.",
+    done: game => nestList(game).length > 0,
+    full: "This is budding rather than a nuptial flight: she does not mate in the air and land alone, she leaves on foot with a share of the workers, so the mother is that many ants poorer and the daughter is alive from her first second. Real, and the reason a Linepithema humile supercolony runs six thousand kilometres along one coast. She carries exactly " + INHERIT_WIDTH + " of her mother's traits and no more — what you do not send with her, she never has, which is why two supercolonies built by two players drift apart instead of converging. Nothing here is bought and nothing is reset; what accumulates is nests, and what it costs is your attention." },
+
+  { id: "nursery", group: "colony", term: "Egg, larva, pupa",
+    known: game => game.eggs.length > 0 || game.stats.eggsHatched > 0,
+    short: "Brood is not one thing waiting to become an ant. It passes through three forms, and only the middle one eats.",
+    done: game => game.stats.eggsHatched > 20,
+    full: "An egg is yolk and needs nothing but warmth. A larva is where the whole adult is actually built, out of protein the nurses bring — it is the only stage with an appetite, and it draws its protein continuously rather than being paid for once when it was laid. A pupa is sealed inside its own cuticle, rebuilding, and cannot be hurried by feeding at all. A larva that goes hungry does not die: it develops more slowly, part-way between the fed and unfed rates, so a colony short of protein is slowed rather than stopped." },
 
   { id: "brood", group: "colony", term: "Brood slot",
     known: () => true,
@@ -336,6 +402,21 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.4.0.0", name: "The ground fights back",
+    changes: [
+      "The Hunt was paying nothing at all. A column in the field fought with the soldiers who had stayed home, so committing your whole army fought at no strength — the map has never once added to what a colony gathers. It does now.",
+      "Garrisons. Post a Phragmotic Guard on ground you hold and that cell answers its own door; leave it bare and the whole army is dragged out to the frontier. Posting them roughly quintuples the ground a colony can keep.",
+      "Every circle has residents — five to ten creatures already standing on it when it opens — and until they are dead, empty ground cannot be occupied. Breaking them is what opens the map.",
+      "Holding ground costs what it is worth. The more of a circle you occupy, the harder something coming for it fights: barely anything at a few cells, five times as hard with the whole circle held.",
+      "War Parties, bought with protein: a second, third and fourth column in the field at once. The shares add up, so what is away cannot defend the nest.",
+      "The brood is a nursery rather than a queue. An egg, then a larva, then a pupa — and only the larva eats, drawing its protein continuously instead of paying once when it was laid. A larva that goes hungry develops slowly rather than not at all.",
+      "Big foragers have names. They were always the only individuals in the colony and they were shown as a number.",
+      "The colony keeps a chronicle of what it remembers — a daughter named, the founding generation spent, a first kill, a nest that did not hold. It is under Settings.",
+      "Six new trials, one for each species, each taking away the thing that species is: the garden, the second queen, the endosymbiont, the column, the jars, the captures.",
+      "Trials ask more of a colony that has grown. A trial level used to fall in about two minutes once you were mastered; it now costs around twenty.",
+      "The Supercolony. Once two species are finished, a daughter can walk out to ground you hold and found a nest of her own — carrying exactly three of this nest's traits, and no more. Both keep running.",
+      "Three new achievement tracks for the map, seven new library entries, and a new bonus at level 25 that brings creatures to the board sooner."
+    ] },
   { version: "0.3.1.1", name: "Every trophy does something",
     changes: [
       "All forty-nine trophies now give a real bonus, and each one matches what you took it from. An antlion teaches you to hold ground. A chimpanzee teaches technique, so your eggs cost less. A pangolin teaches armour. A rove beetle teaches how brood care gets fooled.",

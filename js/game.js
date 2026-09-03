@@ -46,8 +46,8 @@ import {
   UPGRADES,
   upgradeBranch,
   upgradeOwned,
-  upgradeUnlocked
-} from "./ants.js";
+  upgradeUnlocked, spawnRate,
+  maxMarches } from "./ants.js";
 import {
   foodPerProtein,
   EGG_PROTEIN_COST,
@@ -78,6 +78,7 @@ import {
   challengeFailed,
   challengeTarget,
   challengeTargetMet,
+  touchTrials,
   challengeProgress,
   sterileActive,
   callowActive,
@@ -93,8 +94,8 @@ import {
   haplotypeEarned, haplotype, jellyBanked, jellyKept, inheritedPrestige,
   matrilineUpgradeById, matrilineUpgradeOwned, LINEAGE_COST,
   speciesProteinCostMult, passiveFeedFree, dulosis, gardenActive,
-  speciesOverflowsToProtein
-} from "./matriline.js";
+  speciesOverflowsToProtein,
+  finishedSpecies} from "./matriline.js";
 import { INSTINCTS, instinctById, instinctOwned, instinctPoints, instinctKeptFood
 } from "./instincts.js";
 import { discoverLibrary } from "./library.js";
@@ -133,8 +134,16 @@ export { GENERIC_NAME, PASSIVE_KINDS } from "./species.js";
 // a real import, not a re-export: speciesRatios is USED below, and a re-export
 // creates no local binding
 import { speciesRatios } from "./species.js";
+import { broodStage, broodFedShare, LARVA_SPAN, BROOD_STAGES,
+  bigForagerName } from "./ants.js";
+import { monsterById } from "./bestiary.js";
+import { INHERIT_WIDTH, traitById, nestTraits, earnedTraits, nests as nestList,
+  nestCount, networkAge, buddableCells, superUnlocked, SUPER_SPECIES_NEEDED }
+  from "./supercolony.js";
 import { initHunt, huntTick, huntUnlocked, marchTick, mergeTier, heldCells,
-  SPAWN_SECONDS, ADVANCE_SECONDS } from "./hunt.js";
+  SPAWN_SECONDS, ADVANCE_SECONDS, setGarrison, garrisonAvailable, marchesOut,
+  seedBoard, canOccupy,
+  garrisonedGuards, clampGarrisons } from "./hunt.js";
 // real imports, not re-exports: these are USED in tick() below
 import { monsterPower, raidsUnlocked as raidsOpen } from "./raids.js";
 import { awardTrophy, trophyCount } from "./trophies.js";
@@ -244,13 +253,227 @@ function blankGame() {
     stats: { foodEarned: 0, eggsHatched: 0, playtime: 0, exiled: 0, proteinEarned: 0,
       raidsWonTotal: 0, eggsCancelled: 0, challengeLevels: 0, bestTrial: {},
       trained: 0, trainingDeaths: 0, speciesFlights: {}, awayReturns: 0,
-      flightsEver: 0, jellyEver: 0 },
+      flightsEver: 0, jellyEver: 0, peakHeld: 0, circlesEver: 0 },
+    chronicle: [],
+    nests: [],
+    traits: [],
     prestige: { royalJelly: 0, royalJellyTotal: 0, flightsTaken: 0, upgrades: [] },
     lastSave: Date.now()
   };
 }
 
 export const game = blankGame();
+
+// The colony's own account of itself.
+//
+// An hour of play produces no story: every notable thing that happens is one
+// line of interface that the next one overwrites. All of these events were
+// already detected -- a founder dying, an oversized daughter emerging, a circle
+// taken, a creature met -- and none of them was kept. Kept, they are a history,
+// and a history is what an absence should return you to.
+//
+// Newest first, capped, and it costs the model nothing: it is a record of
+// things that already happened rather than a new mechanic.
+// What share of the mother walks out with a daughter. Small on purpose: a
+// network is grown by founding often, not by halving a good nest.
+export const BUD_SHARE = 0.1;
+
+export const CHRONICLE_MAX = 60;
+
+// An entry stores the EVENT, not the sentence. Written out in full it cost 180
+// characters an entry and made a finished colony's save code 25.7% longer --
+// and a save code that grows is a real cost here, because a truncated paste is
+// the documented way importing fails. As a key and a couple of parameters an
+// entry is about 48 characters and the same sixty of them add roughly a tenth.
+//
+// The sentence is built at render time, which also means the wording can be
+// improved later without rewriting anybody's history.
+export const CHRONICLE_EVENTS = {
+  big: e => "An oversized daughter emerged. The colony calls her " + e.a + ".",
+  founders: e => "The founding generation is spent. " + e.a + " of them worked " +
+    "themselves to death on the queen's flight muscle, which is what a founding " +
+    "generation is for.",
+  circle: e => "The whole circle was taken. It is nest now, and a wider ring of " +
+    "unfamiliar ground has opened beyond it — circle " + e.a + ".",
+  flight: e => "A daughter took the nuptial flight and founded a new colony, " +
+    "carrying " + e.a + " royal jelly out of a nest of " + e.b + ".",
+  kill: e => "First kill: " + e.a + ". The colony kept the " + e.b + ".",
+  loss: e => "The nest did not hold. " + e.a + " ants died to " + e.b + ".",
+  bud: e => "A daughter walked out with " + (e.b || 0) + " workers and founded a " +
+    "nest of her own, carrying " + e.a + ".",
+  note: e => e.a
+};
+
+export function chronicleText(entry) {
+  const build = CHRONICLE_EVENTS[entry && entry.k];
+  return build ? build(entry) : (entry && entry.a) || "";
+}
+
+export function chronicle(kind, a, b) {
+  if (!CHRONICLE_EVENTS[kind]) return;
+  if (!Array.isArray(game.chronicle)) game.chronicle = [];
+  const entry = { t: Math.round(game.stats.playtime || 0),
+    run: Math.round(game.runTime || 0), k: kind };
+  if (a !== undefined) entry.a = a;
+  if (b !== undefined) entry.b = b;
+  game.chronicle.unshift(entry);
+  if (game.chronicle.length > CHRONICLE_MAX) game.chronicle.length = CHRONICLE_MAX;
+}
+
+// A raid worth remembering: the first time a creature is beaten, and any defeat
+// that cost real ants. Everything else is routine and would bury the rest.
+function noteRaid(result) {
+  if (!result) return result;
+  if (result.trophy && result.trophy.first) {
+    const monster = monsterById(result.monster);
+    chronicle("kill", monster ? monster.name : "something", result.trophy.name);
+  }
+  if (!result.won) {
+    let lost = 0;
+    for (const k in result.dead || {}) lost += result.dead[k];
+    if (lost >= 20) {
+      chronicle("loss", lost, (monsterById(result.monster) || { name: "something" }).name);
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------- layer 3: the network
+//
+// Everything that belongs to ONE nest rather than to the line. A background nest
+// is a snapshot of exactly these; everything else -- the matriline, the lineage,
+// achievements, trophies, the chronicle, lifetime stats, settings -- is the
+// line's and is shared by every nest in it.
+//
+// Listing what is per-nest rather than what is shared is the safe direction: a
+// key nobody remembered to add stays shared, which is what it already was.
+const NEST_KEYS = ["food", "protein", "reserves", "ants", "eggs", "bigForagers",
+  "upgrades", "runTime", "run", "hunt", "wings", "wingStrip", "wingsShed",
+  "raidTimer", "monster", "monsterMod", "raidsWon", "raidsLost", "lossStreak",
+  "emerged", "naniticsDied", "foragersSinceBig", "nextCaste", "traits",
+  "lastRaid", "rallyUntil", "rallyReadyAt"];
+
+// A nest that is not focused still runs, and it runs through the REAL tick().
+// The away report already established the rule: anything that progresses in the
+// background must take the same path the player would have watched, or
+// switching to it lands somewhere the live path never would.
+//
+// `game` is a single exported object that every module holds a reference to, so
+// the focused nest is swapped into it rather than passed around. Nothing
+// observes the swap, because it begins and ends inside one synchronous call.
+function swapIn(snapshot) {
+  const held = {};
+  for (const key of NEST_KEYS) {
+    held[key] = game[key];
+    if (key in snapshot) game[key] = snapshot[key];
+  }
+  touchBrood();
+  return held;
+}
+
+function swapOut(held, snapshot) {
+  for (const key of NEST_KEYS) {
+    snapshot[key] = game[key];
+    game[key] = held[key];
+  }
+  touchBrood();
+}
+
+export function tickNests(dt) {
+  const list = nestList(game);
+  if (!list.length) return;
+  for (const nest of list) {
+    const held = swapIn(nest);
+    try {
+      tick(dt, true);
+    } finally {
+      swapOut(held, nest);
+    }
+  }
+}
+
+// A daughter walks out with what she was given, on ground the colony holds.
+// Exactly INHERIT_WIDTH traits and no more: what is not chosen is left behind,
+// which is the whole reason this is a drift rather than an accumulation.
+export function budNest(cellIndex, traitIds) {
+  if (!superReady()) return null;
+  const open = buddableCells(game);
+  const spot = open.find(x => x.index === cellIndex);
+  if (!spot) return null;
+  const mine = nestTraits(game);
+  const chosen = (traitIds || []).filter(id => traitById(id) && mine.indexOf(id) >= 0)
+    .slice(0, INHERIT_WIDTH);
+  const fresh = blankGame();
+  const nest = {};
+  for (const key of NEST_KEYS) nest[key] = fresh[key];
+  nest.traits = chosen;
+  nest.runTime = 0;
+  // A daughter WALKS OUT, which is the whole difference between budding and a
+  // nuptial flight. She does not land alone and start from a queen's flight
+  // muscle -- she leaves with a share of the workers, and the mother is that
+  // many ants poorer. So founding a nest costs something real, and the new one
+  // is alive from its first second instead of sitting at nothing for ever
+  // waiting for a queen nobody is watching to shed her wings.
+  let taken = 0;
+  for (const caste in game.ants) {
+    const move = Math.floor((game.ants[caste] || 0) * BUD_SHARE);
+    if (move <= 0) continue;
+    game.ants[caste] -= move;
+    nest.ants[caste] = (nest.ants[caste] || 0) + move;
+    taken += move;
+  }
+  // her queen came with her, so there are no wings to shed and no reserves to
+  // live on: this colony is already past its founding
+  nest.wingsShed = true;
+  nest.wings = 0;
+  nest.emerged = Math.max(1, taken);
+  nest.hunt = { cells: null, tier: 0, open: false, march: null,
+    spawnTimer: 0, advanceTimer: 0 };
+  nest.cell = cellIndex;
+  if (!Array.isArray(game.nests)) game.nests = [];
+  game.nests.push(nest);
+  spot.cell.nest = game.nests.length;
+  chronicle("bud", chosen.length
+    ? chosen.map(id => traitById(id).name).join(", ") : "nothing at all", taken);
+  save();
+  return nest;
+}
+
+// Focus moves; nothing resets. The nest you leave keeps running.
+export function focusNest(index) {
+  const list = nestList(game);
+  if (!(index >= 0 && index < list.length)) return false;
+  const nest = list[index];
+  const held = {};
+  for (const key of NEST_KEYS) {
+    held[key] = game[key];
+    game[key] = key in nest ? nest[key] : game[key];
+  }
+  for (const key of NEST_KEYS) nest[key] = held[key];
+  touchBrood();
+  save();
+  return true;
+}
+
+export function superReady() {
+  return superUnlocked(game, finishedSpecies(game).length);
+}
+
+export function superProgress() {
+  return { have: finishedSpecies(game).length, need: SUPER_SPECIES_NEEDED };
+}
+
+export function networkNests() {
+  return nestCount(game);
+}
+
+export function networkHours() {
+  return networkAge(game);
+}
+
+export function inheritableTraits() {
+  return nestTraits(game).map(id => traitById(id)).filter(Boolean);
+}
 
 export function shedWings() {
   if (game.wingsShed) return false;
@@ -265,7 +488,9 @@ export function shedWings() {
 // line and the brood window both read this rather than recomputing it
 export function eggSecondsLeft(egg, queuePosition) {
   const founding = emergingCaste(game, egg, queuePosition) === "nanitic";
-  const rate = hatchRate(game) * (egg.fed ? FED_EGG_SPEED : 1) *
+  // reads how fed it actually is, not a flag: a part-fed larva develops
+  // part-way between the two speeds and the countdown has to say so
+  const rate = hatchRate(game) * (1 + (FED_EGG_SPEED - 1) * broodFedShare(egg)) *
     (founding ? NANITIC_HATCH_SPEED : 1);
   return Math.max(0, (EGG_TIME - egg.progress) / rate);
 }
@@ -629,17 +854,20 @@ function layOne(caste, stock) {
     ? RESERVE_EGG_COST : eggPrice(caste, stock + 1, game);
   if (game[resource] < amount) return false;
   game[resource] -= amount;
-  // Camponotus recycles nitrogen so an egg costs less protein, and Atta's
-  // Gongylidia feeds a share of them for nothing at all.
-  const proteinCost = EGG_PROTEIN_COST * speciesProteinCostMult(game);
-  // only roll when a species has actually banked the passive: an unconditional
-  // Math.random() per egg walks the shared stream and moves every big-forager
-  // roll in the game with it
+  // Nothing is fed at laying any more. An egg is yolk: it eats when it becomes
+  // a larva, and it eats continuously from then until it pupates, which is what
+  // makes a protein supply matter all the time rather than at one instant. The
+  // total per egg is unchanged -- it is simply drawn down over the stage that
+  // actually consumes it, and a raid that lands mid-development now feeds the
+  // larvae already in the chamber.
+  //
+  // Atta's Gongylidia still decides at laying, because it is a property of the
+  // egg rather than of the larder. Only roll when the passive is actually
+  // banked: an unconditional Math.random() per egg walks the shared stream and
+  // moves every big-forager roll in the game with it.
   const freeShare = passiveFeedFree(game);
   const free = freeShare > 0 && Math.random() < freeShare;
-  const fed = game.settings.feedBrood !== false && (free || game.protein >= proteinCost);
-  if (fed && !free) game.protein -= proteinCost;
-  game.eggs.push({ caste, progress: 0, fed });
+  game.eggs.push({ caste, progress: 0, fed: free, free, paid: free ? 1 : 0 });
   touchBrood();
   return true;
 }
@@ -888,6 +1116,7 @@ export function exportSave() {
 }
 
 export function importSave(text) {
+  touchTrials();
   const data = decodeSave(text);
   if (!data) return false;
   if (!stashSave(data)) return false;
@@ -896,6 +1125,7 @@ export function importSave(text) {
 }
 
 export function hardReset() {
+  touchTrials();
   clearSaves();
   Object.assign(game, blankGame());
   touchBrood();
@@ -908,6 +1138,23 @@ export function hardReset() {
 // The gate a species with a hard cap is held to, which is the flat figure for
 // everyone else. One source, so the milestone line, the Nuptial tab and the
 // flight itself cannot disagree about what it takes.
+// Posting Guards on the frontier. It is a click and only a click -- nothing
+// posts or recalls on the player's behalf, the same rule that keeps laying,
+// exiling and destroying in the player's hands.
+export function garrisonCell(index, count) {
+  const n = setGarrison(game, index, count);
+  save();
+  return n;
+}
+
+export function guardsAvailable() {
+  return garrisonAvailable(game);
+}
+
+export function guardsPosted() {
+  return garrisonedGuards(game);
+}
+
 export function flightGate(game) {
   return speciesFlightGate(game, PRESTIGE_UNLOCK);
 }
@@ -939,6 +1186,7 @@ export function doFlight() {
   game.prestige.royalJelly = Math.round((game.prestige.royalJelly + earned) * 100) / 100;
   game.prestige.royalJellyTotal = Math.round((game.prestige.royalJellyTotal + earned) * 100) / 100;
   game.prestige.flightsTaken += 1;
+  chronicle("flight", earned.toFixed(2), Math.round(population(game)));
   // Lifetime totals the achievement tracks read instead of the resettable
   // fields. A matriline reset zeroes flightsTaken and royalJellyTotal, and
   // measured that cost 25 tiers -- 8 from the flights track and 17 from royal
@@ -1051,6 +1299,7 @@ export function challengeCount() {
 }
 
 export function completeChallenge() {
+  touchTrials();
   if (!challengeMet()) return false;
   const id = activeChallenge(game).id;
   const line = currentSpecies(game);
@@ -1081,6 +1330,7 @@ export function completeChallenge() {
 // worth making: without them a second matriline replays four and a half hours
 // of content the player has already finished.
 export function doMatrilineReset(speciesId) {
+  touchTrials();
   if (!matrilineReady(game)) return 0;
   const earned = haplotypeEarned(game);
   // Retained Royalty keeps a share of the JELLY IN HAND, uncapped. It used to
@@ -1212,16 +1462,31 @@ function rollBigForager() {
   return Math.random() < (game.foragersSinceBig + 1) / threshold;
 }
 
-export function tick(dt) {
+// `background` is set when this is a nest being run while the player is looking
+// at another one. It stops the network ticking itself recursively, and it is the
+// only difference between the two paths -- everything else a background nest
+// does is exactly what a watched one does.
+export function tick(dt, background) {
   if (!isFinite(dt) || dt <= 0) return;
   // A wing pays only for as long as it lasts. An offline chunk can be far
   // longer than the strip -- at an eight hour absence the step is 48s against
   // a 10s strip -- and would otherwise pay out several times over.
   const wingRate = wingYield(game);
   const wingSeconds = Math.min(dt, game.wingStrip || 0);
-  const earned = (foodPerSecond(game) - wingRate) * dt + wingRate * wingSeconds;
+  const foodRate = foodPerSecond(game);
+  const earned = (foodRate - wingRate) * dt + wingRate * wingSeconds;
   game.food += earned;
   game.stats.foodEarned += earned;
+  // The high-water mark of what this LINE can produce with nothing holding it
+  // back. A trial's target is a fraction of this, which is what makes the ask
+  // self-scaling against every source of growth at once rather than against the
+  // one mastery it used to read. Recorded outside a trial only, or a trial
+  // would raise the bar it is being measured by.
+  // reuses the rate already computed above -- calling foodPerSecond twice a tick
+  // was the single most expensive thing this block could have done
+  if (!challengeActive(game) && foodRate > (game.stats.peakFoodRate || 0)) {
+    game.stats.peakFoodRate = foodRate;
+  }
   // Myrmecocystus holds its store in the bodies of living ants. What the colony
   // gathered it gathered -- the ladders count it -- but what it cannot hang up
   // it loses, so growing the nest is the only way to save.
@@ -1267,18 +1532,51 @@ export function tick(dt) {
 
   const rate = hatchRate(game);
   const tended = broodCapacity(game);
+  // What one larva eats across the whole of its larval stage. Camponotus
+  // recycles nitrogen so it costs less; Atta's Gongylidia pays it outright.
+  const proteinPerEgg = EGG_PROTEIN_COST * speciesProteinCostMult(game);
+  const feedOn = game.settings.feedBrood !== false;
   // only the tended slots develop, so only they are walked -- scanning a
   // 187,000-egg queue every tick to skip all but the first 1,600 was wasted work
   for (let i = Math.min(tended, game.eggs.length) - 1; i >= 0; i--) {
     const egg = game.eggs[i];
     const founding = emergingCaste(game, egg, i) === "nanitic";
-    egg.progress += rate * dt * (egg.fed ? FED_EGG_SPEED : 1) *
+    // A part-fed larva develops part-way between the two speeds rather than
+    // falling off a cliff, so a colony that runs short of protein slows down
+    // instead of stopping -- the same rule the old lump payment followed, made
+    // continuous.
+    const share = broodFedShare(egg);
+    egg.fed = share > 0;
+    const wasLarva = broodStage(egg).id === "larva";
+    const delta = rate * dt * (1 + (FED_EGG_SPEED - 1) * share) *
       (founding ? NANITIC_HATCH_SPEED : 1);
+    egg.progress += delta;
+    // ...and now it eats, for the part of the larval window it just crossed.
+    // Charged on the progress ACTUALLY made rather than on `rate * dt`: a fed
+    // larva moves at up to double speed, so billing it at the unfed rate let it
+    // outrun its own appetite and leave the stage having paid 0.72 of 1.00.
+    // Summed over the stage this comes to exactly one egg's worth.
+    if (wasLarva && share < 1 && feedOn && game.protein > 0 && proteinPerEgg > 0) {
+      const want = Math.min(1 - share, delta / LARVA_SPAN);
+      const cost = Math.min(game.protein, want * proteinPerEgg);
+      if (cost > 0) {
+        game.protein -= cost;
+        egg.paid = Math.min(1, share + cost / proteinPerEgg);
+        egg.fed = true;
+      }
+    }
     if (egg.progress >= EGG_TIME) {
       const caste = emergingCaste(game, egg);
       if (caste === "forager" && rollBigForager()) {
         game.ants.bigforager++;
-        game.bigForagers.push(game.stats.playtime);
+        // Her name is derived from her birth time, so two sisters emerging in
+        // the same tick would be the same ant as far as the roster is
+        // concerned. A microsecond apart is enough to tell them apart and is
+        // far below anything her age is measured in.
+        let bornAt = game.stats.playtime;
+        while (game.bigForagers.indexOf(bornAt) >= 0) bornAt += 1e-6;
+        game.bigForagers.push(bornAt);
+        chronicle("big", bigForagerName(bornAt));
         game.foragersSinceBig = 0;
       } else {
         game.ants[caste]++;
@@ -1296,16 +1594,32 @@ export function tick(dt) {
   // battle where it stands -- there is no separate "it reached the centre".
   // opens with the soldiers, the same gate raids have always used
   if (raidsUnlocked(game) && !huntUnlocked(game)) openHunt();
+  // A circle with nobody on it can be walked onto from its first second. Both
+  // the first board and every merged one are seeded here, where the attacker's
+  // base strength is known.
+  if (huntUnlocked(game) && game.hunt.baseCount === 0 && game.hunt.baseLeft === 0 &&
+      !game.hunt.cells.some(c => c.held || c.monster)) {
+    seedBoard(game, monsterPower(game));
+  }
   if (huntUnlocked(game)) {
-    const breach = huntTick(game, dt, monsterPower(game));
+    const breach = huntTick(game, dt, monsterPower(game), undefined, spawnRate(game));
     for (const cell of breach.breached) {
       // a breach is a raid, resolved by whatever is not away with the march
-      resolveRaidFor(game, cell);
+      noteRaid(resolveRaidFor(game, cell));
     }
     // and the army in the field, which fights with only what was sent
-    marchTick(game, dt, cell => resolveRaidFor(game, cell));
+    marchTick(game, dt, cell => noteRaid(resolveRaidFor(game, cell, true)));
+    // The high-water mark of ground held, which a reset must never walk back.
+    // Counted rather than filtered: heldCells() allocates an array every tick
+    // and only its length was ever wanted.
+    let holding = 0;
+    for (const c of game.hunt.cells) if (c.held && !c.monster) holding++;
+    if (holding > (game.stats.peakHeld || 0)) game.stats.peakHeld = holding;
     // a circle taken whole becomes the nest, and a new one opens outside it
-    mergeTier(game);
+    if (mergeTier(game)) {
+      game.stats.circlesEver = (game.stats.circlesEver || 0) + 1;
+      chronicle("circle", game.stats.circlesEver);
+    }
   }
 
   // The Blight. Infection grows on the infected and on the share it already
@@ -1322,6 +1636,7 @@ export function tick(dt) {
   }
 
   if (!game.naniticsDied && game.runTime >= naniticLifespan(game) && game.ants.nanitic > 0) {
+    chronicle("founders", game.ants.nanitic);
     game.ants.nanitic = 0;
     game.naniticsDied = true;
   }
@@ -1370,7 +1685,7 @@ export function tick(dt) {
       game.raidTimer -= dt;
       let guard = 0;
       while (game.raidTimer <= 0 && guard++ < 512) {
-        resolveRaidFor(game);
+        noteRaid(resolveRaidFor(game));
         game.raidTimer += raidInterval(game);
       }
     }
@@ -1382,10 +1697,15 @@ export function tick(dt) {
   checkAchievements();
   checkSpeciesFinished(game);
   discoverLibrary(game);
+
+  // ...and every other nest in the network runs too. Only the focused nest
+  // drives this, or the network would tick itself once per nest per nest.
+  if (!background) tickNests(dt);
 }
 
 
 export function load() {
+  touchTrials();
   const data = readSave();
   if (!data) return 0;
 
@@ -1447,5 +1767,5 @@ export function raidImminent() {
 }
 
 export function resolveRaid() {
-  return resolveRaidFor(game);
+  return noteRaid(resolveRaidFor(game));
 }

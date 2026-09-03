@@ -14,7 +14,9 @@ import {
   speciesFinished, passiveOf, activeValue, activeIs
 } from "./species.js";
 import { PRESTIGE_UPGRADES } from "./prestige.js";
-import { CHALLENGES, speciesTrialLevel, dulosisTrial, dulosisCapture } from "./challenges.js";
+import { CHALLENGES, speciesTrialLevel, dulosisTrial, dulosisCapture,
+  speciesTrialScale, masteryGarden, masteryQueens, masterySymbiont,
+  masteryColumn, masteryCrop, masterySabre } from "./challenges.js";
 
 // what the whole Royal Lineage costs, which is the cap on what Retained
 // Royalty can hand the next matriline -- at most the tree, never a snowball
@@ -357,12 +359,21 @@ export function gardenActive(game) {
   return activeIs(game, "garden");
 }
 
+// Each species active now carries its own trial's debuff and its own trial's
+// mastery. The scale is 1 unless THAT species' trial is the one running, so
+// these read unconditionally and a species whose trial is not open is untouched.
 export function gardenMultiplier(game) {
-  return activeMult(game, "gardenMult");
+  return activeMult(game, "gardenMult") *
+    speciesTrialScale(game, "atta") * masteryGarden(game);
 }
 
 export function speciesCapMult(game) {
-  return activeValue(game, "capMult", 1) + activeAdd(game, "capMultAdd");
+  const base = activeValue(game, "capMult", 1) + activeAdd(game, "capMultAdd");
+  if (base === 1) return 1;
+  // the trial takes the polygyne BONUS, not the whole cap, or a single-queen
+  // colony would hold less than an ordinary one
+  const bonus = (base - 1) * speciesTrialScale(game, "solenopsis") * masteryQueens(game);
+  return 1 + bonus;
 }
 
 export function speciesBroodAdd(game) {
@@ -387,7 +398,10 @@ export function speciesLossMult(game) {
 }
 
 export function speciesProteinCostMult(game) {
-  return activeValue(game, "proteinCostMult", 1) * activeMult(game, "proteinCostMultScale");
+  // Aposymbiotic runs the other way: a smaller scale means a DEARER egg, so the
+  // debuff divides where every other one multiplies.
+  const trial = speciesTrialScale(game, "camponotus") / masterySymbiont(game);
+  return (1 / trial) * activeValue(game, "proteinCostMult", 1) * activeMult(game, "proteinCostMultScale");
 }
 
 export function speciesExcavatorCapMult(game) {
@@ -404,7 +418,8 @@ export function nomadic(game) {
 }
 
 export function nomadCap(game) {
-  return activeValue(game, "nomadCap", 0) * activeMult(game, "nomadCapMult");
+  return activeValue(game, "nomadCap", 0) * activeMult(game, "nomadCapMult") *
+    speciesTrialScale(game, "eciton") * masteryColumn(game);
 }
 
 // What this colony must reach to take the nuptial flight. A species with a hard
@@ -427,7 +442,8 @@ export function speciesRaidIntervalMult(game) {
 // after ninety minutes at every level, which is the Polyergus bug again.
 export function speciesCapture(game) {
   const own = activeValue(game, "capture", 0);
-  return Math.max(own, dulosisCapture(game)) * activeMult(game, "captureMult");
+  return Math.max(own, dulosisCapture(game)) * activeMult(game, "captureMult") *
+    speciesTrialScale(game, "polyergus") * masterySabre(game);
 }
 
 export function speciesHuntMult(game) {
@@ -442,7 +458,8 @@ export function dulosis(game) {
 
 export function speciesFoodCapPerAnt(game) {
   const per = activeValue(game, "foodCapPerAnt", 0);
-  return per > 0 ? per * activeMult(game, "foodCapMult") : 0;
+  return per > 0 ? per * activeMult(game, "foodCapMult") *
+    speciesTrialScale(game, "myrmecocystus") * masteryCrop(game) : 0;
 }
 
 // What an egg costs the colony, as a multiplier on the caste curve.

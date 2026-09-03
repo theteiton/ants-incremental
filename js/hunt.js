@@ -23,6 +23,26 @@ export const ADVANCE_SECONDS = 90;
 // how often something new appears on the rim
 export const SPAWN_SECONDS = 110;
 
+// A fresh circle is not empty ground with a trickle of arrivals -- it is
+// already somebody's. Between these many creatures are standing on it when it
+// opens, and they are what a colony has to break before the ground is its own.
+export const BASE_MONSTERS_MIN = 5;
+export const BASE_MONSTERS_MAX = 10;
+
+// ...and until every one of them is dead, empty ground CANNOT be occupied.
+// That was the wall: a cell could only ever be claimed by killing something
+// standing on it, so nineteen cells sat empty and unclaimable at any moment and
+// no circle could ever be completed however many columns marched. Breaking the
+// resident population is what opens the ground.
+//
+// Holding ground then costs what it is worth. Defence battles scale with how
+// much of the circle the colony occupies -- gently at first and steeply at the
+// end, so early expansion is free and a nearly-complete circle is defended at
+// real cost. Without it the optimal play is to rush every cell and never fight
+// for any of them.
+export const HOLD_PRESSURE = 4;
+export const HOLD_EXPONENT = 2;
+
 // ...and how much of the board anything is allowed to occupy at once. Without
 // it a colony that simply never marched filled 27 of 30 cells in an hour, which
 // is the wall of red the design explicitly refused. With it the pressure is
@@ -113,14 +133,72 @@ export function newBoard(rng) {
   return cells;
 }
 
+// Puts the resident population on a fresh circle. Called wherever a board is
+// created, because a board without them can be occupied from the first second
+// and the whole point is that it cannot.
+export function seedBoard(game, basePower, rng) {
+  const h = game.hunt;
+  if (!h || !h.cells) return 0;
+  const roll = rng || Math.random;
+  const want = BASE_MONSTERS_MIN +
+    Math.floor(roll() * (BASE_MONSTERS_MAX - BASE_MONSTERS_MIN + 1));
+  const free = h.cells.filter(c => !c.monster && !c.held);
+  const choices = monsterChoices(Math.max(1, basePower) * Math.pow(TIER_SCALE, h.tier || 0));
+  let placed = 0;
+  for (let i = 0; i < want && free.length; i++) {
+    const cell = free.splice(Math.floor(roll() * free.length), 1)[0];
+    const picked = choices[Math.floor(roll() * choices.length)];
+    cell.monster = picked.id;
+    const open = MODIFIERS.filter(m => m.grade <= topGradeFor(picked));
+    cell.mod = open[Math.floor(roll() * open.length)].id;
+    cell.base = true;
+    placed++;
+  }
+  h.baseLeft = placed;
+  h.baseCount = placed;
+  return placed;
+}
+
+// The ground is only open once the residents are gone.
+export function canOccupy(game) {
+  const h = game.hunt;
+  return !!h && h.open && (h.baseLeft || 0) <= 0;
+}
+
+// One of the residents has been killed. Monotone: a wandering spawn that later
+// stands on the same cell does not put the count back up.
+export function clearBase(game, cell) {
+  const h = game.hunt;
+  if (!h || !cell || !cell.base) return;
+  cell.base = false;
+  h.baseLeft = Math.max(0, (h.baseLeft || 0) - 1);
+}
+
+// What holding this much of a circle costs when something comes for it. Mild
+// early, steep at the end: at a fifth of the board it is x1.16, at half x2.00,
+// and with the whole circle held x5.00.
+export function holdPressure(game) {
+  const h = game.hunt;
+  if (!h || !h.open || !h.cells) return 1;
+  let held = 0;
+  for (const c of h.cells) if (c.held && !c.monster) held++;
+  return 1 + HOLD_PRESSURE * Math.pow(held / CELLS, HOLD_EXPONENT);
+}
+
 export function initHunt(game) {
   if (!game.hunt) game.hunt = {};
   const h = game.hunt;
   if (!h.cells || h.cells.length !== CELLS) h.cells = newBoard();
   if (typeof h.tier !== "number") h.tier = 0;
   if (typeof h.spawnTimer !== "number") h.spawnTimer = SPAWN_SECONDS;
+  // a save from before the residents existed has an open board with none on it;
+  // it is treated as already broken rather than retro-seeded under the player
+  if (typeof h.baseLeft !== "number") { h.baseLeft = 0; h.baseCount = 0; }
   if (typeof h.advanceTimer !== "number") h.advanceTimer = ADVANCE_SECONDS;
-  if (!("march" in h)) h.march = null;
+  // A save from before War Parties carries a single `march`; it becomes a list
+  // of one, and the old field is dropped so nothing can read it by accident.
+  if (!Array.isArray(h.marches)) h.marches = h.march ? [h.march] : [];
+  delete h.march;
   if (typeof h.open !== "boolean") h.open = false;
   return h;
 }
@@ -186,6 +264,58 @@ export function territoryEgg(game) {
   return 1 / territoryOf(game, "egg");
 }
 
+// ------------------------------------------------------------- the garrison
+//
+// Held ground IS the nest, so anything walking into it starts a defence battle
+// where it stands -- the question the board asks is WHO fights it. An
+// ungarrisoned cell pulls the home army out to the frontier; a garrisoned one
+// defends itself and the home army stays home.
+//
+// The garrison is Phragmotic Guards and only Guards. She is a living door, she
+// already never hunts, and this is the first job in the game that is hers
+// alone: posting her costs the nest nothing in protein and everything in
+// flexibility, because a Guard on a cell is a Guard not at the gate.
+//
+// A posted Guard is NOT removed from the roster. She still counts for
+// population, the cap and the egg price -- `guard` is an assignment count, and
+// the invariant is that the posted total never exceeds the Guards that exist.
+export function garrisonedGuards(game) {
+  const h = game.hunt;
+  if (!h || !h.cells) return 0;
+  let n = 0;
+  for (const c of h.cells) n += c.guard || 0;
+  return n;
+}
+
+export function garrisonAvailable(game) {
+  return Math.max(0, (game.ants.guard || 0) - garrisonedGuards(game));
+}
+
+// Guards die, and when they do the postings have to come back inside the count
+// they are drawn from. Called from every path that can kill one.
+export function clampGarrisons(game) {
+  const h = game.hunt;
+  if (!h || !h.cells) return;
+  let left = game.ants.guard || 0;
+  for (const c of h.cells) {
+    if (!c.guard) continue;
+    const keep = Math.min(c.guard, left);
+    c.guard = keep;
+    left -= keep;
+  }
+}
+
+// Posting is a click and unposting is a click; nothing does either on the
+// player's behalf. A cell only holds a garrison while the colony holds it.
+export function setGarrison(game, index, count) {
+  const cell = cellAt(game, index);
+  if (!cell || !cell.held || cell.monster) return 0;
+  const want = Math.max(0, Math.floor(count));
+  const room = garrisonAvailable(game) + (cell.guard || 0);
+  cell.guard = Math.min(want, room);
+  return cell.guard;
+}
+
 // what a single cell is worth to hold, for the panel to say
 export function cellWorth(cell) {
   const area = areaById(cell.area);
@@ -249,7 +379,9 @@ function advance(game) {
 }
 
 // `rng` is passed in so a test can make the board deterministic.
-export function huntTick(game, dt, basePower, rng) {
+// `rate` is handed in for the same reason `max` is on marchReady: the figure
+// comes from ants.js, which imports this file.
+export function huntTick(game, dt, basePower, rng, rate) {
   const h = game.hunt;
   if (!h || !h.open) return { spawned: null, breached: [] };
   const roll = rng || Math.random;
@@ -259,7 +391,7 @@ export function huntTick(game, dt, basePower, rng) {
   h.spawnTimer -= dt;
   while (h.spawnTimer <= 0) {
     spawned = spawn(game, basePower, roll) || spawned;
-    h.spawnTimer += SPAWN_SECONDS;
+    h.spawnTimer += SPAWN_SECONDS / Math.max(0.05, rate || 1);
   }
   h.advanceTimer -= dt;
   let guard = 0;
@@ -275,29 +407,60 @@ export function huntTick(game, dt, basePower, rng) {
 // One at a time, and the soldiers sent CANNOT defend the nest while they are
 // gone. That is the decision the game was short of: push out to grow, or hold
 // back to survive.
-export function marchReady(game) {
+// One army was the whole decision the board offered, and measured on a mastered
+// colony that became the wall instead: it outguns the weakest cell by x643 to
+// x3,907, marches 97.8% of the time, and still merges no circles in four hours
+// because a single column cannot walk to thirty cells faster than they refill.
+// War Parties is the protein line that lifts it.
+export function marchesOut(game) {
   const h = game.hunt;
-  return !!(h && h.open && !h.march);
+  if (!h) return [];
+  return Array.isArray(h.marches) ? h.marches : [];
+}
+
+// `max` is handed in rather than read: it comes from the upgrade lines in
+// ants.js, and ants.js imports this file.
+export function marchReady(game, max) {
+  const h = game.hunt;
+  if (!h || !h.open) return false;
+  return marchesOut(game).length < Math.max(1, max || 1);
 }
 
 export function travelTime(cell) {
   return TRAVEL_SECONDS * cell.ring;
 }
 
-export function sendMarch(game, index, share) {
+export function sendMarch(game, index, share, max) {
   const h = game.hunt;
-  if (!marchReady(game)) return null;
+  if (!marchReady(game, max)) return null;
   const cell = cellAt(game, index);
-  if (!cell || !cell.monster) return null;
-  const part = Math.max(0.05, Math.min(1, share));
-  h.march = { cell: index, share: part, out: travelTime(cell), fighting: false, home: 0 };
-  return h.march;
+  if (!cell) return null;
+  // Something to fight, or -- once the residents are broken -- empty ground to
+  // walk onto and hold. Occupying is how a circle is ever completed.
+  const occupying = !cell.monster && !cell.held && canOccupy(game);
+  if (!cell.monster && !occupying) return null;
+  // no two columns to the same cell: they would arrive separately and the
+  // second would find nothing
+  if (marchesOut(game).some(m => m.cell === index)) return null;
+  // Whatever is already committed cannot be committed again. The armies share
+  // one colony, so the shares add up and the last one out gets what is left.
+  const committed = marchShare(game);
+  const room = Math.max(0, 1 - committed);
+  if (room <= 0.01) return null;
+  const part = Math.max(0.05, Math.min(room, share));
+  const march = { cell: index, share: part, out: travelTime(cell), fighting: false, home: 0 };
+  if (!Array.isArray(h.marches)) h.marches = [];
+  h.marches.push(march);
+  return march;
 }
 
 // how much of the colony's strength is away, and therefore not defending
+// Every column that is away, added together: the nest defends with whatever
+// none of them took.
 export function marchShare(game) {
-  const h = game.hunt;
-  return h && h.march ? h.march.share : 0;
+  let out = 0;
+  for (const m of marchesOut(game)) out += m.share;
+  return Math.min(1, out);
 }
 
 // A circle taken whole collapses inward and becomes the nest. The tier is
@@ -308,8 +471,14 @@ export function mergeTier(game) {
   const h = game.hunt;
   if (!h || !boardClear(game)) return false;
   h.tier = (h.tier || 0) + 1;
+  // The circle became the nest, so every door those Guards were holding is
+  // interior now and they walk back in. Rolling the new board drops the
+  // postings, which is the whole of bringing them home -- the ants themselves
+  // were never off the roster.
   // a new circle is rolled fresh, so the ground beyond is never the ground behind
   h.cells = newBoard();
+  h.baseLeft = 0;
+  h.baseCount = 0;
   h.spawnTimer = SPAWN_SECONDS;
   h.advanceTimer = ADVANCE_SECONDS;
   return true;
@@ -319,34 +488,45 @@ export function mergeTier(game) {
 // resolution belongs to raids.js and this module sits below it.
 export function marchTick(game, dt, fight) {
   const h = game.hunt;
-  if (!h || !h.march) return null;
-  const m = h.march;
+  const list = marchesOut(game);
+  if (!list.length) return null;
   let result = null;
-  if (m.out > 0) {
-    m.out = Math.max(0, m.out - dt);
-    if (m.out > 0) return null;
-    const cell = cellAt(game, m.cell);
-    // it may have walked off while the army was on the road, which is its own
-    // small lesson about sending an army a long way
-    if (cell && cell.monster) result = fight(cell);
-    m.home = travelTime(cell || { ring: 1 });
-    return result;
+  // walked backwards, because a column that gets home is spliced out
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (m.out > 0) {
+      m.out = Math.max(0, m.out - dt);
+      if (m.out > 0) continue;
+      const cell = cellAt(game, m.cell);
+      // it may have walked off while the army was on the road, which is its own
+      // small lesson about sending an army a long way
+      if (cell && cell.monster) result = fight(cell) || result;
+      // ...and empty ground is simply walked onto, with nobody to fight
+      else if (cell && !cell.held && canOccupy(game)) cell.held = true;
+      m.home = travelTime(cell || { ring: 1 });
+      continue;
+    }
+    if (m.home > 0) {
+      m.home = Math.max(0, m.home - dt);
+      if (m.home <= 0) list.splice(i, 1);
+    } else {
+      list.splice(i, 1);
+    }
   }
-  if (m.home > 0) {
-    m.home = Math.max(0, m.home - dt);
-    if (m.home <= 0) h.march = null;
-  } else {
-    h.march = null;
-  }
-  return null;
+  return result;
 }
 
-export function recallMarch(game) {
-  const h = game.hunt;
-  if (!h || !h.march || h.march.home > 0) return false;
-  const cell = cellAt(game, h.march.cell);
-  h.march.out = 0;
-  h.march.fighting = false;
-  h.march.home = travelTime(cell || { ring: 1 });
-  return true;
+// Recalls one column, or every column that is still on its way out.
+export function recallMarch(game, index) {
+  const list = marchesOut(game);
+  let any = false;
+  list.forEach((m, i) => {
+    if (index !== undefined && i !== index) return;
+    if (m.home > 0) return;
+    m.out = 0;
+    m.fighting = false;
+    m.home = travelTime(cellAt(game, m.cell) || { ring: 1 });
+    any = true;
+  });
+  return any;
 }

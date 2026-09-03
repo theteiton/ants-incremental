@@ -76,17 +76,40 @@ const castes = ["forager", "excavator", "nurse", "soldier"];
 for (let i = 0; i < 2080; i++) G.layEggs(100, castes[i % castes.length]);
 console.log("  eggs:", G.game.eggs.length);
 elementFor("btnBroodDetails").fire("click");
-const t0 = Date.now();
-elementFor("tabButton-ants").fire("click");
-const ms = Date.now() - t0;
+
+// How long one render takes, averaged, so a single unlucky sample cannot decide
+// the run.
+function renderCost(times) {
+  elementFor("tabButton-ants").fire("click");            // warm
+  const t0 = Date.now();
+  for (let i = 0; i < times; i++) elementFor("tabButton-ants").fire("click");
+  return (Date.now() - t0) / times;
+}
+
+const bigMs = renderCost(5);
 const rows = elementFor("broodWaitingList");
-console.log("  rows built:", rows.children.length, " one render:", ms + "ms (was 2,078 rows / 68ms)");
+const bigRows = rows.children.length;
+console.log("  rows built:", bigRows, " one render:", bigMs.toFixed(1) + "ms");
 console.log("  heading   :", elementFor("broodWaitingHead").textContent);
-note(rows.children.length <= 45, "the window still builds a row per batch");
-// The absolute figure is dominated by the shim, which allocates a stub node for
-// every querySelector -- what this can honestly assert is that the row count is
-// capped and the cost is far below the 68ms the uncapped window measured.
-note(ms < 45, "a render with it open costs " + ms + "ms, against 68ms uncapped");
+note(bigRows <= 45, "the window still builds a row per batch");
+
+// This USED to assert `ms < 45` against a wall clock. Measured ten times on an
+// unchanged tree that figure ranges 19-57ms -- the threshold sat inside its own
+// noise, and the suite failed intermittently under load with nothing wrong.
+// A wall-clock bound on a shim-dominated measurement is not a test.
+//
+// What the window actually promises is that it reads the FRONT of the queue
+// rather than all of it, so the honest assertion is a ratio: the same render
+// against a queue five hundred times smaller must cost about the same. That is
+// scale-free, so it does not care how loaded the machine is.
+const bigEggs = G.game.eggs.length;
+G.destroyEggRange(400, G.game.eggs.length - 1);
+const smallMs = renderCost(5);
+const ratio = bigMs / Math.max(0.2, smallMs);
+console.log("  " + bigEggs + " eggs: " + bigMs.toFixed(1) + "ms, " +
+  G.game.eggs.length + " eggs: " + smallMs.toFixed(1) + "ms  -> x" + ratio.toFixed(2));
+note(ratio < 4, "a 500x larger queue costs x" + ratio.toFixed(2) + " to render, so the " +
+  "window is walking the whole queue again");
 
 console.log("\n--- failures ---");
 console.log(fails.length ? fails.join("\n") : "none");

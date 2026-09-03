@@ -147,7 +147,7 @@ This is settled. Do not redesign it. If you think something is wrong, say so in 
 
 ## Current state
 
-Last updated 2 September 2026. Published and playable at the Pages URL below.
+Last updated 3 September 2026. Published and playable at the Pages URL below.
 
 **Built and working.** The founding phase plays end to end: the queen sheds her wings for 100 `reserves`, eggs cost 20 reserves each until the first worker emerges, the first four workers emerge as `nanitics` regardless of the caste chosen, and from then on eggs cost food and hatch into the selected caste. Foragers, excavators and nurses all do their jobs. Population gates at 16 / 64 / 256 are in.
 
@@ -410,6 +410,220 @@ to check whenever one is added.
 **A ladder's top must never move.** `ladder()` interpolates between its start and its top, so raising the top shifts every rung underneath it — and opening three more trials took the trials ladder from "five levels per playable trial" to 25, moving its fifth rung from 5 to 6 and taking a tier from anyone standing on it. The top counts all six trials now, built or not, so it cannot move again. Stepping from the start instead was tried and broke sixteen other values; the narrower fix was correct.
 
 **When layer 2 lands, the lifetime clock is the Matriline.** Not the bloodline: ants have hemolymph rather than blood, in an open system with no hemoglobin, so nothing about them is red or vessel-borne. Colonies genuinely are matrilineal — every worker descends from the queen, and each new nest is founded by her daughter — so the Matriline is the accurate word for the line of queens, and the right home for the total-time figure the header stopped showing when colony age began resetting. Layer 1 keeps *Lineage*; the two read as related without colliding.
+
+
+**The march fought with the troops that stayed home, and the Hunt therefore paid
+nothing at all.** `resolveRaid` computes the defending strength for both halves
+of the board — the breach at the gate and the column in the field — and read
+`combatPower × (1 - marchShare)` for both. For a breach that is right: soldiers
+away cannot defend. For a march it is inverted, so committing the army was what
+lost the fight and committing all of it fought at **zero**. Swept on a colony
+fielding 34,988 against a cell of 13,678: sending 5% won, 50% lost, 100% lost.
+Measured over six hours on three seeds the map held **0 of 30 cells, territory
+×1.000, and contributed ×1.0000 to the food rate** — a policy that marched at
+50% made 521 attempts, took no ground, and drove the colony from 9,257 ants to
+469. Playing the map was strictly worse than ignoring it. It is one share read
+from opposite ends now: `attacking ? share : 1 - share`.
+
+**Garrisons are not an enhancement to the Hunt, they are what makes it work.**
+Even with the sign corrected a commander held 1–2 of 30 cells over six hours,
+because a cell taken at t+11s was walked into at t+15s while the army was still
+on the road home and home defence was zero. Posting Phragmotic Guards on held
+ground gives the board its second decision and the Guard the only job that is
+hers alone: a garrisoned cell fights its own battle with its own Guards and the
+nest never stirs, while an ungarrisoned one drags the whole army to the
+frontier. Measured, posting **roughly quintuples the ground held — 7–10 of 30
+against 1–2 — and leaves the colony larger than never playing the board at
+all**, 10,780 ants against a 5,465 baseline on the same seed. Training Guards
+and *not* posting them is the worst of the three at 1,527–2,672 ants, which is
+the caste rule working: a Guard is a decision, not a strictly better soldier.
+Breaches rise from 8–13 to 126–133 and that is correct — there is five times as
+much ground to be walked into and each breach is one Guard on one cell rather
+than the colony being dragged across the map. **Posted equals held exactly**, so
+the Guard supply is the dial on territory.
+
+**`combatMultiplier()` is the single source for everything multiplying the whole
+army**, because the nest, a garrison and a marching column are the same soldiers
+under the same bonuses and three copies of that product would drift the first
+time a source was added. Every path that kills a Guard calls `clampGarrisons()`:
+a posting must never outlive the ant holding it.
+
+**A trial level cost 2.2 minutes on a mastered colony, and the target rule is
+why.** Only three of nine trials were food-measured, and a headcount was assumed
+to be bounded by the cap — it is not, because the cap mastery is ×2 a level, so
+five levels is ×32 room and 600 ants is a rounding error. A trial's ask now
+scales with the line's **undebuffed peak food rate**, which is self-scaling
+against every source of growth at once rather than against one mastery. Applied
+raw the scale came out at ×1,100,607 and made every food trial unclearable, so
+it goes as a **fractional power, per target kind**: a trial colony is refounded
+at nothing and grows for one sitting, so what it can reach is not proportional
+to its parent's peak. Swept at level 5 — power 0.25 gives Drought 18.9m and
+Barren Brood 20.2m, 0.50 gives the Repletes 25.4m and everything else >120m.
+Set at **population 0.25 and banked 0.5**, which is a **9× increase in what a
+trial level costs**. `foodRate` and `runFood` stay at 0.25, unchanged behaviour,
+because they do not respond below 0.5 and then cliff past reachable — the
+Nanitic Line especially, whose ceiling is hard by construction. `REFERENCE_FOOD_RATE`
+is 5e6, measured: an unmastered line holding the full lineage peaks at 4.90–5.18e6
+by the time the trials open, so a first-time player faces exactly the recorded
+numbers. `stats.peakFoodRate` is recorded outside a trial only, or a trial would
+raise the bar it is measured against.
+
+**Six species trials, one per species, each taking away the thing that species
+is.** The Blighted Garden, The Single Queen, Aposymbiotic, The Halted Column,
+The Broken Jars and The Failed Raid. Enterable only while playing her, so the
+per-species records already work; the debuff is `speciesTrialScale(game, id)`,
+which returns 1 unless that species' own trial is running, so every consuming
+site reads it unconditionally. Aposymbiotic divides where every other debuff
+multiplies, because a *cost* moves the other way. Fifteen trials now.
+
+**Do not compute a ladder top from anything that can grow.** This has now bitten
+twice in one release. `TRIAL_TIER_TOP` was `CHALLENGE_MAX_LEVEL × CHALLENGES.length`,
+so opening six trials moved it 45 → 75 and shifted every rung underneath.
+`BRANCH_TOTALS` was `definedLevelsIn()`, so adding three upgrade levels moved the
+totals 29/21/8 → 32/21/11 — swept, a save holding 29 or 30 upgrades lost a tier
+and one holding 8, 9 or 10 combat upgrades lost a tier. Both are literals now and
+both ladders are byte-identical to the shipped ones. An achievement level once
+earned is never taken back, and it pays food and hatch bonuses.
+
+**The brood is a nursery, not a queue.** Egg, larva, pupa — and only the larva
+eats. **The stage is derived from `progress` rather than stored**, so a v9 save
+loads unchanged and no migration was needed; `broodFedShare()` falls back to
+`fed ? 1 : 0` for an egg written under the old rule, so an in-flight egg is never
+charged twice. Protein moved from a lump at laying to a continuous draw across
+the larval stage at the same total — verified on an isolated egg at 0.0000 as an
+egg, **0.9924 as a larva**, 0.0000 as a pupa. Being fed is a matter of degree:
+a larva develops at `1 + (FED_EGG_SPEED − 1) × paid`, measured at 12.4s well fed,
+13.7s half starved, 16.5s unfed, so a colony short of protein slows rather than
+stops. **The first version billed on `rate × dt` while the larva advanced at the
+fed speed, so a fed larva outran its own bill and left the stage having paid 0.72
+of 1.00** — a 28% silent discount on every protein cost in the game.
+
+**Big foragers have names, and the detail belongs on the caste row.** They were
+always the only individuals in the game and were rendered as a count. The name is
+derived from the birth time rather than stored, so the roster stays an array of
+numbers; two sisters born in the same tick are nudged a microsecond apart, and
+because there are only 384 names a dozen sisters collide by the birthday problem,
+so a repeat is numbered rather than the namer trying to be unique. **A standing
+roster panel was built and cut**: ten rows converging on the same ×3.00 ceiling
+is noise, and the row names only the eldest and the newest, which are the two
+that carry information.
+
+**The colony keeps a chronicle** — an oversized daughter, the founders' generation
+ending, a circle merged, a flight, the first kill of a creature, a defeat costing
+twenty ants or more. **An entry stores the event, not the sentence**: written out
+in full it made a finished save 25.7% longer, and a save code that grows is a real
+cost because a truncated paste is the documented way importing fails. As a key and
+two parameters it is 17.6%, and the wording can be improved later without
+rewriting anybody's history.
+
+**The Hunt pays achievement tiers and has a Library group.** Ground held, Circles
+merged and Trophies taken, all reading lifetime figures so a flight cannot take a
+tier back; seven entries covering held ground, terrain, the march, the garrison,
+circles and tiers, trophies, and bands and grades. A detachment in the field also
+hunts at half rate — sending the army cost nothing in protein before.
+
+**War Parties, and why one column was the wall.** Measured on a mastered colony,
+it outguns the weakest cell on the board by **×643 to ×3,907** and marches
+**97.8% of the time**, and still merges no circles in four hours: power stopped
+being the constraint long ago, the road did not. Three protein levels buy a
+second, third and fourth column. The shares add up and the last column out gets
+what is left, so nothing can commit past the whole army; two columns may not be
+sent to one cell. **Deliberately not tagged with a mastery** — extended levels
+are worth half a defined one, and half an army is not a thing.
+
+**Every circle has residents, and they are what opens the ground.** A cell could
+only ever be claimed by killing something standing on it, so nineteen cells sat
+empty and unclaimable at any moment. 5–10 creatures now stand on a fresh circle
+when it opens, and **until every one of them is dead, empty ground cannot be
+occupied**; `baseLeft` is monotone, so a wandering spawn on a cleared cell does
+not re-lock it. Measured, residents cleared at about 2.5 hours and held ground
+went from 8–15 to **20–23 of 30**.
+
+**Holding ground costs what it is worth.** A defence battle scales with how much
+of the circle is occupied — `1 + 4 × (held/30)²`, so ×1.04 at three cells, ×1.16
+at six, ×2.00 at half and ×5.00 with the whole circle held. Mild early and steep
+late by design, so early expansion is free and a nearly-complete circle is
+defended at real cost; without it the optimal play is to rush every cell and
+fight for none of them. A march is unaffected: the pressure is about what you
+hold, not what you attack.
+
+**Restless ground is the first achievement bonus that is not another multiplier
+on growth**, and the only one with a gate: ×1.05 for every level past 25, times
+the trophy wall's `speed` kind. Measured it is a **trade rather than a gain** —
+faster spawning gives more to farm and makes ground harder to hold, taking held
+cells to 1 of 30 against 8–15 without it.
+
+**A circle still cannot be completed, and the reason is arithmetic.** `boardClear`
+needs all thirty cells held with no monster at one instant; a column to the rim
+travels 60s out and 60s back while a creature appears every 110s, so a round trip
+is slower than the board refills and the window never opens. Four columns absorb
+3.7 spawns per round trip, which keeps pace and never gets ahead. **Tiers are
+therefore still unreachable content.** The candidate fix is that spawning slows
+as the circle fills — thematically right, self-balancing against hold pressure,
+and it turns Restless ground into a real trade.
+
+**Prestige layer 3 — the Supercolony.** In `js/supercolony.js`, and it breaks all
+four properties the first two layers share: no reset, no currency, no tree, no
+completion. It was affordable because **286 of 342 exported model functions
+already take a colony as their first argument** — only `game.js` binds the global,
+at 73 of 74 — so nothing outside `game.js` changed. `NEST_KEYS` names the
+per-nest state and everything else is the line's; **listing what is per-nest
+rather than what is shared is the safe direction**, since a key nobody remembered
+stays shared, which is what it already was. A background nest is swapped into
+`game`, ticked through the **real** `tick()`, and swapped back — the away-report
+rule applies here too.
+
+**A daughter walks out, which is the whole difference between budding and a
+flight.** The first build gave her a blank founding colony and she sat at zero
+ants for ever, because nothing sheds a queen's wings in a colony nobody is
+watching. She leaves on foot with a tenth of the workers and a queen already in
+the column, so the mother is that many ants poorer and the daughter is alive from
+her first second. Measured: from a 4,900-ant mother she reached **1,849 ants in
+thirty minutes** while the mother kept growing.
+
+**Inheritance is exactly three traits, and that is the layer.** What is not sent
+is never hers. If a daughter inherited everything, generation N would be at least
+as strong as N−1 by construction and the line would run away — which is what
+happened to Polyergus at `CAPTURE_DIGGER_CAP` 4 and to veterancy before the Major
+ceiling. Fixed at three, a line **drifts** rather than accumulates and the set can
+never be completed. Eight traits, all scoped, none touching all food; two are
+earned by *how* a nest was played — no egg destroyed, no ant exiled — which is the
+first thing in this game to reward a style rather than a total. A nest is founded
+on a held cell, so the map is the cap and the Guard supply sets it: there is no
+`MAX_NESTS` constant. `networkAge()` counts **nest-hours** and buys nothing; it
+matures traits, so time is the mechanic and there is no third tree.
+
+**The Supercolony ships as a skeleton and is gated behind two finished species.**
+The panel founds on the first available cell with the first three traits, and
+**choosing the cell and the three is the actual feature and is not built**. Nests
+are not connected either — no trails, so a specialised nest cannot feed another
+one, which was the whole argument for the layer. The network yield is unmeasured:
+six nests producing is six times the food into one line. None of it affects a
+colony that has not opened it, which is why pacing is untouched.
+
+**A wall-clock assertion in a shim-dominated measurement is not a test.**
+`test/invariants.mjs` asserted `ms < 45` on one render of the brood window;
+measured ten times on an unchanged tree it ranges 19–57ms, so the threshold sat
+inside its own noise and the suite failed intermittently under load. It is a
+**ratio** now — the same render against a queue five hundred times smaller must
+cost about the same — measured at 1.94, 1.94, 2.26 and 2.20 while the absolute
+figures swung 30.8–50.8ms. Scale-free, and it still catches a window that walks
+the whole queue.
+
+**A tick cost quoted from one process is not a measurement either.** An early
+figure of 0.077ms was taken from a warmed process replaying four colonies and did
+not survive a controlled comparison; alternating the working tree against `git
+stash` three times each puts the tick at **0.16–0.31ms**, which is the number any
+multi-colony reasoning should use.
+
+**The nursery moved the idle pacing row by −4.7%.** Under the old rule feeding was
+decided in the single instant of laying, so an empty larder at that moment meant
+an unfed egg for its whole development however much protein arrived a second
+later. Continuous feeding means a raid feeds the larvae already in the chamber, so
+an idle colony — whose protein arrives in lumps between raids — feeds more of its
+brood. A rallying colony was already feeding nearly everything, which is why its
+row does not move. If the 4.7% is not wanted, the dial is `EGG_PROTEIN_COST`, not
+the stage model.
 
 ---
 

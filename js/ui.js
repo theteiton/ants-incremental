@@ -25,8 +25,10 @@ import {
   runPeakCount,
   wingYield,
   WING_FOOD,
-  WING_STRIP_TIME
-} from "./ants.js";
+  WING_STRIP_TIME,
+  broodStage, broodFedShare,
+  maxMarches, achievementSpawnBonus, achievementSpawnUnlocked, ACHIEVEMENT_SPAWN_RATE, ACHIEVEMENT_SPAWN_UNLOCK} from "./ants.js";
+import { nests as nestList, buddableCells, traitById, INHERIT_WIDTH } from "./supercolony.js";
 import { combatPerCaste, combatPower, hunting, huntRate, inHiding, HIDING_LOSS_STREAK,
   monsterPower, proteinPerSecond, raidsSeen, raidsUnlocked, RAID_WARNING,
   combatPerRank, huntingSoldiers, VETERAN_SHARE, WIN_LOSS_SHARE,
@@ -159,8 +161,10 @@ import {
   startRally,
   stripReady,
   stripWing,
-  tick
-} from "./game.js";
+  tick,
+  chronicleText,
+  budNest, focusNest, superReady, superProgress, networkNests, networkHours,
+  inheritableTraits} from "./game.js";
 import {
   buildAnts,
   buildExileDialog,
@@ -205,7 +209,8 @@ import { fmtFactor } from "./panels.js";
 import { RAID_UNLOCK } from "./raids.js";
 import { huntTerritory } from "./ants.js";
 import { huntUnlocked, heldCells, occupied, cellAt, cellName, cellPower,
-  marchReady, sendMarch, recallMarch, CELLS, SECTORS, RINGS } from "./hunt.js";
+  marchReady, sendMarch, recallMarch, marchesOut, CELLS, SECTORS, RINGS,
+  setGarrison, garrisonAvailable, garrisonedGuards, marchShare} from "./hunt.js";
 import { BANDS, MONSTERS, topGradeFor, bandById, trophyKindAt,
   trophyGradeValue } from "./bestiary.js";
 import { bandMonsters, bandHeld, bandComplete, bandMultiplier, trophyGrade,
@@ -528,7 +533,7 @@ function renderSlots(eggs, slots, tended) {
     const egg = i < tended ? eggs[i] : null;
     row.classList.toggle("empty", !egg);
     row.querySelector(".slot-caste").textContent = egg
-      ? CASTES[emergingCaste(game, egg, i)].name + (egg.fed ? " ·fed" : "")
+      ? broodLabel(game, egg, i)
       : "empty";
     row.querySelector(".bar i").style.width =
       egg ? Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1) + "%" : "0%";
@@ -599,6 +604,92 @@ function huntCellAt(x, y, size) {
   while (angle < 0) angle += Math.PI * 2;
   const sector = Math.floor((angle / (Math.PI * 2)) * SECTORS) % SECTORS;
   return (ring - 1) * SECTORS + sector;
+}
+
+
+// What a brood row says it is. The stage is the interesting part -- an egg, a
+// larva and a pupa are different animals doing different things -- and only a
+// larva has an appetite worth reporting.
+function broodLabel(game, egg, i) {
+  const stage = broodStage(egg);
+  const caste = CASTES[emergingCaste(game, egg, i)].name;
+  if (stage.id !== "larva") return caste + " · " + stage.name.toLowerCase();
+  const share = broodFedShare(egg);
+  const how = share >= 0.999 ? " ·fed" : share > 0 ? " ·feeding" : " ·hungry";
+  return caste + " · larva" + how;
+}
+
+
+// The colony's own account of itself, newest first.
+function renderChronicle() {
+  const log = Array.isArray(game.chronicle) ? game.chronicle : [];
+  setText(el("chronicleNote"), log.length
+    ? "What this line remembers, newest first."
+    : "Nothing worth remembering has happened yet.");
+  fillRows(el("chronicleList"), log.slice(0, 40).map(e => ({
+    pos: e.run >= 3600 ? (e.run / 3600).toFixed(1) + "h" : Math.round(e.run / 60) + "m",
+    what: chronicleText(e),
+    // explicitly null, or fillRows leaves the progress bar showing at an
+    // undefined width -- which is the stray red bar these rows had
+    progress: null,
+    note: ""
+  })));
+}
+
+
+// Layer 3. Nothing is reset and there is no currency: the network simply has
+// more nests in it, each running the real tick and each carrying whatever three
+// traits its mother chose to send.
+function renderNetwork() {
+  const open = superReady();
+  setHidden(el("networkBox"), !open);
+  if (!open) return;
+  const list = nestList(game);
+  const hours = networkHours() / 3600;
+  setText(el("networkNote"), networkNests() + (networkNests() === 1 ? " nest" : " nests") +
+    " running, " + hours.toFixed(2) + " nest-hours between them. A daughter is founded on " +
+    "ground you hold and walks out with a tenth of the workers; she keeps running whether " +
+    "you are watching her or not, and she carries exactly " + INHERIT_WIDTH +
+    " of this nest's traits — what you do not send, she never has.");
+
+  // NOT through fillRows: that helper owns the brood picker and binds every row
+  // it builds to it, so a network row would quietly reach into the brood.
+  const box = el("networkList");
+  while (box.children.length < list.length) {
+    const row = document.createElement("button");
+    row.className = "brood-row";
+    row.innerHTML = '<span class="brood-pos"></span><span class="brood-what"></span>' +
+      '<span class="brood-note"></span>';
+    // mousedown, for the same reason every other live list uses it: this panel
+    // redraws every frame and a node detached between down and up never gets
+    // its click
+    row.addEventListener("mousedown", () => {
+      const i = Number(row.dataset.nest);
+      if (i >= 0) { focusNest(i); render(); }
+    });
+    box.appendChild(row);
+  }
+  while (box.children.length > list.length) box.removeChild(box.lastChild);
+  list.forEach((nest, i) => {
+    const row = box.children[i];
+    row.dataset.nest = String(i);
+    const ants = Object.values(nest.ants || {}).reduce((a, b) => a + b, 0);
+    setText(row.querySelector(".brood-pos"), "Nest " + (i + 2));
+    setText(row.querySelector(".brood-what"),
+      (nest.traits || []).map(id => (traitById(id) || {}).name).filter(Boolean).join(", ")
+        || "no inheritance");
+    setText(row.querySelector(".brood-note"),
+      fmt(ants) + " ants · " + (nest.runTime / 3600).toFixed(1) + "h");
+  });
+
+  const spots = buddableCells(game);
+  setHidden(el("networkBud"), spots.length === 0);
+  if (spots.length) {
+    const carry = inheritableTraits().slice(0, INHERIT_WIDTH);
+    setText(el("networkBudNote"), spots.length + " held cell" + (spots.length === 1 ? "" : "s") +
+      " to found on. She would carry " +
+      (carry.length ? carry.map(t => t.name).join(", ") : "nothing — this nest has earned no traits yet") + ".");
+  }
 }
 
 function drawHuntMap() {
@@ -687,30 +778,60 @@ function renderHunt() {
   drawHuntMap();
 
   const cell = huntPick >= 0 ? cellAt(game, huntPick) : null;
-  const canSend = marchReady(game) && cell && cell.monster;
+  const canSend = marchReady(game, maxMarches(game)) && cell && cell.monster;
   setHidden(el("huntControls"), !canSend);
   if (canSend) {
     setText(el("huntTarget"), cellName(cell) + " at ring " + cell.ring +
       ", strength " + fmt(cellPower(game, cell, monsterPower(game))) +
       " against your " + fmt(combatPower(game)) + ".");
   }
+  // Posting a Guard is the other half of the board. An ungarrisoned cell drags
+  // the whole army out to the frontier when something walks into it; a
+  // garrisoned one answers its own door.
+  const canGarrison = cell && cell.held && !cell.monster;
+  const free = garrisonAvailable(game);
+  setHidden(el("huntGarrison"), !canGarrison);
+  if (canGarrison) {
+    setText(el("huntGarrisonState"), cell.guard > 0
+      ? cell.guard + (cell.guard === 1 ? " Guard holds" : " Guards hold") +
+        " this cell. It defends itself."
+      : free > 0
+        ? "Undefended. " + free + " Guard" + (free === 1 ? "" : "s") +
+          " free — one posted here means the nest never stirs for it."
+        : "Undefended, and no Guard is free. Train one in Units.");
+    setHidden(el("huntPost"), free <= 0);
+    setHidden(el("huntUnpost"), !cell.guard);
+  }
+
   setText(el("huntHint"), cell
-    ? (cell.monster ? "" : cell.held ? "Held. Nothing to fight here." : "Empty ground — nothing holds it.")
+    ? (cell.monster ? "" : cell.held
+        ? "Held. Nothing to fight here."
+        : "Empty ground — nothing holds it.")
     : "Point at a cell to choose where to send the army.");
 
-  const march = h.march;
-  setHidden(el("huntMarch"), !march);
-  setHidden(el("huntRecall"), !march || march.home > 0);
-  if (march) {
-    const target = cellAt(game, march.cell);
-    setText(el("huntMarch"), march.home > 0
-      ? "Marching home, " + Math.ceil(march.home) + "s. " +
-        Math.round(march.share * 100) + "% of the army is still out of position."
-      : march.out > 0
-        ? "On the march to " + (target ? cellName(target) || "empty ground" : "the field") +
-          ", " + Math.ceil(march.out) + "s out. " +
-          Math.round(march.share * 100) + "% of your strength cannot defend the nest."
-        : "Fighting.");
+  // War Parties buys more than one column, so this is a list now. Each says
+  // where it is and what it took with it; the last line says what is left at
+  // the gate, which is the number the decision actually turns on.
+  const out = marchesOut(game);
+  const max = maxMarches(game);
+  setHidden(el("huntMarch"), out.length === 0);
+  setHidden(el("huntRecall"), !out.some(m => m.home <= 0));
+  if (out.length) {
+    const lines = out.map(m => {
+      const target = cellAt(game, m.cell);
+      const who = Math.round(m.share * 100) + "%";
+      if (m.home > 0) return who + " marching home, " + Math.ceil(m.home) + "s";
+      if (m.out > 0) {
+        return who + " on the road to " +
+          (target ? cellName(target) || "empty ground" : "the field") +
+          ", " + Math.ceil(m.out) + "s out";
+      }
+      return who + " fighting at " + (target ? cellName(target) || "empty ground" : "the field");
+    });
+    const home = Math.round((1 - marchShare(game)) * 100);
+    lines.push(out.length + " of " + max + " column" + (max === 1 ? "" : "s") +
+      " in the field. " + home + "% of your strength is at the gate.");
+    setText(el("huntMarch"), lines.join(" · "));
   }
 }
 
@@ -2005,7 +2126,7 @@ function render() {
     else if (combatTab === "trophies") renderTrophies();
   }
   else if (activeTab === "prestige") renderPrestige();
-  else if (activeTab === "matriline") renderMatriline();
+  else if (activeTab === "matriline") { renderMatriline(); renderNetwork(); }
   else if (activeTab === "challenges") renderChallenges();
   else if (activeTab === "library") {
     // marked here rather than inside renderLibrary(), which only runs on the
@@ -2019,6 +2140,7 @@ function render() {
   else if (activeTab === "settings") {
     renderSettings();
     if (settingsTab === "formulas") renderFormulas();
+    if (settingsTab === "record") renderChronicle();
     const unlocked = !el("automationSection").hidden;
     el("automationLocked").hidden = unlocked;
   }
@@ -2533,7 +2655,7 @@ function updateBroodDialog() {
     picked: !!broodPick && broodPick.list === "tended" && broodPick.index === i,
     doomed: doomed(i),
     pos: "#" + (i + 1),
-    what: CASTES[emergingCaste(game, egg, i)].name + (egg.fed ? " ·fed" : ""),
+    what: broodLabel(game, egg, i),
     progress: Math.min(100, (egg.progress / EGG_TIME) * 100).toFixed(1),
     note: eggSecondsLeft(egg, i).toFixed(0) + "s"
   })));
@@ -2631,10 +2753,26 @@ el("huntMap").onclick = event => {
 };
 el("huntSend").onclick = () => {
   const share = Number(el("huntShare").value) || 0.5;
-  sendMarch(game, huntPick, share);
+  sendMarch(game, huntPick, share, maxMarches(game));
   render();
 };
-el("huntRecall").onclick = () => { recallMarch(game); render(); };
+el("huntRecall").onclick = () => { recallMarch(game); render(); };   // all of them
+el("networkBudBtn").onclick = () => {
+  const spots = buddableCells(game);
+  if (!spots.length) return;
+  budNest(spots[0].index, inheritableTraits().slice(0, INHERIT_WIDTH).map(t => t.id));
+  render();
+};
+el("huntPost").onclick = () => {
+  const cell = huntPick >= 0 ? cellAt(game, huntPick) : null;
+  if (cell) setGarrison(game, huntPick, (cell.guard || 0) + 1);
+  render();
+};
+el("huntUnpost").onclick = () => {
+  const cell = huntPick >= 0 ? cellAt(game, huntPick) : null;
+  if (cell) setGarrison(game, huntPick, Math.max(0, (cell.guard || 0) - 1));
+  render();
+};
 
 el("broodLimit").oninput = event => {
   setSetting("broodLimit", event.target.value.trim());

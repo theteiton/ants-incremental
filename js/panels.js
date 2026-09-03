@@ -19,8 +19,7 @@ import {
   populationCap,
   UPGRADES,
   upgradeOwned,
-  upgradeUnlocked
-} from "./ants.js";
+  upgradeUnlocked, bigForagerRoster} from "./ants.js";
 import { combatPerCaste, combatPerSoldier } from "./raids.js";
 import { rankOf } from "./ants.js";
 import {
@@ -337,9 +336,25 @@ function casteEffectText(id) {
       (rank.hunt > 0 ? " · hunts at " + fmt(rank.hunt * 100) + "%" : " · never hunts");
   }
   if (id === "bigforager") {
-    return held > 0
-      ? fmt(bigForagerOutput(game)) + "/s total (" + fmt(bigForagerOutput(game) / held) + " each, rising with age)"
-      : "";
+    if (held <= 0) return "";
+    // They are the only individuals in the game -- a handful of them, each with
+    // a birthday and a multiplier that grows the longer she survives. Naming
+    // them is worth it; a standing roster of ten near-identical rows was not,
+    // because once they are all at the x3 ceiling they read the same. So the
+    // detail lives on this row: who the oldest is, and where the youngest sits.
+    const roster = bigForagerRoster(game);
+    const out = bigForagerOutput(game);
+    const line = fmt(out) + "/s total (" + fmt(out / held) + " each, rising with age)";
+    if (!roster.length) return line;
+    const oldest = roster[0];
+    const youngest = roster[roster.length - 1];
+    const age = m => m < 60 ? Math.round(m) + "m" : (m / 60).toFixed(1) + "h";
+    const who = roster.length === 1
+      ? oldest.name + ", " + age(oldest.minutes) + " old, x" + oldest.mult.toFixed(2)
+      : oldest.name + " is the eldest at " + age(oldest.minutes) + " (x" +
+        oldest.mult.toFixed(2) + "), " + youngest.name + " the newest at " +
+        age(youngest.minutes) + " (x" + youngest.mult.toFixed(2) + ")";
+    return line + " · " + who;
   }
   const each = casteFoodPerSecond(game, id);
   return held > 0 ? fmt(each * held) + "/s total (" + fmt(each) + " each)" + armed : "";
