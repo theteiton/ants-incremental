@@ -834,10 +834,12 @@ export function renderInstincts(game) {
     // as a line at its last level, and leaving it on screen under that toggle
     // was simply a miss.
     setHidden(ui.card, owned && !!game.settings.hideOwned);
-    // Only a held one is dead. An instinct you cannot yet afford is not locked
-    // -- there is no gate on it, just a price -- so it stays live and readable
-    // rather than greyed out like something you have not unlocked.
-    ui.card.disabled = owned;
+    // A card you cannot pay for has to LOOK unavailable. Leaving it enabled
+    // meant `.upgrade:not(:disabled)` gave it the bright accent border that
+    // says "buy me", so an instinct forty-six points out of reach sat there
+    // looking affordable beside genuinely locked upgrade cards.
+    ui.card.classList.toggle("locked", !owned && !afford);
+    ui.card.disabled = owned || !afford;
   }
 }
 

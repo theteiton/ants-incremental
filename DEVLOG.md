@@ -15,6 +15,76 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.4.0.2 — 3 September 2026
+
+**The trials ask more, and a veteran no longer walks through them.**
+
+A trial's reward is permanent and every mastery makes the next trial easier, so
+the rewards were being earned for progressively less work. Measured, a colony
+holding every other mastery cleared Drought level 5 in **0.6 minutes against
+46.3 on a first run — 83x faster** across the whole ladder.
+
+**Two dials, both on what a trial ASKS. Nothing a trial pays was touched**, which
+is the older rule: a mastery is earned and taking it back is the wrong lever.
+
+**`LEVEL_STEP` is 1.666** — the ask rises by that much a level, so the fifth rung
+asks 7.7x the first. The ladder was flat before, and the reason is worth
+recording: the x2 food mastery a level pays almost exactly cancelled the x0.36
+drought, so levels 1 to 5 measured 44.5, 42.5, 46.7, 44.6 and 46.3 minutes. It
+is 40.3 / 53.4 / 70.0 / 87.3 / 92.1 now.
+
+**`MASTERY_POWER` is 0.59**, applied to the masteries that make each kind of
+target easy — cap and brood for a headcount or a bank, food for a rate or a run
+total. It is exactly 1 on a line that has cleared nothing, so a first run faces
+the numbers this file already records and no constant needed recalibrating.
+
+Measured against a **fully kitted veteran** — every trial mastered, every
+adaptation line bought out to its raised maximum, the whole matriline tree, the
+best species of the six, achievement level 33:
+
+| | first run | veteran |
+|---|---|---|
+| Drought L1 | 40.3m | 12.3m (3.3x faster) |
+| Drought L3 | 70.0m | 50.7m (1.4x faster) |
+| Drought L5 | 92.1m | 95.2m (parity) |
+| **all five** | **343m** | **242m — 1.42x faster** |
+
+**How the veteran is defined decides the answer.** A first attempt measured a
+veteran holding masteries but no bought upgrades and no matriline tree, and read
+1.0x — the veteran looked *slower*. Buying the lines is worth about 95 minutes
+at level 5 on its own. Any figure quoted for a veteran has to say what they were
+holding.
+
+**Sterile declares `ramp: 1`** and opts out of the per-level rise. Its debuff is
+the number of adaptation levels it will let you hold — 10, 7, 4, 2, then none —
+which already ramps savagely; multiplying the ask on top made level 2
+unclearable on a first run. It reads 52.9 / 38.3 / 30.3m now.
+
+**One implementation fault worth recording.** The first build multiplied the two
+new terms on top of the existing `colonyScale`, which reads the line's peak food
+rate — itself a product of every mastery. Three multiplications instead of two,
+and every trial went unclearable past level 3 on a first run and at every level
+on a veteran. The mastery term REPLACES that older term rather than joining it.
+
+### Known too easy, and deliberately not changed
+
+Sealed Nest, the Nanitic Line and the Repletes are all still trivial, and the
+numbers are recorded in the constants themselves so nobody has to re-measure:
+a first run reaches **5.66e4 food a second** against Sealed's ask of 400,
+**3.53e5 gathered** against the Nanitic Line's 28,000, and **8.37e6 banked**
+against the Repletes' 4e5.
+
+Corrected bases were tried and reverted, because one seed is not a calibration.
+The Nanitic Line proved it: it has a **ceiling by construction** — the founders
+fade, so there is a maximum any colony can extract — and at level 1 across four
+seeds the peak run-food is 3.36e5, 3.50e5, 3.39e5 and 3.39e5. A base of 3.5e5
+therefore sits exactly on that ceiling and only one seed in four can reach it at
+all. Sealed at 5e4 likewise put levels 3 and 5 out of reach on a first run.
+
+The Repletes need something else again: banked food is bounded by the replete
+store rather than by any mastery this scales on, so it is flat against the dial
+whatever the base. Each of the three needs its own multi-seed sweep.
+
 ## 0.4.0.1 — 3 September 2026
 
 **Hovering an instinct card crashed the game.**

@@ -1070,6 +1070,9 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 /* Instincts — what achievement tiers buy. Permanent, so they read as earned
    rather than as something the colony currently holds. */
+/* the instincts sit under the upgrade grid on the All filter, and ran
+   straight into the cards above them */
+#instinctPanel { margin-top: 26px; }
 #instinctList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .upgrade.instinct { border-left: 3px solid var(--good); }
 #matTabs { margin: 10px 0 4px; }

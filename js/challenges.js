@@ -63,6 +63,11 @@ export const DULOSIS_SCALE = 0.78;
 // the store sits full without blocking upgrades.
 export const REPLETE_PER_ANT = 800;
 export const REPLETE_SCALE = 0.62;        // per level
+// KNOWN TOO LOW. A first run peaks at 8.37e6 banked inside forty minutes
+// against this 4e5. Raising it to 8e6 put level 5 out of reach on a first run
+// while a veteran still cleared in 12.9m, because banked food is bounded by the
+// replete store rather than by any mastery this scales on -- it needs an index
+// of its own before the number is worth moving.
 export const REPLETE_TARGET_FOOD = 400000;
 
 export const FAIL_KINDS = {
@@ -150,11 +155,49 @@ export function colonyScale(game, power) {
 // not: the cap mastery is x2 a level, so five levels is x32 room and 600 ants
 // is a rounding error to a mastered colony. Every kind that grows with the
 // colony scales; a raid count is bounded by the clock and does not.
+// What a level asks over the one before it. Measured on Drought, the ladder was
+// FLAT -- 44.5, 42.5, 46.7, 44.6, 46.3 minutes -- because the x2 food mastery a
+// level pays almost exactly cancels the x0.36 drought, so the fifth rung cost
+// what the first did. This is the ramp: 44.5 to 107.5 minutes across the five.
+export const LEVEL_STEP = 1.666;
+
+// ...and what it asks of a line that has already cleared other trials. The
+// masteries are what make a later trial trivial -- x32 food, x32 cap, x32 brood,
+// x32 soldier -- so the ask is scaled by the same figures, which cancels by
+// construction and is exactly 1 on a line that has cleared nothing. Measured,
+// a mastered colony cleared Drought level 5 in 0.6 minutes against 46.3 fresh;
+// this holds the two within sight of each other without touching a single
+// reward, which is earned and should not be taken back.
+export const MASTERY_POWER = 0.59;
+
+// Which masteries make each kind of target easy. A headcount and a bank are
+// bounded by how many ants the colony can hold and how fast they arrive; a rate
+// and a run total are bounded by food.
+function masteryFor(game, kind) {
+  if (kind === "population" || kind === "banked") {
+    return masteryCap(game) * masteryBrood(game);
+  }
+  return masteryFood(game);
+}
+
 export function challengeTargetAmount(game, challenge) {
   const target = challengeTarget(challenge);
   const kind = TARGET_KINDS[target.kind];
-  return kind && kind.scales
-    ? Math.round(target.amount * colonyScale(game, kind.scales)) : target.amount;
+  if (!kind || !kind.scales) return target.amount;
+  // NOT multiplied by colonyScale as well. That term reads the line's peak food
+  // rate, which itself rises with every mastery, so stacking the two scaled the
+  // ask three times over -- measured, every trial became unclearable past level
+  // three on a fresh line and at every level on a mastered one. The mastery
+  // term replaces it rather than joining it.
+  // Sterile is the exception and says so in its own data: its debuff is the
+  // number of adaptation levels it will let you hold at once -- 10, 7, 4, 2 and
+  // then none -- which is already a savage ramp. Multiplying the ask on top of
+  // that made level 2 unclearable on a first run.
+  const level = challengeLevel(game, challenge.id) + 1;
+  const step = challenge.ramp === undefined ? LEVEL_STEP : challenge.ramp;
+  const ramp = Math.pow(step, Math.max(0, level - 1));
+  const held = Math.pow(masteryFor(game, target.kind), MASTERY_POWER);
+  return Math.round(target.amount * ramp * held);
 }
 
 // the debuff for the level being attempted, and the permanent reward held from
@@ -258,6 +301,11 @@ export const SEALED_SCALE = 0.40;
 // minutes and four and five at about 37. That is SEALED_SCALE at 0.40 against
 // a x2 cap mastery, which leaves the nest at 0.8^level -- a deliberately gentle
 // shrink. Steepening it is the lever if a five-step ramp is wanted.
+// KNOWN TOO LOW and deliberately left alone. Measured, a first run reaches
+// 5.66e4 food a second inside forty minutes against this ask of 400, so the
+// trial is over in under twenty seconds at every level. Raising it to 5e4 was
+// tried and made levels 3 and 5 unclearable on a first run: one seed is not a
+// calibration, and this needs its own sweep.
 export const SEALED_TARGET_RATE = 400;
 
 // Sterile. The colony may hold only so many bought adaptation levels at once,
@@ -300,6 +348,13 @@ export const CALLOW_SCALE = 2.15;
 // last -- the shape this trial was always meant to have, which the old 38,000
 // missed by asking for more than the last attempt could ever gather. Scaled by
 // the colony's food mastery, as SEALED_TARGET_RATE is.
+// KNOWN TOO LOW, and the reason this one is hard to fix is worth recording.
+// The Nanitic Line has a CEILING by construction -- the founders fade, so there
+// is a maximum any colony can extract before the line burns out. Measured at
+// level 1 on four seeds the peak run-food is 3.36e5, 3.50e5, 3.39e5 and 3.39e5,
+// so a target of 3.5e5 sits exactly on that ceiling and only one seed in four
+// can reach it at all. A base for this trial has to sit well under the ceiling,
+// and the ceiling itself moves with the level and with what the line holds.
 export const CALLOW_TARGET_FOOD = 28000;
 export const CHALLENGE_BASE_DEBUFF = 0.25;
 export const CHALLENGE_LEVEL_SCALE = 0.36;
@@ -427,6 +482,7 @@ export const CHALLENGES = [
     name: "Sterile",
     open: true,
     kind: "sterile",
+    ramp: 1,
     flavour: "Nothing the colony learns takes hold. Every generation begins from instinct alone.",
     debuff: "The colony can hold only a few bought adaptation levels at once, and fewer with every attempt \u2014 none at all on the last. Nest Memory does not run here: which few you hold is yours to decide, and nothing gives a level back.",
     // it denies you adaptations, so it gives adaptations back

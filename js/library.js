@@ -402,6 +402,15 @@ export function libraryUnread(game) {
 //
 // Newest first. A version stays on this list once it ships.
 export const UPDATES = [
+  { version: "0.4.0.2", name: "The trials ask more",
+    changes: [
+      "Trials were too easy once you had cleared a few. What a trial pays is permanent and stacks — every mastery makes the next trial simpler — so the rewards were being earned for less and less work.",
+      "The ask now rises ×1.666 a level. Level 5 asks about 7.7× what level 1 does; before, the ladder was flat and every level took about the same 45 minutes.",
+      "The ask also scales with the masteries you already hold, at ^0.59, so a line that has cleared everything no longer walks straight through whatever is left.",
+      "Measured on Drought: a first run goes from about 224 to 343 minutes for all five levels. A player holding every other mastery used to clear it 83× faster than a first run — that is now 1.4× faster.",
+      "Nothing you have earned was reduced. Every mastery pays exactly what it did; only what a trial asks has moved.",
+      "Sterile is exempt from the per-level rise, because the number of adaptations it lets you keep already falls hard with each attempt."
+    ] },
   { version: "0.4.0.0", name: "The ground fights back",
     changes: [
       "The Hunt was paying nothing at all. A column in the field fought with the soldiers who had stayed home, so committing your whole army fought at no strength — the map has never once added to what a colony gathers. It does now.",
