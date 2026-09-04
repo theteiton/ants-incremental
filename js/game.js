@@ -47,7 +47,7 @@ import {
   upgradeBranch,
   upgradeOwned,
   upgradeUnlocked, spawnRate,
-  maxMarches } from "./ants.js";
+  maxMarches, eggPricer, LARVA_FROM, LARVA_TO} from "./ants.js";
 import {
   foodPerProtein,
   EGG_PROTEIN_COST,
@@ -584,6 +584,9 @@ export function autoCaste() {
   return layableCastes(game).indexOf(caste) >= 0 ? caste : fallback;
 }
 
+// how many eggs the automation may lay in one tick
+const AUTO_LAY_BATCH = 64;
+
 function runAutomation() {
   if (automationOn("autoBuy")) {
     // every unlocked adaptation it can afford, not only ones owned before.
@@ -594,14 +597,29 @@ function runAutomation() {
   if (!automationOn("autoLay")) return;
   const caste = autoCaste();
   const reserve = foodReserve();
-  // top up the tended slots only: filling the queue would bury whatever the
-  // player lays by hand, which is the problem destroying eggs exists to undo
-  let guard = 0;
-  while (game.eggs.length < broodCapacity(game) && guard++ < 64) {
-    const cost = eggCost(game, caste);
-    if (cost.resource === "food" && game.food - cost.amount < reserve) break;
-    if (!layEgg(caste)) break;
+  // Top up the tended slots only: filling the queue would bury whatever the
+  // player lays by hand, which is the problem destroying eggs exists to undo.
+  //
+  // Laid as ONE batch. This used to call layEgg() up to sixty-four times, and
+  // every one of those invalidates the brood tally -- so the next iteration's
+  // casteStock() walked the whole brood again. At a million ants with five
+  // thousand eggs standing that is 64 x 5,169 walks in a single tick, and it
+  // measured 12.4ms of a 16.7ms frame against 0.41ms with laying switched off.
+  const room = Math.floor(broodCapacity(game) - game.eggs.length);
+  if (room <= 0) return;
+  const want = Math.min(AUTO_LAY_BATCH, room);
+  if (game.emerged === 0) {
+    // the founding phase spends reserves rather than food, and there are only
+    // ever a handful of eggs, so the simple path is fine and stays readable
+    let guard = 0;
+    while (game.eggs.length < broodCapacity(game) && guard++ < want) {
+      if (!layEgg(caste)) break;
+    }
+    return;
   }
+  const budget = Math.max(0, game.food - reserve);
+  const n = affordableBatch(caste, casteStock(game, caste), budget, want, game);
+  if (n > 0) layEggs(n, caste);
 }
 
 export function setNextCaste(casteId) {
@@ -872,6 +890,19 @@ function layOne(caste, stock) {
   return true;
 }
 
+// The same, without invalidating the tally: a batch does it once at the end.
+// layEggs() called this 100,000 times and paid for a fresh walk each time.
+function layOneQuiet(caste, stock, price) {
+  const resource = game.emerged === 0 ? "reserves" : "food";
+  const amount = game.emerged === 0 ? RESERVE_EGG_COST : price(stock + 1);
+  if (game[resource] < amount) return false;
+  game[resource] -= amount;
+  const freeShare = passiveFeedFree(game);
+  const free = freeShare > 0 && Math.random() < freeShare;
+  game.eggs.push({ caste, progress: 0, fed: free, free, paid: free ? 1 : 0 });
+  return true;
+}
+
 export function layEgg(casteId) {
   const caste = casteId || game.nextCaste;
   if (!canLay(caste)) return false;
@@ -888,11 +919,14 @@ export function layEggs(count, casteId) {
   let space = broodSlots(caste);
   let stock = casteStock(game, caste);
   let laid = 0;
-  while (laid < count && space > 0 && layOne(caste, stock)) {
+  // the price curve is built once for the whole batch, not once per egg
+  const price = eggPricer(game, caste);
+  while (laid < count && space > 0 && layOneQuiet(caste, stock, price)) {
     stock++;
     space--;
     laid++;
   }
+  if (laid) touchBrood();
   return laid;
 }
 
@@ -1538,19 +1572,39 @@ export function tick(dt, background) {
   const feedOn = game.settings.feedBrood !== false;
   // only the tended slots develop, so only they are walked -- scanning a
   // 187,000-egg queue every tick to skip all but the first 1,600 was wasted work
-  for (let i = Math.min(tended, game.eggs.length) - 1; i >= 0; i--) {
+  // Walked FORWARD and compacted in one pass. It used to walk backwards and
+  // splice each hatched egg out where it stood, which is O(n) per hatch and so
+  // O(n^2) per tick -- with a million-ant colony hatching thousands of eggs a
+  // tick that is the freeze. Survivors are written down over the gaps and the
+  // untended tail is shifted once, at the end, only if anything actually
+  // hatched.
+  const limit = Math.min(tended, game.eggs.length);
+  let write = 0;
+  let hatchedThisTick = 0;
+  // Everything constant for the whole tick, hoisted out of a loop that walks
+  // every tended egg: at a million ants the brood runs to hundreds of
+  // thousands, so a function call per egg is milliseconds of the frame.
+  const allFounders = callowActive(game);
+  const larvaFrom = LARVA_FROM * EGG_TIME;
+  const larvaTo = LARVA_TO * EGG_TIME;
+  const fedGain = FED_EGG_SPEED - 1;
+  const step = rate * dt;
+  for (let i = 0; i < limit; i++) {
     const egg = game.eggs[i];
-    const founding = emergingCaste(game, egg, i) === "nanitic";
+    // game.emerged is read live, not hoisted: it rises as eggs hatch inside
+    // this very loop, and in the founding phase that is what decides whether
+    // the next one out is a nanitic
+    const founding = allFounders || game.emerged + i < NANITIC_GENERATION;
     // A part-fed larva develops part-way between the two speeds rather than
     // falling off a cliff, so a colony that runs short of protein slows down
     // instead of stopping -- the same rule the old lump payment followed, made
     // continuous.
-    const share = broodFedShare(egg);
+    const share = egg.paid !== undefined ? egg.paid : (egg.fed ? 1 : 0);
     egg.fed = share > 0;
-    const wasLarva = broodStage(egg).id === "larva";
-    const delta = rate * dt * (1 + (FED_EGG_SPEED - 1) * share) *
-      (founding ? NANITIC_HATCH_SPEED : 1);
-    egg.progress += delta;
+    const at = egg.progress;
+    const wasLarva = at >= larvaFrom && at < larvaTo;
+    const delta = step * (1 + fedGain * share) * (founding ? NANITIC_HATCH_SPEED : 1);
+    egg.progress = at + delta;
     // ...and now it eats, for the part of the larval window it just crossed.
     // Charged on the progress ACTUALLY made rather than on `rate * dt`: a fed
     // larva moves at up to double speed, so billing it at the unfed rate let it
@@ -1566,7 +1620,8 @@ export function tick(dt, background) {
       }
     }
     if (egg.progress >= EGG_TIME) {
-      const caste = emergingCaste(game, egg);
+      const caste = allFounders || game.emerged < NANITIC_GENERATION
+        ? "nanitic" : egg.caste;
       if (caste === "forager" && rollBigForager()) {
         game.ants.bigforager++;
         // Her name is derived from her birth time, so two sisters emerging in
@@ -1584,9 +1639,16 @@ export function tick(dt, background) {
       }
       game.emerged++;
       game.stats.eggsHatched++;
-      game.eggs.splice(i, 1);
-      touchBrood();
+      hatchedThisTick++;
+    } else {
+      game.eggs[write++] = egg;
     }
+  }
+  if (hatchedThisTick) {
+    // one shift of the queue behind the tended window, rather than one per egg
+    for (let i = limit; i < game.eggs.length; i++) game.eggs[write++] = game.eggs[i];
+    game.eggs.length = write;
+    touchBrood();
   }
 
   // The ground around the nest. Monsters appear on the rim and walk inward,

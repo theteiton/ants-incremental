@@ -1139,6 +1139,21 @@ export function eggPrice(casteId, n, game) {
   return eggBase(game, curve) * Math.pow(n, exponent);
 }
 
+// The same price, with the constant part computed once. Every term in
+// eggBase() -- the matriline discount, the instincts, the species passive, the
+// midden, the trophy wall -- is identical for every egg in one batch, and
+// trophyEgg() alone walks all forty-nine creatures. Paying that per egg made
+// eggPrice cost about 2us, which is nothing until automation lays five
+// thousand of them in a single tick and the frame is gone.
+export function eggPricer(game, casteId) {
+  const curve = eggCurve(game, casteId);
+  const base = eggBase(game, curve);
+  const breakAt = curve.breakAt;
+  const exponent = curve.exponent;
+  const exponent2 = curve.exponent2;
+  return n => base * Math.pow(n, breakAt && n > breakAt ? exponent2 : exponent);
+}
+
 // What a run of eggs costs, without adding them up one at a time. Egg n costs
 // base * n^e, so the total from stock+1 to stock+count is a sum of powers --
 // close enough to the integral of the same curve that the midpoint rule is
