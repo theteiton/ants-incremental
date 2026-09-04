@@ -415,7 +415,8 @@ export const UPDATES = [
       "Six new trials, one for each species, each taking away the thing that species is: the garden, the second queen, the endosymbiont, the column, the jars, the captures.",
       "Trials ask more of a colony that has grown. A trial level used to fall in about two minutes once you were mastered; it now costs around twenty.",
       "The Supercolony. Once two species are finished, a daughter can walk out to ground you hold and found a nest of her own — carrying exactly three of this nest's traits, and no more. Both keep running.",
-      "Three new achievement tracks for the map, seven new library entries, and a new bonus at level 25 that brings creatures to the board sooner."
+      "Three new achievement tracks for the map, seven new library entries, and a new bonus at level 25 that brings creatures to the board sooner.",
+      "Instincts have moved to the Upgrades tab, beside Colony and Combat — they are bought and they are permanent, which makes them upgrades."
     ] },
   { version: "0.3.1.1", name: "Every trophy does something",
     changes: [

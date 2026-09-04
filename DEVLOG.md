@@ -15,6 +15,39 @@ Every release, newest first. Versions are `epoch.layer.feature.fix`:
 
 ---
 
+## 0.4.0.1 — 3 September 2026
+
+**Hovering an instinct card crashed the game.**
+
+`buildInstincts()` takes no arguments and `achievements.js` does not import the
+colony, so the note closure on every instinct card referenced a `game` that was
+never in scope. It threw `ReferenceError: game is not defined` on the first
+mouseenter — and because the cards are built at module scope, it fired whatever
+tab you were on.
+
+**The inspector is now swept by a test.** A note is a closure, so a symbol that
+is not in scope there throws only when a player points at it, and nothing in the
+suite had ever fired a mouseenter. `test/hover.mjs` walks every tab and sub-tab
+and hovers all 263 watched elements. It caught this one and nothing else.
+
+**The explanations are shorter.** The instincts page opened with a six-sentence
+paragraph and now reads "Instincts cost achievement points and are kept for
+good", followed by the count. The achievement bonus notes are a clause each —
+"Multiplies every caste at once", "Incubation is 24s divided by this" — and the
+instinct card note is one line rather than three headed sections. `buildBox`
+accepts a plain string as a note now, since most of them are one sentence.
+
+**Instincts moved to the Upgrades tab**, as a fourth branch filter beside All,
+Colony and Combat. They are bought and they are permanent, which makes them
+upgrades; achievements read as something extra rather than as part of the game,
+so a tree tucked inside them was easy to miss entirely.
+
+**The bottleneck line is gone.** "What the colony is short of" told a player
+that foragers are one source of food and that the brood caps how fast ants
+arrive, both of which the screen already shows. Removed from under the brood and
+from the away report; `colonyBottleneck()` stays in `game.js`, where the
+assistant still reads it.
+
 ## 0.4.0.0 — 3 September 2026
 
 **The Hunt was paying nothing at all, layer 3 exists, and the brood became a

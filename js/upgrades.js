@@ -79,6 +79,9 @@ import {
 import { activeChallenge, challengeDebuff, challengeReward, masteryFood } from "./challenges.js";
 import { buyUpgrade, game, markSeen, setSetting } from "./game.js";
 import { fmt, setText, fmtFactor, watch } from "./panels.js";
+import { renderInstincts } from "./achievements.js";
+
+function setHidden(node, hide) { if (node && node.hidden !== !!hide) node.hidden = !!hide; }
 
 const el = id => document.getElementById(id);
 
@@ -689,7 +692,8 @@ function sortedUpgrades() {
 const BRANCHES = [
   { id: "all", name: "All" },
   { id: "colony", name: "Colony" },
-  { id: "combat", name: "Combat" }
+  { id: "combat", name: "Combat" },
+  { id: "instincts", name: "Instincts" }
 ];
 
 export function buildUpgrades(onChange) {
@@ -891,6 +895,12 @@ export function renderUpgrades() {
   for (const button of el("upgradeFilters").children) {
     button.classList.toggle("active", button.dataset.branch === filter);
   }
+  // the instincts are a different tree with a different currency, so they get
+  // the panel to themselves rather than being mixed into the line cards
+  const onInstincts = filter === "instincts";
+  setHidden(el("instinctPanel"), !onInstincts);
+  setHidden(el("upgradeList"), onInstincts);
+  if (onInstincts) renderInstincts(game);
   markSeen("upgrades", affordableUpgrades());
 }
 

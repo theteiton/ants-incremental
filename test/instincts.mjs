@@ -9,9 +9,13 @@ G.game.prestige.flightsTaken = 2;
 G.game.settings.ratios = { forager: 80, excavator: 0, nurse: 5, soldier: 12 };
 for (let t = 0; t < 900; t++) G.tick(1);
 
-elementFor("tabButton-achievements").fire("click");
-elementFor("achievementTabs").children[2].fire("click");
-elementFor("tabButton-achievements").fire("click");
+// The instincts moved off the Achievements tab and onto Upgrades, as a fourth
+// branch filter beside All / Colony / Combat: they are bought and permanent,
+// which makes them upgrades, and achievements read as something extra.
+elementFor("tabButton-upgrades").fire("click");
+const instinctFilter = [...elementFor("upgradeFilters").children]
+  .find(b => b.textContent === "Instincts");
+instinctFilter.fire("click");
 
 const tail = () => elementFor("instinctIntro").textContent.slice(-62);
 

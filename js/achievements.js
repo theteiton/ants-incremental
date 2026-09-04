@@ -512,10 +512,13 @@ export function levelPoints(level) {
 
 const trackRows = {};
 
+// Instincts used to be a third sub-tab here. They are bought and they are
+// permanent, which makes them upgrades -- and achievements read as something
+// extra rather than as part of the game, so a tree tucked inside them was
+// easy to miss entirely. They live on the Upgrades tab now.
 const ACH_TABS = [
   { id: "tracks", name: "Tracks" },
-  { id: "bonuses", name: "Bonuses" },
-  { id: "instincts", name: "Instincts" }
+  { id: "bonuses", name: "Bonuses" }
 ];
 let achTab = "tracks";
 
@@ -527,18 +530,14 @@ const BONUS_BOXES = [
     formula: game => "×" + ACHIEVEMENT_FOOD_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_FOOD_RATE)) +
       " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementFoodBonus(game)),
-    note: game => "Level " + game.achievementLevel +
-      ". Every level is the same step up, and every level costs more XP than the one " +
-      "before it. It multiplies every caste at once." },
+    note: "Multiplies every caste at once." },
   { id: "jelly", name: "Richer jelly",
     desc: "A colony with a long record behind it sends off a better queen.",
     formula: game => "×" + ACHIEVEMENT_JELLY_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_JELLY_RATE)) +
       " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementJellyBonus(game)),
     value: game => "×" + fmt(achievementJellyBonus(game)) + " Royal Jelly",
-    note: game => "Level " + game.achievementLevel +
-      ". Every level is the same step up, and each costs more than the last. " +
-      "It multiplies what every nuptial flight pays." },
+    note: "Multiplies what every nuptial flight pays." },
   // The first achievement bonus that is not another multiplier on growth, and
   // the only one with a gate. It answers a problem that only exists very late:
   // a colony that outguns the whole board and marches without stopping still
@@ -553,20 +552,15 @@ const BONUS_BOXES = [
       ACHIEVEMENT_SPAWN_UNLOCK + " — you are at " + game.achievementLevel +
       " = ×" + fmt(achievementSpawnBonus(game)),
     note: game => achievementSpawnUnlocked(game)
-      ? "Level " + game.achievementLevel + ". Four columns in the field are worth " +
-        "nothing if there is nothing to march at, so this is what keeps a mastered " +
-        "colony's board full. The trophy wall speeds it too."
-      : "Nothing until level " + ACHIEVEMENT_SPAWN_UNLOCK + ", and deliberately so: " +
-        "a faster board is only useful to a colony that has already outgrown it." },
+      ? "Creatures reach the board sooner. The trophy wall speeds it too."
+      : "Locked until achievement level " + ACHIEVEMENT_SPAWN_UNLOCK + "." },
   { id: "hatch", name: "Warm brood",
     desc: "Levels also shorten how long an egg takes to develop.",
     value: game => "×" + fmt(achievementHatchBonus(game)) + " hatch speed",
     formula: game => "×" + ACHIEVEMENT_HATCH_RATE + " a level — ×" + fmt(achievementTop(ACHIEVEMENT_HATCH_RATE)) +
       " a level — you are at " +
       game.achievementLevel + " = ×" + fmt(achievementHatchBonus(game)),
-    note: game => "Level " + game.achievementLevel +
-      ". Every level is the same step up, and each costs more than the last. " +
-      "Incubation is 24s divided by this." }
+    note: "Incubation is 24s divided by this." }
 ];
 
 // One box per trial, because each trial gives back the thing it took. The
@@ -621,7 +615,9 @@ function buildBox(list, entry, game) {
     '<span class="bonus-formula"></span><span class="bonus-note"></span>';
   box.querySelector("b").textContent = entry.name;
   box.querySelector(".bonus-note").textContent = entry.desc;
-  watch(box, { title: entry.name, body: entry.desc, note: () => entry.note(game) });
+  // a note may be a plain string now that most of them are one sentence
+  watch(box, { title: entry.name, body: entry.desc,
+    note: () => typeof entry.note === "function" ? entry.note(game) : entry.note });
   bonusBoxes[entry.id] = {
     box,
     value: box.querySelector(".bonus-value"),
@@ -634,7 +630,6 @@ export function selectAchievementTab(name) {
   achTab = name;
   el("achievementPanel-tracks").hidden = name !== "tracks";
   el("achievementPanel-bonuses").hidden = name !== "bonuses";
-  el("achievementPanel-instincts").hidden = name !== "instincts";
   for (const button of el("achievementTabs").children) {
     button.classList.toggle("active", button.dataset.tab === name);
   }
@@ -738,21 +733,15 @@ function buildInstincts() {
     instinctCards[instinct.id] = { card, name: card.querySelector("b"),
       level: card.querySelector(".upgrade-level"), desc: card.querySelector(".upgrade-desc"),
       cost: card.querySelector(".upgrade-cost") };
+    // `game` is not in scope here and never was: buildInstincts() takes no
+    // arguments and this file does not import the colony, so every hover of an
+    // instinct card threw "game is not defined". The note does not need a live
+    // figure anyway -- the card already shows whether it is affordable.
     watch(card, {
       title: instinct.name,
       body: instinct.desc,
-      note: () => "HOW THIS IS BOUGHT\n" +
-        "  \u00b7 It costs " + instinct.cost + " points and you buy it by clicking it. " +
-        "Nothing here unlocks by itself.\n" +
-        "  \u00b7 A point is an achievement tier. All eight instincts spend from the same pool, " +
-        "so buying one leaves fewer for the others.\n" +
-        "  \u00b7 Spending never lowers your achievement level \u2014 the tiers still count towards it.\n\n" +
-        "WHAT IT COSTS YOU\n" +
-        "  \u00b7 " + instinct.cost + " of the " + instinctPoints(game) + " points you have left.\n\n" +
-        "WHAT IT PAYS\n" +
-        "  \u00b7 " + instinct.desc + "\n" +
-        "  \u00b7 Held for good: through a nuptial flight, a matriline and a trial alike.",
-      warn: false });
+      note: instinct.cost + " achievement points, kept for good — a flight, a " +
+        "matriline and a trial all keep it." });
   }
 }
 
@@ -761,14 +750,8 @@ export function renderInstincts(game) {
   const earned = game.achievementPoints || 0;
   const spent = instinctsSpent(game);
   setText(el("instinctIntro"),
-    "Nothing here unlocks on its own \u2014 you buy each one, by clicking it. Every achievement " +
-    "tier the colony has ever earned is one point, and all eight instincts draw on the same " +
-    "pool, so buying one leaves fewer for the rest. Spending never lowers your achievement " +
-    "level: the level is what the tiers scored, and this is what the same tiers can be spent " +
-    "on besides. Nothing bought here is ever lost \u2014 an instinct is held through a nuptial " +
-    "flight, a matriline and a trial alike. " +
-    "You have earned " + earned + " points, spent " + spent + ", and have " + available +
-    " left.");
+    "Instincts cost achievement points and are kept for good. " +
+    earned + " earned, " + spent + " spent, " + available + " left.");
   for (const instinct of INSTINCTS) {
     const ui = instinctCards[instinct.id];
     if (!ui) continue;
