@@ -902,7 +902,6 @@ export function renderUpgrades() {
   const onInstincts = filter === "instincts";
   const showInstincts = onInstincts || filter === "all";
   setHidden(el("instinctPanel"), !showInstincts);
-  setHidden(el("instinctHead"), onInstincts);
   setHidden(el("upgradeList"), onInstincts);
   if (showInstincts) renderInstincts(game);
   markSeen("upgrades", affordableUpgrades());

@@ -17,6 +17,8 @@ import { instinctOfflineHours, instinctKeptFood, instinctEggCost,
   instinctProtein } from "./instincts.js";
 import { fmt, fmtFactor, watch, setText, setClass, setWidth } from "./panels.js";
 
+function setHidden(node, hide) { if (node && node.hidden !== !!hide) node.hidden = !!hide; }
+
 import { INSTINCTS, instinctOwned, instinctPoints, instinctsSpent } from "./instincts.js";
 import { trophyCount } from "./trophies.js";
 import { CELLS } from "./hunt.js";
@@ -791,6 +793,12 @@ function instinctEffectText(game, instinct) {
 
 export function renderInstincts(game) {
   const available = instinctPoints(game);
+  // when Hide maxed empties the block entirely, the heading and the count go
+  // with it rather than leaving a title over nothing
+  const allHeld = INSTINCTS.every(i => instinctOwned(game, i.id));
+  const blank = allHeld && !!game.settings.hideOwned;
+  setHidden(el("instinctHead"), blank || game.settings.upgradeFilter === "instincts");
+  setHidden(el("instinctIntro"), blank);
   const earned = game.achievementPoints || 0;
   const spent = instinctsSpent(game);
   setText(el("instinctIntro"),
@@ -822,7 +830,14 @@ export function renderInstincts(game) {
     ui.cost.classList.toggle("affordable", !owned && afford);
     ui.cost.classList.toggle("owned-tag", owned);
     ui.card.classList.toggle("owned", owned);
-    ui.card.disabled = owned || !afford;
+    // Hide maxed applies here too: an instinct you hold is bought out, the same
+    // as a line at its last level, and leaving it on screen under that toggle
+    // was simply a miss.
+    setHidden(ui.card, owned && !!game.settings.hideOwned);
+    // Only a held one is dead. An instinct you cannot yet afford is not locked
+    // -- there is no gate on it, just a price -- so it stays live and readable
+    // rather than greyed out like something you have not unlocked.
+    ui.card.disabled = owned;
   }
 }
 
