@@ -10,8 +10,12 @@ import {
   CHALLENGES, CHALLENGE_MAX_LEVEL, CHALLENGE_REWARD_STEP,
   bestTrialLevel, trialLevelsEver, trialsWithMastery
 } from "./challenges.js";
-import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT } from "./ants.js";
-import { fmt, watch, setText, setClass, setWidth } from "./panels.js";
+import { bigForagerBonus, BIG_FORAGER_PRESTIGE_MULT, populationCap,
+  broodCapacity, hatchRate } from "./ants.js";
+import { combatPower } from "./raids.js";
+import { instinctOfflineHours, instinctKeptFood, instinctEggCost,
+  instinctProtein } from "./instincts.js";
+import { fmt, fmtFactor, watch, setText, setClass, setWidth } from "./panels.js";
 
 import { INSTINCTS, instinctOwned, instinctPoints, instinctsSpent } from "./instincts.js";
 import { trophyCount } from "./trophies.js";
@@ -727,11 +731,13 @@ function buildInstincts() {
     const card = document.createElement("button");
     card.className = "upgrade instinct";
     card.innerHTML = '<div class="upgrade-head"><b></b><span class="upgrade-level"></span></div>' +
-      '<span class="upgrade-desc"></span><span class="upgrade-cost"></span>';
+      '<span class="upgrade-desc"></span><span class="upgrade-effect"></span>' +
+      '<span class="upgrade-cost"></span>';
     card.addEventListener("click", () => onBuyInstinct(instinct.id));
     list.appendChild(card);
     instinctCards[instinct.id] = { card, name: card.querySelector("b"),
       level: card.querySelector(".upgrade-level"), desc: card.querySelector(".upgrade-desc"),
+      effect: card.querySelector(".upgrade-effect"),
       cost: card.querySelector(".upgrade-cost") };
     // `game` is not in scope here and never was: buildInstincts() takes no
     // arguments and this file does not import the colony, so every hover of an
@@ -745,6 +751,44 @@ function buildInstincts() {
   }
 }
 
+// What buying this instinct would actually do to the colony standing now, in
+// the same before-and-after shape the upgrade cards use. Probing costs a
+// population cap, a brood figure and a fighting strength per instinct, so it is
+// on the same 250ms clock the upgrade previews are on rather than every frame.
+const INSTINCT_PREVIEW_MS = 250;
+const instinctPreview = { at: 0, key: null, text: {} };
+
+function instinctProbe(game, id) {
+  const held = (game.instincts || []).slice();
+  if (held.indexOf(id) < 0) held.push(id);
+  return Object.assign({}, game, { instincts: held });
+}
+
+function instinctEffectText(game, instinct) {
+  const probe = instinctProbe(game, instinct.id);
+  const bits = [];
+  const cap = populationCap(game), capNow = populationCap(probe);
+  if (capNow !== cap) bits.push("cap " + fmt(cap) + " to " + fmt(capNow));
+  const brood = broodCapacity(game), broodNow = broodCapacity(probe);
+  if (broodNow !== brood) bits.push("brood " + fmt(brood) + " to " + fmt(broodNow));
+  const hatch = hatchRate(game), hatchNow = hatchRate(probe);
+  if (hatchNow !== hatch) bits.push("hatch ×" + fmtFactor(hatchNow / hatch));
+  // instinctEggCost, not eggCostMultiplier: the latter is the matriline's
+  // discount and does not read the instincts at all, so four cards that make an
+  // egg cheaper were reporting nothing
+  const egg = instinctEggCost(game), eggNow = instinctEggCost(probe);
+  if (eggNow !== egg) bits.push("eggs " + Math.round((1 - eggNow / egg) * 100) + "% cheaper");
+  const protein = instinctProtein(game), proteinNow = instinctProtein(probe);
+  if (proteinNow !== protein) bits.push("protein ×" + fmtFactor(proteinNow / protein));
+  const power = combatPower(game), powerNow = combatPower(probe);
+  if (powerNow !== power && power > 0) bits.push("strength ×" + fmtFactor(powerNow / power));
+  const off = instinctOfflineHours(game), offNow = instinctOfflineHours(probe);
+  if (offNow !== off) bits.push("+" + (offNow - off) + "h offline");
+  const kept = instinctKeptFood(game), keptNow = instinctKeptFood(probe);
+  if (keptNow !== kept) bits.push(Math.round(keptNow * 100) + "% of food kept on a flight");
+  return bits.join(" · ");
+}
+
 export function renderInstincts(game) {
   const available = instinctPoints(game);
   const earned = game.achievementPoints || 0;
@@ -752,6 +796,10 @@ export function renderInstincts(game) {
   setText(el("instinctIntro"),
     "Instincts cost achievement points and are kept for good. " +
     earned + " earned, " + spent + " spent, " + available + " left.");
+  const now = Date.now();
+  const key = (game.instincts || []).length + "|" + available;
+  const due = key !== instinctPreview.key || now - instinctPreview.at >= INSTINCT_PREVIEW_MS;
+  if (due) { instinctPreview.at = now; instinctPreview.key = key; }
   for (const instinct of INSTINCTS) {
     const ui = instinctCards[instinct.id];
     if (!ui) continue;
@@ -767,6 +815,10 @@ export function renderInstincts(game) {
       : afford
       ? "Click to buy \u2014 " + instinct.cost + " points"
       : instinct.cost + " points, " + (instinct.cost - available) + " more needed");
+    if (due) {
+      instinctPreview.text[instinct.id] = owned ? "" : instinctEffectText(game, instinct);
+    }
+    setText(ui.effect, instinctPreview.text[instinct.id] || "");
     ui.cost.classList.toggle("affordable", !owned && afford);
     ui.cost.classList.toggle("owned-tag", owned);
     ui.card.classList.toggle("owned", owned);

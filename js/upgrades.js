@@ -895,12 +895,16 @@ export function renderUpgrades() {
   for (const button of el("upgradeFilters").children) {
     button.classList.toggle("active", button.dataset.branch === filter);
   }
-  // the instincts are a different tree with a different currency, so they get
-  // the panel to themselves rather than being mixed into the line cards
+  // The instincts are a different tree with a different currency, so they keep
+  // their own block rather than being mixed into the line cards -- but "All"
+  // has to mean all of them, or the tree is invisible unless you already know
+  // to look for it, which is the problem moving it here was meant to solve.
   const onInstincts = filter === "instincts";
-  setHidden(el("instinctPanel"), !onInstincts);
+  const showInstincts = onInstincts || filter === "all";
+  setHidden(el("instinctPanel"), !showInstincts);
+  setHidden(el("instinctHead"), onInstincts);
   setHidden(el("upgradeList"), onInstincts);
-  if (onInstincts) renderInstincts(game);
+  if (showInstincts) renderInstincts(game);
   markSeen("upgrades", affordableUpgrades());
 }
 
