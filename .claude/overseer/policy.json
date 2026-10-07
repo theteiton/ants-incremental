@@ -1,0 +1,352 @@
+{
+  "_readme": "Overseer policy. Edit this file by hand; agents cannot change it. Decisions: allow (runs silently), ask (you get a prompt), deny (blocked). The most severe finding wins. Regexes are case-insensitive. Run `node .claude/tools/overseer-selftest.js` after any change.",
+  "version": 1,
+  "mode": "enforce",
+  "_mode": "enforce = decisions are applied. audit = decisions are only logged, nothing is blocked (use briefly while tuning).",
+  "profile": "balanced",
+  "_profile": "balanced = edits inside an agent's allowed area run silently. strict = every edit asks you first.",
+  "askAs": "ask",
+  "_askAs": "ask = show you a prompt. deny = block instead, and the agent is told to ask the lead (use this if prompts from subagents never reach you).",
+  "secrets": [
+    "**/.env",
+    "**/.env.*",
+    "!**/.env.example",
+    "!**/.env.sample",
+    "**/*.pem",
+    "**/*.key",
+    "**/*.pfx",
+    "**/*.p12",
+    "**/id_rsa*",
+    "**/id_ed25519*",
+    "**/.npmrc",
+    "**/.pypirc",
+    "**/.git-credentials",
+    "**/credentials*.json",
+    "**/secrets/**",
+    "**/.ssh/**",
+    "**/.aws/**"
+  ],
+  "_secrets": "Never readable or writable by any agent. Denied outright.",
+  "protectedWrite": [
+    ".claude/**",
+    "CLAUDE.md",
+    ".git/**"
+  ],
+  "_protectedWrite": "Agents are denied; the lead (main session) is asked. This protects the overseer, hooks, agents, settings and ledger from being changed by the agents they govern.",
+  "logsOnlyViaTool": [
+    "docs/agent-logs/**"
+  ],
+  "_logsOnlyViaTool": "Logs may only be written with `node .claude/tools/log-append.js`, so they stay append-only.",
+  "roles": {
+    "_comment": "write = folders/files this role may edit (relative to the project). [] = no edits. bash = log-append-only limits the role to the log tool.",
+    "manager": {
+      "write": [
+        "docs/**"
+      ]
+    },
+    "thinker": {
+      "write": [],
+      "bash": "log-append-only"
+    },
+    "game-designer": {
+      "write": [
+        "docs/**"
+      ]
+    },
+    "engineer": {
+      "write": [
+        "**"
+      ]
+    },
+    "developer": {
+      "write": [
+        "**"
+      ]
+    },
+    "ui-designer": {
+      "write": [
+        "**"
+      ]
+    },
+    "tester": {
+      "write": [
+        "test/**",
+        "tests/**",
+        "__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "scripts/**",
+        "docs/**"
+      ]
+    },
+    "reviewer": {
+      "write": []
+    },
+    "release-manager": {
+      "write": [
+        "CHANGELOG.md",
+        "package.json",
+        "docs/**",
+        "dist/**",
+        "build/**",
+        "release/**"
+      ]
+    },
+    "overseer": {
+      "write": [],
+      "bash": "log-append-only"
+    },
+    "_default": {
+      "write": [
+        "**"
+      ]
+    },
+    "lead": {
+      "write": [
+        "**"
+      ]
+    }
+  },
+  "bash": {
+    "default": "ask",
+    "denyWhole": [
+      {
+        "id": "pipe-to-interpreter",
+        "re": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^\\n]*\\|\\s*(sh|bash|zsh|iex|invoke-expression|powershell|pwsh|node|python3?|cmd)\\b",
+        "reason": "downloads and runs code in one step"
+      }
+    ],
+    "deny": [
+      {
+        "id": "wipe-root",
+        "re": "\\b(rm|rmdir|del|erase|rd|remove-item)\\b(?=[^;&|]*(?:\\s-[a-z]*r[a-z]*f|\\s-[a-z]*f[a-z]*r|\\s/s\\b|\\s-recurse\\b|\\s-r\\b))(?=[^;&|]*\\s(?:/|~|\\$home|%userprofile%|[a-z]:[\\\\/]?|\\*|\\.|\\.\\.)(?:\\s|$))",
+        "reason": "recursive delete of a root, drive, home or whole folder"
+      },
+      {
+        "id": "disk-system",
+        "re": "\\b(format(\\.com)?\\s+[a-z]:|diskpart|mkfs(\\.\\w+)?|dd\\s+if=|shutdown|reboot|poweroff|bcdedit|vssadmin|cipher\\s+/w)\\b",
+        "reason": "disk or system-level command"
+      },
+      {
+        "id": "invoke-expression",
+        "re": "\\b(iex|invoke-expression)\\b",
+        "reason": "runs text as code"
+      },
+      {
+        "id": "privilege",
+        "re": "\\b(sudo|runas|doas)\\b|\\bsu\\s+-",
+        "reason": "privilege escalation"
+      },
+      {
+        "id": "system-config",
+        "re": "\\b(reg(\\.exe)?\\s+(add|delete|import|save)|setx|schtasks|netsh|icacls|takeown|net\\s+(user|localgroup)|sc(\\.exe)?\\s+(create|config|delete)|wmic|regedit)\\b",
+        "reason": "changes system settings, accounts or scheduled tasks"
+      }
+    ],
+    "ask": [
+      {
+        "id": "recursive-delete",
+        "re": "\\b(rm|rmdir|del|erase|rd|remove-item|unlink|shred)\\b",
+        "reason": "deletes files"
+      },
+      {
+        "id": "git-change",
+        "re": "\\bgit\\b[^;&|]*\\b(add|commit|checkout|switch|restore|stash|merge|rebase|tag|reset|clean|cherry-pick|revert|pull|fetch|push|clone|submodule|worktree|am|apply|rm|mv|init)\\b",
+        "reason": "changes git history, the working tree or a remote"
+      },
+      {
+        "id": "package-install",
+        "re": "\\b(npm|pnpm|yarn|bun)\\s+(install|i|ci|add|remove|rm|uninstall|update|up|upgrade|link|publish|exec|dlx|create|init)\\b|\\bnpx\\b|\\b(pip3?|pipx|uv|poetry|gem|cargo|go)\\s+(install|add|get|publish)\\b|\\b(winget|choco|scoop|apt(-get)?|brew)\\b",
+        "reason": "installs or publishes packages"
+      },
+      {
+        "id": "network",
+        "re": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|ssh|scp|sftp|ftp|nc|ncat|telnet|rclone)\\b",
+        "reason": "uses the network or transfers data"
+      },
+      {
+        "id": "inline-code",
+        "re": "\\b(node|python3?|py|ruby|perl|php|deno|bun)\\s+(-e|-c|-p|--eval)\\b|\\b(powershell|pwsh)\\b[^;&|]*(-command|-c\\b|-encodedcommand|-enc\\b)|\\bbash\\s+-c\\b|\\bcmd(\\.exe)?\\s+/c\\b",
+        "reason": "runs inline code"
+      },
+      {
+        "id": "long-running",
+        "re": "\\bnpm\\s+(run\\s+)?(dev|start|serve|watch)\\b|\\bvite\\b(?!\\s+build)|\\bhttp\\.server\\b|\\bstart(-process)?\\b|\\bexplorer(\\.exe)?\\b",
+        "reason": "starts a long-running process or opens a program"
+      },
+      {
+        "id": "find-exec",
+        "re": "\\bfind\\b[^;&|]*-(exec|delete|ok)\\b",
+        "reason": "find with exec or delete"
+      },
+      {
+        "id": "publish-deploy",
+        "re": "\\b(gh\\s+\\w+|netlify|vercel|firebase|butler|wrangler|surge)\\b",
+        "reason": "publishes or deploys"
+      }
+    ],
+    "allow": [
+      {
+        "id": "read-only",
+        "readonly": true,
+        "re": "^(ls|dir|pwd|cat|type|head|tail|wc|grep|rg|findstr|where|which|tree|find|sort|uniq|diff|fc|date|echo|printf|true|false|cd|pushd|popd|get-childitem|get-content|select-string|test-path|set-location)\\b"
+      },
+      {
+        "id": "git-read",
+        "readonly": true,
+        "re": "^git\\s+(status|diff|log|show|rev-parse|ls-files|blame|describe|shortlog)\\b|^git\\s+branch(\\s+(--list|-a|-r|-v|-vv))*\\s*$|^git\\s+remote\\s+-v\\s*$|^git\\s+config\\s+--get\\b"
+      },
+      {
+        "id": "node-version",
+        "re": "^node\\s+(--version|-v)\\s*$"
+      },
+      {
+        "id": "npm-checks",
+        "re": "^npm\\s+(test|t|run\\s+(test|build|lint|check|typecheck|format:check)|ls|outdated|--version)\\b"
+      },
+      {
+        "id": "test-runners",
+        "re": "^(vitest|jest|mocha|eslint|pytest)\\b|^(python3?|py)\\s+-m\\s+(pytest|unittest)\\b"
+      },
+      {
+        "id": "retro-tools",
+        "exempt": true,
+        "agents": [
+          "lead"
+        ],
+        "re": "^node\\s+(?:\\./)?\\.claude[\\\\/]tools[\\\\/]retro-tools\\.js\\s+(snapshot|diff)\\s+[\\w.\\-]+\\s*$"
+      },
+      {
+        "id": "selftest",
+        "exempt": true,
+        "agents": [
+          "lead"
+        ],
+        "re": "^node\\s+(?:\\./)?\\.claude[\\\\/]tools[\\\\/]overseer-selftest\\.js\\s*$"
+      },
+      {
+        "id": "task-tool",
+        "exempt": true,
+        "agents": [
+          "lead"
+        ],
+        "re": "^node\\s+(?:\\./)?\\.claude[\\\\/]tools[\\\\/]task\\.js\\s+(start|status|list|finish|close|abandon)\\b"
+      }
+    ],
+    "_askEveryCommand": "true = every shell command asks you first (only the log tool and hard blocks are exceptions). Set false to let the allow list below run silently.",
+    "askEveryCommand": true,
+    "_sandboxRules": "Git operations that could reach beyond the sandbox. Blocked for agents; the lead is asked.",
+    "sandboxRules": [
+      {
+        "id": "git-leaves-sandbox",
+        "re": "\\bgit\\b[^;&|]*\\b(push|pull|fetch|clone|remote|worktree|submodule|update-ref|filter-branch|gc|prune|reflog|merge|rebase|tag)\\b",
+        "reason": "git operation that leaves the sandbox or changes other branches (only the user merges, with the task tool)"
+      },
+      {
+        "id": "git-escape",
+        "re": "\\bgit\\b[^;&|]*\\s(-C|--git-dir|--work-tree|--exec-path)\\b|\\bGIT_(DIR|WORK_TREE)=",
+        "reason": "points git at another folder or repository"
+      },
+      {
+        "id": "git-main-branch",
+        "re": "\\bgit\\b[^;&|]*\\b(checkout|switch|branch)\\b[^;&|]*\\b(main|master|develop|trunk)\\b",
+        "reason": "touches the main branch"
+      }
+    ],
+    "_protectedMentions": "A command that is not read-only and mentions any of these anywhere (even inside inline code) is treated as touching protected files.",
+    "protectedMentions": "\\.claude[\\\\/]|\\.claude\\b.*(settings|hooks|overseer|tools|agents|ledger|team-home)|CLAUDE\\.md|team-home\\.json|agent-logs|overseer[\\\\/.]|policy\\.json"
+  },
+  "web": {
+    "allowDomains": [
+      "docs.claude.com",
+      "code.claude.com",
+      "developer.mozilla.org",
+      "docs.github.com",
+      "nodejs.org",
+      "npmjs.com",
+      "w3.org",
+      "web.dev",
+      "phaser.io",
+      "pixijs.com",
+      "reactjs.org",
+      "react.dev",
+      "wikipedia.org"
+    ],
+    "denyHosts": [
+      "^localhost$",
+      "^127\\.",
+      "^0\\.0\\.0\\.0$",
+      "^10\\.",
+      "^192\\.168\\.",
+      "^172\\.(1[6-9]|2\\d|3[01])\\.",
+      "^169\\.254\\.",
+      "^\\[?::1\\]?$",
+      "\\.local$",
+      "\\.internal$"
+    ],
+    "searchAgents": [
+      "thinker",
+      "game-designer",
+      "manager",
+      "lead"
+    ]
+  },
+  "tools": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "TaskCreate",
+      "TaskUpdate",
+      "TaskGet",
+      "TaskList",
+      "TodoWrite",
+      "Skill",
+      "ToolSearch",
+      "AskUserQuestion",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "SendUserMessage"
+    ],
+    "agentSpawn": "allow",
+    "mcp": "ask",
+    "unknown": "ask"
+  },
+  "_sandbox": "required = agents may only change files inside a task sandbox (a separate git worktree). With no sandbox active, agents cannot edit the main app at all.",
+  "sandbox": {
+    "required": true
+  },
+  "gates": {
+    "_comment": "Before the user merges a task, each role below must have recorded one of the listed verdicts on the exact final commit. The task tool checks this; agents cannot merge.",
+    "verdicts": {
+      "tester": [
+        "ready",
+        "not-ready"
+      ],
+      "reviewer": [
+        "approve",
+        "request-changes"
+      ],
+      "overseer": [
+        "clear",
+        "block"
+      ]
+    },
+    "required": {
+      "tester": [
+        "ready"
+      ],
+      "reviewer": [
+        "approve"
+      ],
+      "overseer": [
+        "clear"
+      ]
+    },
+    "kitPaths": [
+      ".claude/**",
+      "CLAUDE.md",
+      ".gitignore"
+    ]
+  }
+}

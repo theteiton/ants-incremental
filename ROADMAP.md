@@ -1,9 +1,9 @@
 # Roadmap
 
-**This file is not canon.** `CLAUDE.md` and `GEMINI.md` hold what is settled and
+**This file is not canon.** `docs/CANON.md` holds what is settled and
 `DEVLOG.md` holds what shipped. This one holds what is planned and what is still
 undecided, and every line of it is arguable until it lands. When something here
-ships, it moves into the canon files and comes out of this one.
+ships, it moves into the canon file and comes out of this one.
 
 Last updated 2 September 2026, against 0.3.1.1.
 
