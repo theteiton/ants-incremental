@@ -61,6 +61,119 @@ function ownMemory(ctx, ap) {
 }
 const isDevNull = (w) => /^(\/dev\/null|nul|\$null)$/i.test(w);
 
+// ---------- auto mode ----------
+// autonomy.level = "auto": agents are never asked. Whatever the rules do not block runs; the rest is blocked with a reason.
+// The lead (the user's own session) still gets a question for the few user-gated things (push, publish, kit edits).
+const isAuto = (P) => !!(P && P.autonomy && P.autonomy.level === 'auto');
+const PENDING_DL = []; // files this decision would download; saved by main() once the command is allowed
+const DL_FILE = () => path.join(lib.LEDGER_DIR, 'downloads.json');
+const readDownloads = () => (lib.readJson(DL_FILE(), { files: [] }).files || []);
+const INTERPRETERS = /^(node|python3?|py|ruby|perl|php|deno|bun|sh|bash|zsh|powershell|pwsh|cmd|cscript|wscript|java|dotnet|npm|npx)(\.exe)?$/i;
+const EXEC_EXT = /\.(exe|msi|bat|cmd|ps1|psm1|vbs|vbe|scr|com|dll|lnk|jar|sh|reg|hta|cpl|msc)$/i;
+
+function askRule(ctx, r) {
+  const id = 'bash.' + r.id;
+  if (isAuto(ctx.policy) && r.auto) {
+    if (r.auto === 'allow') return D('allow', id, r.reason);
+    if (r.auto === 'deny') return D('deny', id, 'Blocked: ' + r.reason + '.');
+    if (r.auto === 'gate') return violation(ctx, id, 'Needs the user (not decided by agents): ' + r.reason + '. Tell the lead what you need and why.');
+  }
+  return D('ask', id, 'Needs your approval: ' + r.reason + '.');
+}
+
+// One URL, for WebFetch and for curl/wget in the shell.
+function checkUrl(ctx, raw, shell) {
+  const P = ctx.policy, W = P.web || {}, A = P.autonomy || {};
+  let u;
+  try { u = new URL(String(raw || '')); } catch (e) { return D('ask', 'web-url', 'The URL could not be parsed.'); }
+  if (!/^https?:$/.test(u.protocol)) return D('deny', 'web-scheme', 'Only http and https pages may be fetched.');
+  if (u.username || u.password) return D('deny', 'web-credentials-in-url', 'Links with a user name or password in them are not allowed.');
+  if (String(raw).length > (A.maxUrlLength || 1500)) return D('deny', 'web-long-url', 'The link is very long, which can smuggle data out. Shorten it.');
+  // data smuggled out in the query string or path of an otherwise harmless link
+  let tail = u.search + u.pathname;
+  try { tail = decodeURIComponent(tail); } catch (e) { /* keep the raw text */ }
+  if (lib.scrub(tail) !== tail || /[A-Za-z0-9+\/=_-]{48,}/.test(u.search)) return D('deny', 'web-secret-in-url', 'The link carries what looks like a key or an encoded blob in its query string. Nothing is sent out in links.');
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (shell && isAuto(P) && W.allowLoopbackInShell !== false && /^(localhost|127(\.\d+){3}|::1)$/.test(host)) {
+    return D('allow', 'web-loopback', 'Reads the project\'s own local server.');
+  }
+  for (const re of W.denyHosts || []) if (new RegExp(re, 'i').test(host)) return D('deny', 'web-private-host', 'Local and private network addresses may not be fetched (' + host + ').');
+  const full = host + u.pathname.toLowerCase();
+  for (const d of W.denyDomains || []) {
+    const dh = d.split('/')[0].toLowerCase();
+    if ((host === dh || host.endsWith('.' + dh)) && (!d.includes('/') || full.startsWith(d.toLowerCase()))) return D('deny', 'web-dropsite', 'Known data-drop or tunnel site (' + host + '): nothing is sent there.');
+  }
+  if ((W.allowDomains || []).some((d) => host === d || host.endsWith('.' + d))) return D('allow', 'web-allowed-domain', 'Fetch from an approved documentation site.');
+  if (isAuto(P) && A.openWeb) return D('allow', 'web-open', 'Public website, read only.');
+  return D('ask', 'web-new-domain', 'Fetching from a site not on the approved list (' + host + ').');
+}
+
+// curl / wget / iwr / irm. Public GET requests run; anything that sends data out or fetches a program does not.
+const NET_TOOLS = /^(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c)(\.exe)?$/i;
+function netCommand(ctx, ws, i0) {
+  const w = (ws[i0] || '').replace(/^.*[\\/]/, '');
+  if (!NET_TOOLS.test(w)) return null;
+  if (!isAuto(ctx.policy)) return D('ask', 'bash.network', 'Needs your approval: uses the network or transfers data.');
+  const name = w.toLowerCase().replace(/\.exe$/, '');
+  const ps = /^(iwr|irm|invoke-webrequest|invoke-restmethod)$/.test(name);
+  const wget = name === 'wget' || name === 'aria2c';
+  const args = ws.slice(i0 + 1);
+  const bad = (m) => D('deny', 'bash.net-upload', 'Blocked: ' + m + '. Only public GET requests may run from the shell.');
+  const urls = [], outs = [];
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k], l = a.toLowerCase(), nx = args[k + 1] || '';
+    if (ps) {
+      if (l === '-method' && /^(post|put|delete|patch|merge)$/i.test(nx)) return bad('sends data out (' + nx + ')');
+      if (['-body', '-infile', '-form', '-inputobject'].includes(l)) return bad('sends data out');
+      if (l === '-outfile') outs.push(nx);
+      if (l === '-uri' || l === '-url') urls.push(nx);
+    } else if (wget) {
+      if (/^--(post-data|post-file|body-data|body-file|upload-file)/i.test(a) || (/^--method=(post|put|delete|patch)/i.test(a))) return bad('sends data out');
+      if (l === '--method' && /^(post|put|delete|patch)$/i.test(nx)) return bad('sends data out (' + nx + ')');
+      if (a === '-O' || l === '--output-document') outs.push(nx);
+      if (/^--output-document=/i.test(a)) outs.push(a.split('=')[1]);
+    } else {
+      if (/^--(data|data-\w+|form|form-string|upload-file|json)(=|$)/.test(a)) return bad('sends data out');
+      if (/^-[A-Za-z]+$/.test(a) && /[dFT]/.test(a.slice(1))) return bad('sends data out');
+      if ((a === '-X' || l === '--request') && /^(post|put|delete|patch)$/i.test(nx)) return bad('sends data out (' + nx + ')');
+      if (/^-X(POST|PUT|DELETE|PATCH)$/i.test(a) || /^--request=(post|put|delete|patch)/i.test(a)) return bad('sends data out');
+      if (a === '-o' || l === '--output') outs.push(nx);
+      if (/^--output=/i.test(a)) outs.push(a.split('=')[1]);
+      if (l === '--url') urls.push(nx);
+    }
+    if (/^https?:\/\//i.test(a)) urls.push(a);
+    else if (/^[a-z][a-z0-9+.-]*:\/\//i.test(a)) return D('deny', 'web-scheme', 'Only http and https pages may be fetched.');
+  }
+  let res = D('allow', 'bash.web-get', 'Public GET request.');
+  for (const u of urls) {
+    const r = checkUrl(ctx, u, true);
+    if (r.d === 'deny' || r.d === 'ask') return r;
+  }
+  // output files: a program may not be fetched, and anything fetched may not be run later
+  const keepName = args.some((a) => a === '-O' || /^-[A-Za-z]*O[A-Za-z]*$/.test(a)) && !wget; // curl -O keeps the remote name
+  const names = outs.filter(Boolean).slice();
+  if (keepName || (wget && !outs.length)) for (const u of urls) { try { names.push(path.basename(new URL(u).pathname) || 'index.html'); } catch (e) { /* ignore */ } }
+  for (const n of names) {
+    if (EXEC_EXT.test(n)) return D('deny', 'bash.download-program', 'Blocked: downloads a program or script file (' + n + '). Agents may not fetch things to run.');
+    if (!INERT_EXT.test(n)) PENDING_DL.push(n);
+  }
+  return res;
+}
+const INERT_EXT = /\.(json|md|txt|csv|tsv|xml|ya?ml|html?|css|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|mp3|ogg|wav|flac|mp4|webm|pdf|map|wasm|glsl|atlas|tmx|tsx|log)$/i;
+const WRAP_RE = /^\s*(?:cmd(?:\.exe)?\s+\/[ck]|(?:powershell|pwsh)(?:\.exe)?\s+(?:-\w+\s+)*-c(?:ommand)?|(?:ba|z)?sh\s+-c)\s+([\s\S]+)$/i;
+
+// Running a file that came from the internet is the user's decision.
+function runsDownloaded(ctx, seg, ws, i0, input, extra) {
+  const known = readDownloads().concat(extra || []);
+  if (!known.length) return null;
+  const keys = new Set(known.map((f) => cmpCase(lib.posix(f)).replace(/^.*\//, '')));
+  const first = (ws[i0] || '').replace(/^.*[\\/]/, '');
+  const interp = INTERPRETERS.test(first);
+  const hit = ws.slice(i0).find((w, idx) => (idx === 0 ? !interp : interp) && keys.has(cmpCase(lib.posix(w)).replace(/^.*\//, '')));
+  if (!hit) return null;
+  return violation(ctx, 'bash.runs-downloaded', 'Blocked: "' + hit + '" came from the internet. Read it if you must, but running it is the user\'s decision.');
+}
+
 // A rule violation is a hard block for subagents and a question for the lead (who answers to you).
 const violation = (ctx, rule, reason) => D(ctx.isLead ? 'ask' : 'deny', rule, reason);
 const needSandbox = (ctx) => ctx.requireSandbox && !lib.SANDBOX;
@@ -189,15 +302,39 @@ function checkBash(ctx, input) {
   const sp = splitCommand(cmd);
   let result = null;
   if (sp.unbalanced) result = worst(result, D('ask', 'bash.unbalanced-quotes', 'The command has unbalanced quotes, so it cannot be checked.'));
-  if (sp.subst) result = worst(result, D('ask', 'bash.substitution', 'The command uses substitution or subshells, which cannot be checked.'));
-  if (sp.heredoc) result = worst(result, D('ask', 'bash.heredoc', 'The command embeds a heredoc, which cannot be checked.'));
+  // auto mode: substitutions and heredocs are common (git commit -m "$(cat <<EOF ...)", PowerShell $(...)). Their text is still
+  // scanned by every rule below, so they run; in supervised mode they ask.
+  if (sp.subst) result = worst(result, D(isAuto(P) ? 'allow' : 'ask', 'bash.substitution', 'The command uses substitution or subshells; its text was scanned but its result cannot be predicted.'));
+  if (sp.heredoc) result = worst(result, D(isAuto(P) ? 'allow' : 'ask', 'bash.heredoc', 'The command embeds a heredoc; its text was scanned.'));
   if (!sp.segs.length) return D('defer', 'empty', 'Empty command.');
 
   for (const seg of sp.segs) {
     let segRes = null;
+    // network commands, files from the internet, and the same inside cmd /c, powershell -command, bash -c
+    {
+      const ws0 = words(seg);
+      let j0 = 0;
+      while (j0 < ws0.length && /^[A-Za-z_]\w*=/.test(ws0[j0])) j0++;
+      const net = netCommand(ctx, ws0, j0);
+      if (net) segRes = worst(segRes, net);
+      const dl = runsDownloaded(ctx, seg, ws0, j0, input, PENDING_DL);
+      if (dl) segRes = worst(segRes, dl);
+      const wrap = seg.match(WRAP_RE);
+      if (wrap) {
+        for (const s2 of splitCommand(wrap[1].trim().replace(/^["']|["']$/g, '')).segs) {
+          const w2 = words(s2);
+          let k = 0;
+          while (k < w2.length && /^[A-Za-z_]\w*=/.test(w2[k])) k++;
+          const n2 = netCommand(ctx, w2, k);
+          if (n2) segRes = worst(segRes, n2);
+          const d2 = runsDownloaded(ctx, s2, w2, k, input, PENDING_DL);
+          if (d2) segRes = worst(segRes, d2);
+        }
+      }
+    }
     for (const r of B.deny || []) if (new RegExp(r.re, 'i').test(seg)) segRes = worst(segRes, D('deny', 'bash.' + r.id, 'Blocked: ' + r.reason + '.'));
     for (const r of B.sandboxRules || []) if (new RegExp(r.re, 'i').test(seg)) segRes = worst(segRes, violation(ctx, 'bash.' + r.id, 'Blocked: ' + r.reason + '.'));
-    for (const r of B.ask || []) if (new RegExp(r.re, 'i').test(seg)) segRes = worst(segRes, D('ask', 'bash.' + r.id, 'Needs your approval: ' + r.reason + '.'));
+    for (const r of B.ask || []) if (new RegExp(r.re, 'i').test(seg)) segRes = worst(segRes, askRule(ctx, r));
     let allowRule = null;
     for (const r of B.allow || []) {
       if (r.agents && !r.agents.includes(ctx.isLead ? 'lead' : ctx.agent)) continue;
@@ -242,13 +379,16 @@ function checkBash(ctx, input) {
       }
     }
 
+    if (role.bash === 'read-only' && !(allowRule && (allowRule.readonly || allowRule.id === 'team-tools'))) {
+      segRes = worst(segRes, D('deny', 'role-bash', 'The ' + ctx.agent + ' role may only run read-only commands (ls, cat, grep, git status/diff/log/show) and the log tool. Ask the lead to run anything else.'));
+    }
     if (!segRes || segRes.d === 'allow') {
       if (allowRule) segRes = worst(segRes, D('allow', 'bash.' + allowRule.id, 'Routine command.'));
-      else segRes = worst(segRes, D(B.default || 'ask', 'bash.unlisted', 'This command is not on the allow list.'));
+      else segRes = worst(segRes, D(isAuto(P) ? (B.autoDefault || 'allow') : (B.default || 'ask'), 'bash.unlisted', isAuto(P) ? 'Auto mode: nothing in the policy blocks this command.' : 'This command is not on the allow list.'));
     }
     result = worst(result, segRes);
   }
-  if (B.askEveryCommand && result.d === 'allow') {
+  if (B.askEveryCommand && !isAuto(P) && result.d === 'allow') {
     result = D('ask', result.rule, 'Every shell command asks you first (policy: askEveryCommand).');
   }
   return result;
@@ -258,17 +398,12 @@ function checkBash(ctx, input) {
 function checkWeb(ctx, tool, input) {
   const W = ctx.policy.web || {};
   if (tool === 'WebSearch') {
+    if (isAuto(ctx.policy) && (ctx.policy.autonomy || {}).openWeb) return D('allow', 'web-search', 'Web search (auto mode).');
     return (W.searchAgents || []).includes(ctx.isLead ? 'lead' : ctx.agent)
       ? D('allow', 'web-search', 'Web search by a research role.')
       : D('ask', 'web-search', 'Web search by a role that does not normally need it.');
   }
-  let u;
-  try { u = new URL(String(input.url || '')); } catch (e) { return D('ask', 'web-url', 'The URL could not be parsed.'); }
-  if (!/^https?:$/.test(u.protocol)) return D('deny', 'web-scheme', 'Only http and https pages may be fetched.');
-  const host = u.hostname.toLowerCase();
-  for (const re of W.denyHosts || []) if (new RegExp(re, 'i').test(host)) return D('deny', 'web-private-host', 'Local and private network addresses may not be fetched (' + host + ').');
-  if ((W.allowDomains || []).some((d) => host === d || host.endsWith('.' + d))) return D('allow', 'web-allowed-domain', 'Fetch from an approved documentation site.');
-  return D('ask', 'web-new-domain', 'Fetching from a site not on the approved list (' + host + ').');
+  return checkUrl(ctx, input.url, false);
 }
 
 function decide(ctx, tool, input) {
@@ -302,6 +437,7 @@ const readState = () => lib.readJson(STATE, { pending: {}, recent: {} });
 const writeState = (s) => { try { fs.mkdirSync(lib.LEDGER_DIR, { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(s), 'utf8'); } catch (e) { /* ignore */ } };
 
 function logDecision(ctx, input, dec, mode) {
+  let reps = 0;
   const detail = lib.describeTool(input.tool_name, input.tool_input);
   const row = {
     ts: new Date().toISOString(), event: 'decision', decision: dec.d, rule: dec.rule, agent: ctx.agent,
@@ -309,7 +445,7 @@ function logDecision(ctx, input, dec, mode) {
     tool_use_id: input.tool_use_id || null, mode, task: lib.TASK || null,
   };
   lib.appendJsonl(path.join(lib.LEDGER_DIR, 'overseer.jsonl'), row);
-  if (dec.d !== 'deny' && dec.d !== 'ask') return;
+  if (dec.d !== 'deny' && dec.d !== 'ask') return 0;
 
   lib.withLock('overseer-state', () => {
     const st = readState();
@@ -327,6 +463,13 @@ function logDecision(ctx, input, dec, mode) {
     const key = [ctx.agent, input.tool_name, detail, dec.rule].join('|');
     const repeat = dec.d === 'deny' && st.recent[key] && now - st.recent[key] < 60000;
     st.recent[key] = now;
+    if (dec.d === 'deny') {
+      st.counts = st.counts || {};
+      const c = st.counts[key] && now - st.counts[key].t < 600000 ? st.counts[key].n + 1 : 1;
+      st.counts[key] = { n: c, t: now };
+      for (const k of Object.keys(st.counts)) if (now - st.counts[k].t > 600000) delete st.counts[k];
+      reps = c;
+    }
     for (const k of Object.keys(st.recent)) if (now - st.recent[k] > 120000) delete st.recent[k];
     if (!repeat) {
       const n = lib.appendLogEntry('overseer', (num) => [
@@ -341,6 +484,7 @@ function logDecision(ctx, input, dec, mode) {
     }
     writeState(st);
   });
+  return reps;
 }
 
 // ---------- main ----------
@@ -366,16 +510,41 @@ function main() {
   if (!policy || !policy.bash || !policy.roles) {
     return emit(D('ask', 'policy-missing', 'The overseer policy file is missing or unreadable, so this action cannot be checked.'), ctx);
   }
+  // the self-test can try both modes
+  if (DRY && process.env.OVERSEER_LEVEL) {
+    policy.autonomy = Object.assign({}, policy.autonomy, { level: process.env.OVERSEER_LEVEL });
+    if (process.env.OVERSEER_LEVEL === 'supervised') policy.bash.askEveryCommand = true; // supervised = the old behaviour
+  }
   const tool = input.tool_name;
   const ti = Object.assign({ cwd: input.cwd }, input.tool_input || {});
   let dec = decide(ctx, tool, ti);
   if (dec.d === 'ask' && policy.askAs === 'deny') {
     dec = D('deny', dec.rule, dec.reason + ' This needs the user\'s approval: tell the lead what you need and why, and the lead will ask.');
   }
+  // auto mode: agents are never asked. A question becomes a block with a reason; the lead (the user's own session) is still asked.
+  if (dec.d === 'ask' && isAuto(policy) && !ctx.isLead && (policy.autonomy.agentAsk || 'deny') === 'deny') {
+    dec = D('deny', dec.rule, dec.reason + ' Auto mode: agents are never asked. If this is really needed, tell the lead what you need and why; the lead decides with the user.');
+  }
   // never silently approve edits or commands while in plan mode
   if (input.permission_mode === 'plan' && dec.d === 'allow' && !/^(Read|Grep|Glob|WebFetch|WebSearch)$/.test(tool)) dec = D('defer', dec.rule, dec.reason);
   const enforced = policy.mode !== 'audit';
-  if (!DRY) { try { logDecision(ctx, input, dec, enforced ? 'enforce' : 'audit'); } catch (e) { /* logging must never change the decision */ } }
+  let reps = 0;
+  if (!DRY) { try { reps = logDecision(ctx, input, dec, enforced ? 'enforce' : 'audit') || 0; } catch (e) { /* logging must never change the decision */ } }
+  const limit = (policy.autonomy && policy.autonomy.repeatBlockLimit) || 3;
+  if (dec.d === 'deny' && reps >= limit) {
+    dec = D('deny', dec.rule, dec.reason + ' STOP: this exact action has now been blocked ' + reps + ' times in the last 10 minutes. Do not try again. End your turn and report to the lead what you need and why.');
+  }
+  // remember files fetched from the internet, so nobody runs them later without the user
+  if (!DRY && enforced && dec.d !== 'deny' && PENDING_DL.length) {
+    try {
+      lib.withLock('downloads', () => {
+        const cur = lib.readJson(DL_FILE(), { files: [] });
+        cur.files = Array.from(new Set((cur.files || []).concat(PENDING_DL))).slice(-500);
+        fs.mkdirSync(lib.LEDGER_DIR, { recursive: true });
+        fs.writeFileSync(DL_FILE(), JSON.stringify(cur), 'utf8');
+      });
+    } catch (e) { /* ignore */ }
+  }
   if (!enforced) process.exit(0);
   emit(dec, ctx);
 }

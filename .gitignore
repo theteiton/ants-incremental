@@ -147,3 +147,4 @@ vite.config.ts.timestamp-*
 .claude/team-home.json
 docs/agent-logs
 docs/retro/*-memory-before
+.tmp

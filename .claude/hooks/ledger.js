@@ -122,6 +122,13 @@ function main() {
 
   if (event === 'SubagentStart') {
     lib.appendJsonl(ledgerFile, { ts: new Date().toISOString(), event, agent, agent_id: input.agent_id, session: input.session_id });
+    // Close the loop: hand the agent its open feedback and its measured pitfalls at the moment it starts.
+    if (lib.AGENTS.includes(agent)) {
+      try {
+        const brief = require('../tools/brief.js').buildBrief(agent);
+        fs.writeSync(1, JSON.stringify({ hookSpecificOutput: { hookEventName: 'SubagentStart', additionalContext: lib.clip(brief.replace(/\n/g, '\u0001'), 3600).replace(/\u0001/g, '\n') } }));
+      } catch (e) { /* the brief is a help, never a blocker */ }
+    }
     return;
   }
 
